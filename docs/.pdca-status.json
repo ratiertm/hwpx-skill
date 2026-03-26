@@ -1,0 +1,182 @@
+{
+  "version": "2.0",
+  "lastUpdated": "2026-03-26T21:55:47.041Z",
+  "activeFeatures": [
+    "agent-harness",
+    "hwpx",
+    "core",
+    "tests",
+    "cli-oneshot-autosave"
+  ],
+  "primaryFeature": "cli-oneshot-autosave",
+  "features": {
+    "agent-harness": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-26T12:46:30.605Z",
+        "lastUpdated": "2026-03-26T13:03:21.305Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/conftest.py"
+    },
+    "hwpx": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-26T12:46:37.340Z",
+        "lastUpdated": "2026-03-26T21:55:47.041Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/hwpx_cli.py"
+    },
+    "core": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-26T12:46:37.631Z",
+        "lastUpdated": "2026-03-26T12:57:20.441Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/core/table.py"
+    },
+    "tests": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-26T12:46:38.220Z",
+        "lastUpdated": "2026-03-26T12:59:59.526Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/tests/test_core.py"
+    },
+    "cli-oneshot-autosave": {
+      "phase": "plan",
+      "phaseNumber": 1,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [
+        "--file 모드에서 mutation 명령 후 자동 저장",
+        "연속 text add 호출 시 내용 누적",
+        "읽기 전용 명령은 파일 미수정",
+        "REPL 모드 영향 없음"
+      ],
+      "documents": {
+        "plan": "docs/01-plan/features/cli-oneshot-autosave.plan.md"
+      },
+      "timestamps": {
+        "started": "2026-03-26T14:50:00.000Z",
+        "lastUpdated": "2026-03-26T14:50:00.000Z"
+      },
+      "lastFile": null
+    }
+  },
+  "pipeline": {
+    "currentPhase": 1,
+    "level": "Dynamic",
+    "phaseHistory": []
+  },
+  "session": {
+    "startedAt": "2026-03-26T12:36:25.613Z",
+    "onboardingCompleted": false,
+    "lastActivity": "2026-03-26T21:55:47.041Z"
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-26T14:50:00.000Z",
+      "feature": "cli-oneshot-autosave",
+      "phase": "plan",
+      "action": "created"
+    },
+    {
+      "timestamp": "2026-03-26T14:43:47.907Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:43:54.883Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:00.829Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:11.801Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:17.462Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:22.645Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:28.203Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:33.427Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:38.315Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:43.156Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:48.327Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T14:44:53.359Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T21:55:47.041Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    }
+  ]
+}

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hwpx-skill-v1 - Prototype</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; padding: 16px; }
+    #app { max-width: 640px; margin: 0 auto; }
+    .screen { display: none; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 24px; }
+    .screen.active { display: block; }
+    h2 { margin-bottom: 16px; color: #333; }
+    h3 { margin: 16px 0 8px; color: #555; font-size: 15px; }
+    input, select, textarea {
+      width: 100%; padding: 10px; border: 1px solid #ccc;
+      border-radius: 4px; margin-bottom: 12px; font-size: 14px;
+      font-family: monospace;
+    }
+    button, .btn {
+      display: inline-block; padding: 10px 20px; background: #2563eb;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer;
+      font-size: 14px; text-decoration: none; margin: 4px 4px 4px 0;
+    }
+    button:hover, .btn:hover { background: #1d4ed8; }
+    button.secondary { background: #6b7280; }
+    button.secondary:hover { background: #4b5563; }
+    button.success { background: #16a34a; }
+    button.success:hover { background: #15803d; }
+    .error {
+      background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626;
+      padding: 12px; border-radius: 4px; margin-bottom: 12px; display: none;
+    }
+    .success-box {
+      background: #f0fdf4; border: 1px solid #86efac; color: #16a34a;
+      padding: 12px; border-radius: 4px; margin-bottom: 12px;
+    }
+    .terminal {
+      background: #1f2937; color: #10b981; padding: 16px; border-radius: 8px;
+      font-family: monospace; font-size: 13px; line-height: 1.6;
+      margin-bottom: 12px; white-space: pre-wrap; overflow-x: auto;
+    }
+    .terminal .prompt { color: #9ca3af; }
+    .terminal .output { color: #e5e7eb; }
+    .terminal .highlight { color: #fbbf24; }
+    .field-group { margin-bottom: 12px; }
+    .field-group label {
+      display: block; margin-bottom: 4px; font-weight: 600;
+      color: #555; font-size: 13px;
+    }
+    .nav-link {
+      color: #2563eb; text-decoration: underline; cursor: pointer;
+      font-size: 14px;
+    }
+    .step-badge {
+      display: inline-block; background: #dbeafe; color: #1d4ed8;
+      padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-bottom: 8px;
+    }
+    .doc-preview {
+      background: #fafafa; border: 1px solid #e5e7eb; border-radius: 4px;
+      padding: 16px; margin: 12px 0; font-size: 14px; line-height: 1.8;
+    }
+    .hancom-header {
+      background: #1a56db; color: white; padding: 8px 16px; border-radius: 4px 4px 0 0;
+      font-size: 13px; display: flex; justify-content: space-between;
+    }
+    .hancom-body {
+      border: 1px solid #d1d5db; border-top: none; border-radius: 0 0 4px 4px;
+      padding: 24px; min-height: 200px; background: white; line-height: 1.8;
+    }
+    .loading { text-align: center; padding: 40px; color: #6b7280; }
+    .loading .spinner {
+      display: inline-block; width: 32px; height: 32px;
+      border: 3px solid #e5e7eb; border-top-color: #2563eb;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .nav-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .info { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
+    @media (min-width: 768px) { #app { max-width: 720px; } }
+  </style>
+</head>
+<body>
+
+  <script type="application/json" id="prototype-manifest">
+  {
+    "feature": "hwpx-skill-v1",
+    "specFile": "hwpx-skill-v1.spec.md",
+    "version": "1",
+    "generatedFrom": "e2e-hwpx-skill-v1 spec",
+    "screens": ["create-doc", "add-loading", "extract-result", "hancom-view", "hancom-error", "llm-instruct", "llm-loading", "llm-result", "file-upload", "file-loading", "file-result"],
+    "specMapping": [
+      {"specId": "e2e-hwpx-skill-v1-001", "element": "[data-screen='create-doc']", "type": "Screen"},
+      {"specId": "e2e-hwpx-skill-v1-002", "element": "[data-action='create-and-add']", "type": "Connection"},
+      {"specId": "e2e-hwpx-skill-v1-003", "element": "[data-screen='add-loading']", "type": "Processing"},
+      {"specId": "e2e-hwpx-skill-v1-004", "element": "[data-screen='extract-result']", "type": "Response"},
+      {"specId": "e2e-hwpx-skill-v1-005", "element": "[data-error='file-error']", "type": "Error"},
+      {"specId": "e2e-hwpx-skill-v1-006", "element": "[data-action='extract-text']", "type": "Screen"},
+      {"specId": "e2e-hwpx-skill-v1-007", "element": "[data-action='extract-text']", "type": "Connection"},
+      {"specId": "e2e-hwpx-skill-v1-008", "element": "[data-screen='add-loading']", "type": "Processing"},
+      {"specId": "e2e-hwpx-skill-v1-009", "element": "[data-screen='extract-result']", "type": "Response"},
+      {"specId": "e2e-hwpx-skill-v1-010", "element": "[data-error='extract-error']", "type": "Error"},
+      {"specId": "e2e-hwpx-skill-v1-011", "element": "[data-screen='hancom-view']", "type": "Screen"},
+      {"specId": "e2e-hwpx-skill-v1-012", "element": "[data-action='open-hancom']", "type": "Connection"},
+      {"specId": "e2e-hwpx-skill-v1-013", "element": "[data-screen='hancom-view']", "type": "Processing"},
+      {"specId": "e2e-hwpx-skill-v1-014", "element": "[data-screen='hancom-view']", "type": "Response"},
+      {"specId": "e2e-hwpx-skill-v1-015", "element": "[data-screen='hancom-error']", "type": "Error"},
+      {"specId": "e2e-hwpx-skill-v1-016", "element": "[data-screen='llm-instruct']", "type": "Screen"},
+      {"specId": "e2e-hwpx-skill-v1-017", "element": "[data-action='llm-generate']", "type": "Connection"},
+      {"specId": "e2e-hwpx-skill-v1-018", "element": "[data-screen='llm-loading']", "type": "Processing"},
+      {"specId": "e2e-hwpx-skill-v1-019", "element": "[data-screen='llm-result']", "type": "Response"},
+      {"specId": "e2e-hwpx-skill-v1-020", "element": "[data-error='llm-error']", "type": "Error"},
+      {"specId": "e2e-hwpx-skill-v1-021", "element": "[data-screen='file-upload']", "type": "Screen"},
+      {"specId": "e2e-hwpx-skill-v1-022", "element": "[data-action='file-convert']", "type": "Connection"},
+      {"specId": "e2e-hwpx-skill-v1-023", "element": "[data-screen='file-loading']", "type": "Processing"},
+      {"specId": "e2e-hwpx-skill-v1-024", "element": "[data-screen='file-result']", "type": "Response"},
+      {"specId": "e2e-hwpx-skill-v1-025", "element": "[data-error='file-upload-error']", "type": "Error"}
+    ],
+    "interactions": [
+      {"screen": "create-doc", "element": "[data-action='create-and-add']", "action": "click", "result": "navigate", "target": "#add-loading"},
+      {"screen": "extract-result", "element": "[data-action='open-hancom']", "action": "click", "result": "navigate", "target": "#hancom-view"},
+      {"screen": "extract-result", "element": "[data-action='add-more']", "action": "click", "result": "navigate", "target": "#create-doc"},
+      {"screen": "hancom-view", "element": "[data-action='back-to-start']", "action": "click", "result": "navigate", "target": "#create-doc"}
+    ],
+    "fields": [
+      {"screen": "create-doc", "element": "[data-field='filename']", "type": "text", "required": true},
+      {"screen": "create-doc", "element": "[data-field='content']", "type": "textarea", "required": true}
+    ],
+    "errorStates": [
+      {"screen": "create-doc", "trigger": "empty filename", "element": "[data-error='file-error']", "message": "Error: File path is required"},
+      {"screen": "create-doc", "trigger": "invalid extension", "element": "[data-error='file-error']", "message": "Error: Not a .hwpx file"},
+      {"screen": "extract-result", "trigger": "file not found", "element": "[data-error='extract-error']", "message": "Error: File not found"}
+    ]
+  }
+  </script>
+
+  <div id="app">
+
+    <!-- Navigation Tabs -->
+    <div class="nav-bar" id="main-nav" style="margin-bottom: 16px;">
+      <button data-action="nav-direct" class="btn" style="font-size:12px;">Direct Input</button>
+      <button data-action="nav-llm" class="btn secondary" style="font-size:12px;">LLM Instruction</button>
+      <button data-action="nav-upload" class="btn secondary" style="font-size:12px;">File Upload</button>
+    </div>
+
+    <!-- Screen 1: Create Document & Add Text -->
+    <div data-screen="create-doc" data-spec-id="e2e-hwpx-skill-v1-001" class="screen">
+      <span class="step-badge">Interaction 1: Create + Add Text</span>
+      <h2>HWPX Document Generator</h2>
+      <p class="info">CLI-Anything-HWPX: AI 에이전트가 한글 문서를 자동 생성합니다.</p>
+
+      <div data-error="file-error" data-spec-id="e2e-hwpx-skill-v1-005" class="error"></div>
+
+      <div class="field-group">
+        <label for="filename">Output File Path</label>
+        <input data-field="filename" type="text" id="filename" placeholder="docs/report.hwpx" value="docs/report.hwpx">
+      </div>
+
+      <div class="field-group">
+        <label for="content">Text Content (each line = 1 paragraph)</label>
+        <textarea data-field="content" id="content" rows="6" placeholder="프로그램 구조 설계서&#10;&#10;1. 개요&#10;이 프로젝트는 CLI-Anything과 python-hwpx를 결합합니다.">프로그램 구조 설계서
+
+1. 개요
+이 프로젝트는 CLI-Anything과 python-hwpx를 결합하여
+AI 에이전트가 한글 문서를 자동으로 생성합니다.</textarea>
+      </div>
+
+      <div class="terminal">
+<span class="prompt">$</span> cli-anything-hwpx document new --output <span data-mock="cmd.filename" class="highlight">docs/report.hwpx</span>
+<span class="output">Created new document: docs/report.hwpx</span>
+
+<span class="prompt">$</span> cli-anything-hwpx --file <span class="highlight">docs/report.hwpx</span> text add "<span data-mock="cmd.firstline" class="highlight">프로그램 구조 설계서</span>"
+<span class="output">Added paragraph: 프로그램 구조 설계서...</span></div>
+
+      <button data-action="create-and-add" data-spec-id="e2e-hwpx-skill-v1-002">Generate Document</button>
+      <button data-action="show-error" class="secondary">Simulate Error</button>
+    </div>
+
+    <!-- Loading Screen -->
+    <div data-screen="add-loading" data-spec-id="e2e-hwpx-skill-v1-003" data-state="loading" class="screen">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 16px;">Processing: python-hwpx writing to .hwpx file...</p>
+        <p class="info">Storage: .hwpx file (ZIP+XML) -- WRITE</p>
+      </div>
+    </div>
+
+    <!-- Screen 2: Extract Result -->
+    <div data-screen="extract-result" data-spec-id="e2e-hwpx-skill-v1-009" class="screen">
+      <span class="step-badge">Interaction 2: Extract & Verify</span>
+      <h2>Document Created Successfully</h2>
+
+      <div data-error="extract-error" data-spec-id="e2e-hwpx-skill-v1-010" class="error"></div>
+
+      <div class="success-box">
+        <strong>File saved:</strong> <span data-mock="result.filename">docs/report.hwpx</span>
+      </div>
+
+      <h3>cli-anything-hwpx text extract result:</h3>
+      <div class="terminal">
+<span class="prompt">$</span> cli-anything-hwpx --file <span class="highlight" data-mock="result.filename">docs/report.hwpx</span> text extract
+<span class="output" data-mock="result.content">프로그램 구조 설계서
+
+1. 개요
+이 프로젝트는 CLI-Anything과 python-hwpx를 결합하여
+AI 에이전트가 한글 문서를 자동으로 생성합니다.</span></div>
+
+      <div class="nav-bar">
+        <button data-action="open-hancom" data-spec-id="e2e-hwpx-skill-v1-012" class="success">Open in Hancom Office</button>
+        <button data-action="add-more" class="secondary">Add More Text</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Hancom Office View -->
+    <div data-screen="hancom-view" data-spec-id="e2e-hwpx-skill-v1-011" class="screen">
+      <span class="step-badge">Interaction 3: Hancom Office</span>
+      <h2>Hancom Office Preview</h2>
+
+      <div class="hancom-header">
+        <span>한컴오피스 한글 - <span data-mock="result.filename">docs/report.hwpx</span></span>
+        <span>100%</span>
+      </div>
+      <div class="hancom-body" data-spec-id="e2e-hwpx-skill-v1-014">
+        <div data-mock="hancom.content" style="font-family: serif;">
+          <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">프로그램 구조 설계서</p>
+          <p style="margin-bottom: 8px;">&nbsp;</p>
+          <p style="font-weight: bold; margin-bottom: 8px;">1. 개요</p>
+          <p style="margin-bottom: 4px;">이 프로젝트는 CLI-Anything과 python-hwpx를 결합하여</p>
+          <p>AI 에이전트가 한글 문서를 자동으로 생성합니다.</p>
+        </div>
+      </div>
+
+      <p class="info" style="margin-top: 12px;">Korean text rendered correctly. Default font: 함초롬돋움. Page: A4.</p>
+
+      <div class="nav-bar" style="margin-top: 12px;">
+        <button data-action="show-hancom-error" class="secondary">Simulate File Error</button>
+        <button data-action="back-to-start" class="secondary">Back to Start</button>
+      </div>
+    </div>
+
+    <!-- Hancom Error Screen -->
+    <div data-screen="hancom-error" data-spec-id="e2e-hwpx-skill-v1-015" class="screen">
+      <span class="step-badge">Error: Hancom Office</span>
+      <h2>Hancom Office - Error</h2>
+      <div class="error" style="display: block;">
+        <strong>파일이 손상되었습니다</strong><br>
+        Invalid XML structure in section0.xml: missing required &lt;hp:pic&gt; child elements (shapeObject, shapeRect, imgRect, imgDim, img)
+      </div>
+      <p class="info">This error occurs when HWPX pic elements lack required sub-elements for size/position.</p>
+      <button data-action="back-to-start">Back to Start</button>
+    </div>
+
+    <!-- Screen 4: LLM Instruction -->
+    <div data-screen="llm-instruct" data-spec-id="e2e-hwpx-skill-v1-016" class="screen">
+      <span class="step-badge">Interaction 4: LLM Instruction</span>
+      <h2>AI Agent Instruction</h2>
+      <p class="info">자연어로 지시하면 AI 에이전트가 CLI 명령어를 생성하여 한글 문서를 만듭니다.</p>
+
+      <div data-error="llm-error" data-spec-id="e2e-hwpx-skill-v1-020" class="error"></div>
+
+      <div class="field-group">
+        <label for="llm-output">Output File Path</label>
+        <input data-field="llm-output" type="text" id="llm-output" value="docs/ai-generated.hwpx">
+      </div>
+
+      <div class="field-group">
+        <label for="llm-instruction">AI Instruction (자연어 지시문)</label>
+        <textarea data-field="llm-instruction" id="llm-instruction" rows="4" placeholder="예: 이 프로그램의 특징을 10가지로 정리해서 한글 문서로 만들어줘">이 프로그램의 특징을 한글로 적어줘</textarea>
+      </div>
+
+      <div class="terminal">
+<span class="prompt">User:</span> <span class="highlight">"이 프로그램의 특징을 한글로 적어줘"</span>
+
+<span class="prompt">AI Agent:</span> <span class="output">SKILL.md를 읽고 CLI 명령어 시퀀스를 생성합니다...</span>
+<span class="prompt">$</span> cli-anything-hwpx document new --output docs/ai-generated.hwpx
+<span class="prompt">$</span> cli-anything-hwpx --file docs/ai-generated.hwpx text add "1. 한컴오피스 설치 불필요"
+<span class="prompt">$</span> cli-anything-hwpx --file docs/ai-generated.hwpx text add "2. AI 에이전트 자동 생성"
+<span class="output">...</span></div>
+
+      <button data-action="llm-generate" data-spec-id="e2e-hwpx-skill-v1-017">Generate with AI</button>
+      <button data-action="llm-show-error" class="secondary">Simulate Error</button>
+    </div>
+
+    <!-- LLM Loading -->
+    <div data-screen="llm-loading" data-spec-id="e2e-hwpx-skill-v1-018" data-state="loading" class="screen">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 16px;">AI Agent processing instruction...</p>
+        <p class="info">AI reads SKILL.md -> generates CLI commands -> executes sequentially</p>
+        <p class="info">Storage: .hwpx file (ZIP+XML) -- WRITE</p>
+      </div>
+    </div>
+
+    <!-- LLM Result -->
+    <div data-screen="llm-result" data-spec-id="e2e-hwpx-skill-v1-019" class="screen">
+      <span class="step-badge">Interaction 4: AI Result</span>
+      <h2>AI Document Generated</h2>
+
+      <div class="success-box">
+        <strong>AI generated document:</strong> <span data-mock="llm.filename">docs/ai-generated.hwpx</span><br>
+        <span data-mock="llm.summary">5 paragraphs added based on instruction</span>
+      </div>
+
+      <h3>Generated content:</h3>
+      <div class="terminal">
+<span class="prompt">$</span> cli-anything-hwpx --file <span class="highlight" data-mock="llm.filename">docs/ai-generated.hwpx</span> text extract
+<span class="output" data-mock="llm.content">1. 한컴오피스 설치 없이 HWPX 문서를 생성할 수 있다.
+2. AI 에이전트가 CLI 명령어로 문서를 자동 생성한다.
+3. CLI-Anything 프레임워크와 python-hwpx를 결합했다.
+4. 텍스트, 표, 이미지 삽입을 지원한다.
+5. 마크다운, HTML, 텍스트로 변환이 가능하다.</span></div>
+
+      <div class="nav-bar">
+        <button data-action="open-hancom-llm" class="success">Open in Hancom Office</button>
+        <button data-action="nav-llm" class="secondary">New Instruction</button>
+      </div>
+    </div>
+
+    <!-- Screen 5: File Upload -->
+    <div data-screen="file-upload" data-spec-id="e2e-hwpx-skill-v1-021" class="screen">
+      <span class="step-badge">Interaction 5: File Upload & Convert</span>
+      <h2>Convert File to HWPX</h2>
+      <p class="info">HTML, Markdown, Text 파일을 업로드하면 HWPX 문서로 변환합니다.</p>
+
+      <div data-error="file-upload-error" data-spec-id="e2e-hwpx-skill-v1-025" class="error"></div>
+
+      <div class="field-group">
+        <label for="upload-file">Source File (.html, .md, .txt)</label>
+        <input data-field="upload-file" type="file" id="upload-file" accept=".html,.md,.txt,.text,.markdown">
+      </div>
+
+      <div class="field-group">
+        <label for="upload-output">Output .hwpx Path</label>
+        <input data-field="upload-output" type="text" id="upload-output" value="docs/converted.hwpx">
+      </div>
+
+      <div class="field-group">
+        <label>File Preview</label>
+        <div id="file-preview" class="doc-preview" style="min-height: 80px; color: #9ca3af;">Select a file to preview...</div>
+      </div>
+
+      <div class="terminal">
+<span class="prompt">#</span> <span class="output">Conversion flow:</span>
+<span class="prompt">1.</span> Read source file (html/md/txt)
+<span class="prompt">2.</span> Parse into paragraphs by format
+<span class="prompt">3.</span> cli-anything-hwpx document new --output <span class="highlight">output.hwpx</span>
+<span class="prompt">4.</span> For each paragraph: text add "<span class="highlight">...</span>"
+<span class="prompt">5.</span> Auto-save after each addition</div>
+
+      <button data-action="file-convert" data-spec-id="e2e-hwpx-skill-v1-022">Convert to HWPX</button>
+      <button data-action="file-show-error" class="secondary">Simulate Error</button>
+    </div>
+
+    <!-- File Loading -->
+    <div data-screen="file-loading" data-spec-id="e2e-hwpx-skill-v1-023" data-state="loading" class="screen">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 16px;">Converting file to HWPX...</p>
+        <p class="info">Parsing source -> Creating paragraphs -> Writing to .hwpx</p>
+        <p class="info">Storage: .hwpx file (ZIP+XML) -- WRITE</p>
+      </div>
+    </div>
+
+    <!-- File Convert Result -->
+    <div data-screen="file-result" data-spec-id="e2e-hwpx-skill-v1-024" class="screen">
+      <span class="step-badge">Interaction 5: Convert Result</span>
+      <h2>File Converted Successfully</h2>
+
+      <div class="success-box">
+        <strong>Source:</strong> <span data-mock="file.source">document.md</span> (<span data-mock="file.format">markdown</span>)<br>
+        <strong>Output:</strong> <span data-mock="file.output">docs/converted.hwpx</span><br>
+        <strong>Paragraphs:</strong> <span data-mock="file.count">12</span>
+      </div>
+
+      <h3>Converted content:</h3>
+      <div class="terminal">
+<span class="prompt">$</span> cli-anything-hwpx --file <span class="highlight" data-mock="file.output">docs/converted.hwpx</span> text extract
+<span class="output" data-mock="file.content"># Project Overview
+
+This project combines CLI-Anything with python-hwpx...
+
+## Features
+- Document generation
+- Text extraction</span></div>
+
+      <div class="nav-bar">
+        <button data-action="open-hancom-file" class="success">Open in Hancom Office</button>
+        <button data-action="nav-upload" class="secondary">Upload Another</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(function(s) {
+        s.classList.remove('active');
+      });
+      var target = document.querySelector('[data-screen="' + id + '"]');
+      if (target) target.classList.add('active');
+    }
+
+    function getDefaultScreen() {
+      return JSON.parse(document.getElementById('prototype-manifest').textContent).screens[0];
+    }
+
+    window.addEventListener('hashchange', function() {
+      showScreen(location.hash.slice(1) || getDefaultScreen());
+    });
+
+    document.addEventListener('click', function(e) {
+      var actionEl = e.target.closest('[data-action]');
+      if (actionEl) {
+        e.preventDefault();
+        handleAction(actionEl.dataset.action, actionEl);
+      }
+    });
+
+    function handleAction(action, element) {
+      // Hide all errors first
+      document.querySelectorAll('.error').forEach(function(e) { e.style.display = 'none'; });
+
+      switch (action) {
+        // --- Nav tabs ---
+        case 'nav-direct': showScreen('create-doc'); break;
+        case 'nav-llm': showScreen('llm-instruct'); break;
+        case 'nav-upload': showScreen('file-upload'); break;
+
+        // --- Interaction 1: Direct input ---
+        case 'create-and-add':
+          var fn = (document.querySelector('[data-field="filename"]') || {}).value || '';
+          var ct = (document.querySelector('[data-field="content"]') || {}).value || '';
+          var err = document.querySelector('[data-error="file-error"]');
+          if (!fn.trim()) { if (err) { err.textContent = 'Error: File path is required'; err.style.display = 'block'; } return; }
+          if (!fn.endsWith('.hwpx')) { if (err) { err.textContent = 'Error: Not a .hwpx file: ' + fn; err.style.display = 'block'; } return; }
+          MOCK.result = { filename: fn, content: ct || '(empty document)' };
+          MOCK.cmd = { filename: fn, firstline: (ct.split('\n')[0] || '') };
+          showScreen('add-loading');
+          setTimeout(function() { showScreen('extract-result'); populateScreen('extract-result'); }, 800);
+          break;
+        case 'show-error':
+          var e1 = document.querySelector('[data-error="file-error"]');
+          if (e1) { e1.textContent = 'Error: No document open. Use "document new" first.'; e1.style.display = 'block'; }
+          break;
+        case 'add-more': showScreen('create-doc'); break;
+
+        // --- Interaction 2/3: Extract + Hancom ---
+        case 'open-hancom': case 'open-hancom-llm': case 'open-hancom-file':
+          showScreen('hancom-view'); populateScreen('hancom-view'); break;
+        case 'show-hancom-error': showScreen('hancom-error'); break;
+        case 'back-to-start': showScreen('create-doc'); break;
+
+        // --- Interaction 4: LLM Instruction ---
+        case 'llm-generate':
+          var llmOut = (document.querySelector('[data-field="llm-output"]') || {}).value || '';
+          var llmInst = (document.querySelector('[data-field="llm-instruction"]') || {}).value || '';
+          var llmErr = document.querySelector('[data-error="llm-error"]');
+          if (!llmInst.trim()) { if (llmErr) { llmErr.textContent = '지시문을 입력해주세요'; llmErr.style.display = 'block'; } return; }
+          if (!llmOut.endsWith('.hwpx')) { if (llmErr) { llmErr.textContent = 'Error: Output must be .hwpx file'; llmErr.style.display = 'block'; } return; }
+          MOCK.llm = {
+            filename: llmOut,
+            instruction: llmInst,
+            summary: 'AI generated 5 paragraphs from instruction',
+            content: '1. 한컴오피스 설치 없이 HWPX 문서를 생성할 수 있다.\n2. AI 에이전트가 CLI 명령어로 문서를 자동 생성한다.\n3. CLI-Anything 프레임워크와 python-hwpx를 결합했다.\n4. 텍스트, 표, 이미지 삽입을 지원한다.\n5. 마크다운, HTML, 텍스트로 변환이 가능하다.'
+          };
+          MOCK.result = { filename: llmOut, content: MOCK.llm.content };
+          showScreen('llm-loading');
+          setTimeout(function() { showScreen('llm-result'); populateScreen('llm-result'); }, 800);
+          break;
+        case 'llm-show-error':
+          var le = document.querySelector('[data-error="llm-error"]');
+          if (le) { le.textContent = 'Error: CLI command failed — file permission denied'; le.style.display = 'block'; }
+          break;
+
+        // --- Interaction 5: File Upload ---
+        case 'file-convert':
+          var fileInput = document.getElementById('upload-file');
+          var fileOut = (document.querySelector('[data-field="upload-output"]') || {}).value || '';
+          var fErr = document.querySelector('[data-error="file-upload-error"]');
+          if (!fileInput || !fileInput.files.length) { if (fErr) { fErr.textContent = '파일을 선택해주세요'; fErr.style.display = 'block'; } return; }
+          if (!fileOut.endsWith('.hwpx')) { if (fErr) { fErr.textContent = 'Error: Output must be .hwpx file'; fErr.style.display = 'block'; } return; }
+          var f = fileInput.files[0];
+          var ext = f.name.split('.').pop().toLowerCase();
+          if (['html','md','txt','text','markdown'].indexOf(ext) === -1) {
+            if (fErr) { fErr.textContent = '지원하지 않는 형식입니다. html, md, txt만 가능합니다.'; fErr.style.display = 'block'; } return;
+          }
+          var reader = new FileReader();
+          reader.onload = function(ev) {
+            var text = ev.target.result;
+            var lines = text.split('\n').filter(function(l) { return l.trim(); });
+            MOCK.file = { source: f.name, format: ext, output: fileOut, count: lines.length + '', content: text.substring(0, 500) };
+            MOCK.result = { filename: fileOut, content: text.substring(0, 500) };
+            showScreen('file-loading');
+            setTimeout(function() { showScreen('file-result'); populateScreen('file-result'); }, 800);
+          };
+          reader.readAsText(f);
+          break;
+        case 'file-show-error':
+          var fe = document.querySelector('[data-error="file-upload-error"]');
+          if (fe) { fe.textContent = '인코딩 오류: UTF-8 파일만 지원합니다'; fe.style.display = 'block'; }
+          break;
+      }
+    }
+
+    function populateScreen(screenId) {
+      var screen = document.querySelector('[data-screen="' + screenId + '"]');
+      if (!screen) return;
+      screen.querySelectorAll('[data-mock]').forEach(function(el) {
+        var value = resolvePath(MOCK, el.dataset.mock);
+        if (value !== undefined) {
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = value;
+          else el.textContent = value;
+        }
+      });
+    }
+
+    function resolvePath(obj, path) {
+      return path.split('.').reduce(function(acc, key) { return acc && acc[key]; }, obj);
+    }
+
+    var MOCK = {
+      result: { filename: 'docs/report.hwpx', content: '' },
+      cmd: { filename: 'docs/report.hwpx', firstline: '' },
+      llm: { filename: '', instruction: '', summary: '', content: '' },
+      file: { source: '', format: '', output: '', count: '0', content: '' }
+    };
+
+    // File preview on upload
+    document.addEventListener('change', function(e) {
+      if (e.target.id === 'upload-file' && e.target.files.length) {
+        var r = new FileReader();
+        r.onload = function(ev) {
+          var prev = document.getElementById('file-preview');
+          if (prev) { prev.textContent = ev.target.result.substring(0, 500); prev.style.color = '#333'; }
+        };
+        r.readAsText(e.target.files[0]);
+      }
+    });
+
+    showScreen(location.hash.slice(1) || getDefaultScreen());
+  </script>
+
+</body>
+</html>
