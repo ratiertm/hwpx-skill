@@ -279,12 +279,16 @@ def table():
 @table.command("add")
 @click.option("--rows", "-r", type=int, required=True, help="Number of rows")
 @click.option("--cols", "-c", type=int, required=True, help="Number of columns")
+@click.option("--header", "-h", type=str, default=None,
+              help="Comma-separated header row (e.g. '이름,역할,설명')")
+@click.option("--data", "-d", type=str, multiple=True,
+              help="Comma-separated data row (repeatable, e.g. -d 'A,B,C' -d 'D,E,F')")
 @handle_error
-def table_add(rows, cols):
-    """Add a table to the document."""
+def table_add(rows, cols, header, data):
+    """Add a table to the document. Optionally fill with header and data."""
     sess = get_session()
     sess.snapshot()
-    result = table_mod.add_table(sess.get_doc(), rows, cols)
+    result = table_mod.add_table(sess.get_doc(), rows, cols, header=header, data=data)
     _auto_save_if_needed()
     globals()["output"](result, f"Added {rows}x{cols} table")
 
