@@ -95,29 +95,86 @@ Three tabs:
 - **Auto-save in one-shot mode** — `--file` flag persists changes after each mutation command
 - **Table with data** — `table add -h "A,B" -d "1,2" -d "3,4"` fills cells via `set_cell_text()`
 - **File conversion** — `convert source.md -o output.hwpx` supports HTML, Markdown, plain text
-- **Font size support** — `ensure_run_style(height=2000)` for 20pt text (OWPML spec: 100 hwpunit = 1pt)
-- **Text color** — `ensure_run_style(text_color="#FF0000")` for colored text
 - **JSON output** — `--json` flag for structured agent-consumable output
 - **Cross-platform** — Windows, macOS, Linux, CI/CD (pure Python, no Hancom Office needed)
 
-## Font Size (OWPML Spec)
+## OWPML Full Coverage (python-hwpx fork)
 
-python-hwpx fork (`ratiertm-hwpx/`) extends `ensure_run_style()` with font size and color:
+Install: `pip install git+https://github.com/ratiertm/python-hwpx.git`
+
+### Character Properties (charPr — 18 attributes)
 
 ```python
 from hwpx import HwpxDocument
 
 doc = HwpxDocument.new()
 
-# 20pt bold title
-title = doc.ensure_run_style(bold=True, height=2000)
+# Font + size + color + bold
+title = doc.ensure_run_style(
+    font_hangul="맑은 고딕", font_latin="Arial",
+    bold=True, height=2000, text_color="#1a1a2e"
+)
 doc.add_paragraph("Title", char_pr_id_ref=title)
 
-# 12pt blue text
-blue = doc.ensure_run_style(height=1200, text_color="#0000FF")
-doc.add_paragraph("Blue text", char_pr_id_ref=blue)
+# Strikeout + superscript
+strike = doc.ensure_run_style(strikeout=True)
+sup = doc.ensure_run_style(superscript=True, height=700)
 
-doc.save_to_path("styled.hwpx")
+# Per-language spacing/ratio
+spaced = doc.ensure_run_style(ratio_hangul=90, spacing_hangul=-5)
+```
+
+All charPr attributes: `bold`, `italic`, `underline`, `height`, `text_color`, `shade_color`, `font_hangul`~`font_user` (7 langs), `strikeout`, `outline`, `shadow`, `emboss`, `engrave`, `superscript`, `subscript`, `sym_mark`, `use_font_space`, `use_kerning`, `spacing_*`, `ratio_*`, `rel_size_*`, `offset_*` (7 langs each)
+
+### Paragraph Properties (paraPr — 11 attributes)
+
+```python
+# Center align + 200% line spacing
+p1 = doc.ensure_para_style(align="CENTER", line_spacing=200)
+doc.add_paragraph("Centered", para_pr_id_ref=p1)
+
+# Indent + paragraph spacing
+p2 = doc.ensure_para_style(indent=800, spacing_before=200, spacing_after=100)
+
+# Combined: charPr + paraPr
+doc.add_paragraph("Styled", char_pr_id_ref=title, para_pr_id_ref=p1)
+```
+
+All paraPr attributes: `align` (LEFT/CENTER/RIGHT/JUSTIFY/DISTRIBUTE), `line_spacing`, `line_spacing_type`, `indent`, `margin_left`, `margin_right`, `spacing_before`, `spacing_after`, `heading_type`, `keep_with_next`, `page_break_before`
+
+### Table Advanced
+
+```python
+tbl = doc.add_table(4, 3)
+tbl.merge_cells(0, 0, 0, 2)          # Merge first row
+tbl.set_cell_text(0, 0, "Header")
+tbl.cell(1, 0).set_margin(left=100)  # Cell margin
+tbl.set_repeat_header(True)           # Repeat header on page break
+```
+
+### Image Inline Insert
+
+```python
+doc.insert_image("photo.png", width=28000, height=14000,
+    crop_left=10, bright=20, contrast=10)
+```
+
+### Page Setup
+
+```python
+doc.set_page_setup(paper="A4", landscape=False,
+    margin_left=7000, margin_right=7000)
+# Presets: A4, A3, A5, B4, B5, Letter, Legal
+```
+
+### Misc
+
+```python
+doc.add_line()                          # Line shape
+doc.add_rectangle(fill_color="#DBEAFE") # Rectangle
+doc.add_ellipse()                       # Ellipse
+doc.add_arc()                           # Arc
+doc.add_equation("E = mc^2")           # Equation
 ```
 
 Height unit: 1 hwpunit = 1/100 pt (OWPML `<hh:charPr height="1000">` = 10pt)

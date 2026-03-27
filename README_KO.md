@@ -95,14 +95,69 @@ python -m uvicorn web.server:app --port 8080
 - **one-shot 자동 저장** — `--file` 모드에서 변경 명령 실행 후 파일에 자동 저장
 - **표에 데이터 입력** — `table add -h "A,B" -d "1,2" -d "3,4"` 로 셀 값 채우기
 - **파일 변환** — `convert source.md -o output.hwpx` (HTML, Markdown, 텍스트 지원)
-- **폰트 크기** — `ensure_run_style(height=2000)` 으로 20pt 텍스트 (OWPML 규격: 100 hwpunit = 1pt)
-- **글자 색상** — `ensure_run_style(text_color="#FF0000")` 으로 빨간 글자
 - **JSON 출력** — `--json` 플래그로 AI 에이전트용 구조화된 출력
 - **크로스 플랫폼** — Windows, macOS, Linux, CI/CD 어디서든 동작 (순수 Python)
 
-## 폰트 크기 (OWPML 규격)
+## OWPML 전체 구현 (python-hwpx fork)
 
-python-hwpx fork (`ratiertm-hwpx/`)에 폰트 크기와 글자 색상 기능을 추가했습니다:
+설치: `pip install git+https://github.com/ratiertm/python-hwpx.git`
+
+### 글자 모양 (charPr — 18개 속성)
+
+글꼴, 크기, 색상, 굵기, 취소선, 위/아래첨자, 장평, 자간 등:
+
+```python
+# 글꼴 + 크기 + 색상 + 굵기
+title = doc.ensure_run_style(
+    font_hangul="맑은 고딕", bold=True, height=2000, text_color="#1a1a2e")
+# 취소선 / 위첨자 / 장평+자간
+strike = doc.ensure_run_style(strikeout=True)
+sup = doc.ensure_run_style(superscript=True, height=700)
+spaced = doc.ensure_run_style(ratio_hangul=90, spacing_hangul=-5)
+```
+
+### 문단 모양 (paraPr — 11개 속성)
+
+정렬, 줄간격, 들여쓰기, 문단간격 등:
+
+```python
+p1 = doc.ensure_para_style(align="CENTER", line_spacing=200)
+p2 = doc.ensure_para_style(indent=800, spacing_before=200)
+doc.add_paragraph("제목", char_pr_id_ref=title, para_pr_id_ref=p1)
+```
+
+### 표 고급 기능
+
+셀 병합, 셀 여백, 표 속성:
+
+```python
+tbl = doc.add_table(4, 3)
+tbl.merge_cells(0, 0, 0, 2)
+tbl.cell(1, 0).set_margin(left=100)
+tbl.set_repeat_header(True)
+```
+
+### 이미지 인라인 삽입
+
+```python
+doc.insert_image("photo.png", width=28000, height=14000, crop_left=10, bright=20)
+```
+
+### 페이지 설정
+
+```python
+doc.set_page_setup(paper="A4", margin_left=7000, margin_right=7000)
+# 용지: A4, A3, A5, B4, B5, Letter, Legal
+```
+
+### 기타 도형/수식
+
+```python
+doc.add_line(); doc.add_rectangle(); doc.add_ellipse(); doc.add_arc()
+doc.add_equation("E = mc^2")
+```
+
+Height 단위: 1 hwpunit = 1/100 pt (OWPML `<hh:charPr height="1000">` = 10pt)
 
 ```python
 from hwpx import HwpxDocument
