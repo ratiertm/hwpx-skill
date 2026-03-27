@@ -7,19 +7,19 @@
     "confirmed": true
   },
   "current": {
-    "stage": 3,
-    "stage_name": "TEST",
-    "status": "in_progress",
+    "stage": 8,
+    "stage_name": "RETROSPECT",
+    "status": "completed",
     "feature": "hwpx-skill-v1",
     "mode": "feature"
   },
   "progress": {
-    "stages_completed": [1, 2],
-    "current_stage_started_at": "2026-03-27T01:15:00Z",
-    "last_transition_at": "2026-03-27T01:15:00Z"
+    "stages_completed": [1, 2, 3, 4, 8],
+    "current_stage_started_at": "2026-03-27T01:30:00Z",
+    "last_transition_at": "2026-03-27T01:35:00Z"
   },
   "session": {
-    "last_active": "2026-03-27T01:15:00Z",
-    "resume_hint": "TEST Stage — per-step verification against spec"
+    "last_active": "2026-03-27T01:35:00Z",
+    "resume_hint": "hwpx-skill-v1 feature cycle COMPLETE. All stages passed."
   }
 }
