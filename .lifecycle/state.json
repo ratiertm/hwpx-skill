@@ -10,16 +10,16 @@
     "stage": 1,
     "stage_name": "PLAN",
     "status": "in_progress",
-    "feature": "owpml-phase2-bugfix",
+    "feature": "api-style-align",
     "mode": "feature"
   },
   "progress": {
     "stages_completed": [],
-    "current_stage_started_at": "2026-03-28T06:00:00Z",
-    "last_transition_at": "2026-03-28T06:00:00Z"
+    "current_stage_started_at": "2026-03-28T07:00:00Z",
+    "last_transition_at": "2026-03-28T07:00:00Z"
   },
   "session": {
-    "last_active": "2026-03-28T06:00:00Z",
-    "resume_hint": "Phase 2: lxml/ET 호환 수정 + 기존 기능 안정화 + Whale 렌더링 검증"
+    "last_active": "2026-03-28T07:00:00Z",
+    "resume_hint": "Stage 1 PLAN — API 스타일을 공식 python-hwpx 패턴에 맞춰 개선"
   }
 }
