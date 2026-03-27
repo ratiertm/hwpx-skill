@@ -98,7 +98,7 @@ Three tabs:
 - **JSON output** — `--json` flag for structured agent-consumable output
 - **Cross-platform** — Windows, macOS, Linux, CI/CD (pure Python, no Hancom Office needed)
 
-## OWPML Full Coverage (python-hwpx fork)
+## OWPML Core Coverage (Phase 1) (python-hwpx fork)
 
 Install: `pip install git+https://github.com/ratiertm/python-hwpx.git`
 

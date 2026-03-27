@@ -1,12 +1,14 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-03-26T21:55:47.041Z",
+  "lastUpdated": "2026-03-27T20:25:41.898Z",
   "activeFeatures": [
     "agent-harness",
     "hwpx",
     "core",
     "tests",
-    "cli-oneshot-autosave"
+    "cli-oneshot-autosave",
+    "oxml",
+    "web"
   ],
   "primaryFeature": "cli-oneshot-autosave",
   "features": {
@@ -32,9 +34,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-03-26T12:46:37.340Z",
-        "lastUpdated": "2026-03-26T21:55:47.041Z"
+        "lastUpdated": "2026-03-27T19:51:49.038Z"
       },
-      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/hwpx_cli.py"
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/ratiertm-hwpx/src/hwpx/document.py"
     },
     "core": {
       "phase": "do",
@@ -45,7 +47,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-03-26T12:46:37.631Z",
-        "lastUpdated": "2026-03-26T12:57:20.441Z"
+        "lastUpdated": "2026-03-27T12:35:41.546Z"
       },
       "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/core/table.py"
     },
@@ -58,9 +60,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-03-26T12:46:38.220Z",
-        "lastUpdated": "2026-03-26T12:59:59.526Z"
+        "lastUpdated": "2026-03-27T12:18:35.219Z"
       },
-      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/cli_anything/hwpx/tests/test_core.py"
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/tests/test_autosave.py"
     },
     "cli-oneshot-autosave": {
       "phase": "plan",
@@ -81,6 +83,32 @@
         "lastUpdated": "2026-03-26T14:50:00.000Z"
       },
       "lastFile": null
+    },
+    "oxml": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-27T12:57:25.565Z",
+        "lastUpdated": "2026-03-27T20:25:41.898Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/ratiertm-hwpx/src/hwpx/oxml/document.py"
+    },
+    "web": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-27T13:04:36.213Z",
+        "lastUpdated": "2026-03-27T13:04:36.213Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/hwpx/agent-harness/web/server.py"
     }
   },
   "pipeline": {
@@ -91,7 +119,7 @@
   "session": {
     "startedAt": "2026-03-26T12:36:25.613Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-03-26T21:55:47.041Z"
+    "lastActivity": "2026-03-27T20:25:41.898Z"
   },
   "history": [
     {
@@ -175,6 +203,168 @@
     {
       "timestamp": "2026-03-26T21:55:47.041Z",
       "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T22:15:30.393Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T22:15:53.279Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T22:16:14.480Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T22:16:34.638Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-26T22:16:59.313Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:09:19.491Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:17:08.681Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:17:43.572Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:18:35.219Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:35:25.079Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:35:41.546Z",
+      "feature": "core",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:57:25.565Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:58:03.795Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T12:59:05.476Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T13:04:36.213Z",
+      "feature": "web",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:22:06.021Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:22:19.456Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:30:10.654Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:31:05.327Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:31:50.969Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:43:00.335Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:44:13.860Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:50:09.483Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:50:48.390Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T19:51:49.038Z",
+      "feature": "hwpx",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T20:23:43.679Z",
+      "feature": "oxml",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-27T20:25:41.898Z",
+      "feature": "oxml",
       "phase": "do",
       "action": "updated"
     }

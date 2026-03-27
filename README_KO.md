@@ -98,7 +98,7 @@ python -m uvicorn web.server:app --port 8080
 - **JSON 출력** — `--json` 플래그로 AI 에이전트용 구조화된 출력
 - **크로스 플랫폼** — Windows, macOS, Linux, CI/CD 어디서든 동작 (순수 Python)
 
-## OWPML 전체 구현 (python-hwpx fork)
+## OWPML 핵심 구현 (Phase 1) (python-hwpx fork)
 
 설치: `pip install git+https://github.com/ratiertm/python-hwpx.git`
 

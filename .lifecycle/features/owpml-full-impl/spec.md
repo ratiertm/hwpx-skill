@@ -1,6 +1,6 @@
 ---
 feature: owpml-full-impl
-title: OWPML Full Implementation — python-hwpx 100% Coverage
+title: OWPML Core Implementation — charPr, paraPr, table, image, page (Phase 1)
 created: 2026-03-28
 updated: 2026-03-28
 status: agreed
