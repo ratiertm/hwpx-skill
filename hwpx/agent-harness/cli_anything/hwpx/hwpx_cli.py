@@ -119,10 +119,15 @@ def cli(ctx, use_json, file_path):
     global _json_output, _auto_save_path
     _json_output = use_json
 
+    # SPEC: e2e-hwpx-skill-v1-005 -- Text Add Errors (file validation)
     if file_path:
         sess = get_session()
         if not sess.has_project():
-            doc = doc_mod.open_document(file_path)
+            try:
+                doc = doc_mod.open_document(file_path)
+            except (FileNotFoundError, ValueError) as e:
+                click.echo(f"Error: {e}", err=True)
+                ctx.abort()
             sess.set_doc(doc, file_path)
         _auto_save_path = file_path
 
@@ -131,6 +136,7 @@ def cli(ctx, use_json, file_path):
 
 
 # ── Document Commands ──────────────────────────────────────────────────
+# SPEC: e2e-hwpx-skill-v1-001 -- CLI New Document Screen
 
 @cli.group()
 def document():
@@ -193,6 +199,10 @@ def text():
     pass
 
 
+# SPEC: e2e-hwpx-skill-v1-006 -- Text Extract Screen
+# SPEC: e2e-hwpx-skill-v1-007 -- Text Extract Connection
+# SPEC: e2e-hwpx-skill-v1-008 -- Text Extract Processing
+# SPEC: e2e-hwpx-skill-v1-009 -- Text Extract Response
 @text.command("extract")
 @click.argument("path", required=False)
 @click.option("--format", "-f", "fmt", type=click.Choice(["text", "markdown", "html"]),
@@ -243,6 +253,9 @@ def text_replace(old, new_text):
                         f"Replaced {count} occurrence(s)")
 
 
+# SPEC: e2e-hwpx-skill-v1-002 -- CLI Text Add Connection
+# SPEC: e2e-hwpx-skill-v1-003 -- Text Add Processing (auto-save)
+# SPEC: e2e-hwpx-skill-v1-004 -- Text Add Response
 @text.command("add")
 @click.argument("content")
 @handle_error
