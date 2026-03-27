@@ -7,19 +7,19 @@
     "confirmed": true
   },
   "current": {
-    "stage": 2,
-    "stage_name": "DO",
+    "stage": 3,
+    "stage_name": "TEST",
     "status": "in_progress",
     "feature": "hwpx-skill-v1",
     "mode": "feature"
   },
   "progress": {
-    "stages_completed": [1],
-    "current_stage_started_at": "2026-03-27T01:00:00Z",
-    "last_transition_at": "2026-03-27T01:00:00Z"
+    "stages_completed": [1, 2],
+    "current_stage_started_at": "2026-03-27T01:15:00Z",
+    "last_transition_at": "2026-03-27T01:15:00Z"
   },
   "session": {
-    "last_active": "2026-03-27T01:00:00Z",
-    "resume_hint": "DO Stage 재진입 — per-step 구현 + SPEC 코멘트 + 테스트"
+    "last_active": "2026-03-27T01:15:00Z",
+    "resume_hint": "TEST Stage — per-step verification against spec"
   }
 }
