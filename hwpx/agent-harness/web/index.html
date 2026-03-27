@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HWPX Document Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Apple SD Gothic Neo', system-ui, sans-serif; background: #f0f2f5; min-height: 100vh; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+    h1 { text-align: center; color: #1a1a2e; margin-bottom: 8px; font-size: 24px; }
+    .subtitle { text-align: center; color: #6b7280; margin-bottom: 24px; font-size: 14px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #e5e7eb; }
+    .tab {
+      flex: 1; padding: 12px 16px; text-align: center; cursor: pointer;
+      background: #f9fafb; border: 1px solid #e5e7eb; border-bottom: none;
+      border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 500; color: #6b7280;
+      transition: all 0.2s;
+    }
+    .tab:hover { background: #fff; color: #374151; }
+    .tab.active { background: #fff; color: #2563eb; border-color: #2563eb; border-bottom: 2px solid #fff; margin-bottom: -2px; }
+
+    /* Panel */
+    .panel { display: none; background: #fff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; padding: 24px; }
+    .panel.active { display: block; }
+
+    /* Form */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    input[type="text"], textarea, select {
+      width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 14px; font-family: inherit; transition: border-color 0.2s;
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    textarea { resize: vertical; min-height: 120px; }
+
+    .file-input { padding: 8px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 14px; font-weight: 500; transition: all 0.2s;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Result */
+    .result { display: none; margin-top: 20px; }
+    .result.show { display: block; }
+    .result-box {
+      background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;
+      padding: 16px; margin-bottom: 12px;
+    }
+    .result-box.error { background: #fef2f2; border-color: #fca5a5; }
+    .result-box h3 { font-size: 15px; color: #166534; margin-bottom: 8px; }
+    .result-box.error h3 { color: #dc2626; }
+    .result-box p { font-size: 13px; color: #374151; margin: 4px 0; }
+
+    .preview {
+      background: #1f2937; color: #e5e7eb; padding: 16px; border-radius: 8px;
+      font-family: 'SF Mono', monospace; font-size: 13px; line-height: 1.6;
+      white-space: pre-wrap; max-height: 300px; overflow-y: auto; margin-top: 12px;
+    }
+
+    /* Loading */
+    .loading { display: none; text-align: center; padding: 24px; }
+    .loading.show { display: block; }
+    .spinner {
+      display: inline-block; width: 28px; height: 28px;
+      border: 3px solid #e5e7eb; border-top-color: #2563eb;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { color: #6b7280; margin-top: 8px; font-size: 13px; }
+
+    /* File preview */
+    .file-preview {
+      background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px;
+      padding: 12px; margin-top: 8px; font-size: 13px; color: #6b7280;
+      max-height: 150px; overflow-y: auto; white-space: pre-wrap;
+    }
+
+    .info { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>HWPX Document Generator</h1>
+  <p class="subtitle">CLI-Anything-HWPX: AI 에이전트가 한글 문서를 자동 생성합니다</p>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('direct')">Direct Input</div>
+    <div class="tab" onclick="switchTab('llm')">LLM Instruction</div>
+    <div class="tab" onclick="switchTab('upload')">File Upload</div>
+  </div>
+
+  <!-- Tab 1: Direct Input -->
+  <div id="panel-direct" class="panel active">
+    <form id="form-direct" onsubmit="return submitDirect(event)">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" name="filename" value="output.hwpx" required>
+      </div>
+      <div class="field">
+        <label>Title Font Size (pt)</label>
+        <select name="title_size">
+          <option value="14">14pt</option>
+          <option value="16">16pt</option>
+          <option value="18">18pt</option>
+          <option value="20" selected>20pt</option>
+          <option value="24">24pt</option>
+          <option value="28">28pt</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Content (each line = 1 paragraph, first line = title)</label>
+        <textarea name="content" rows="8" placeholder="프로그램 구조 설계서&#10;&#10;1. 개요&#10;CLI-Anything과 python-hwpx를 결합한 도구입니다.">프로그램 구조 설계서
+
+1. 개요
+CLI-Anything과 python-hwpx를 결합하여
+AI 에이전트가 한글 문서를 자동으로 생성합니다.
+
+2. 주요 기능
+- 문서 생성, 텍스트 추가
+- 표 삽입 (헤더 + 데이터)
+- HTML/MD/TXT → HWPX 변환</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Generate HWPX</button>
+    </form>
+    <div id="loading-direct" class="loading"><div class="spinner"></div><p>Generating HWPX...</p></div>
+    <div id="result-direct" class="result"></div>
+  </div>
+
+  <!-- Tab 2: LLM Instruction -->
+  <div id="panel-llm" class="panel">
+    <form id="form-llm" onsubmit="return submitLLM(event)">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" name="filename" value="ai-generated.hwpx" required>
+      </div>
+      <div class="field">
+        <label>AI Instruction (자연어 지시문)</label>
+        <textarea name="instruction" rows="4" placeholder="예: 이 프로그램의 특징을 10가지로 정리해서 한글 문서로 만들어줘">이 프로그램의 특징을 한글로 적어줘</textarea>
+        <p class="info">AI 에이전트가 SKILL.md를 읽고 CLI 명령어 시퀀스를 생성합니다.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Generate with AI</button>
+    </form>
+    <div id="loading-llm" class="loading"><div class="spinner"></div><p>AI Agent processing...</p></div>
+    <div id="result-llm" class="result"></div>
+  </div>
+
+  <!-- Tab 3: File Upload -->
+  <div id="panel-upload" class="panel">
+    <form id="form-upload" onsubmit="return submitUpload(event)">
+      <div class="field">
+        <label>Source File (.html, .md, .txt)</label>
+        <input type="file" name="file" accept=".html,.htm,.md,.markdown,.txt,.text" class="file-input" onchange="previewFile(this)">
+        <div id="file-preview" class="file-preview" style="display:none;"></div>
+      </div>
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" name="filename" value="converted.hwpx" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Convert to HWPX</button>
+    </form>
+    <div id="loading-upload" class="loading"><div class="spinner"></div><p>Converting file...</p></div>
+    <div id="result-upload" class="result"></div>
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  event.target.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function showLoading(id) {
+  document.getElementById('loading-' + id).classList.add('show');
+  document.getElementById('result-' + id).classList.remove('show');
+}
+function hideLoading(id) {
+  document.getElementById('loading-' + id).classList.remove('show');
+}
+
+function showResult(id, data) {
+  hideLoading(id);
+  var el = document.getElementById('result-' + id);
+  if (data.error) {
+    el.innerHTML = '<div class="result-box error"><h3>Error</h3><p>' + data.error + '</p></div>';
+  } else {
+    el.innerHTML =
+      '<div class="result-box">' +
+        '<h3>Document Generated</h3>' +
+        '<p><strong>File:</strong> ' + (data.filename || '') + '</p>' +
+        '<p><strong>Paragraphs:</strong> ' + (data.paragraphs || 0) + '</p>' +
+        (data.source ? '<p><strong>Source:</strong> ' + data.source + ' (' + data.format + ')</p>' : '') +
+        '<a href="' + data.download + '" class="btn btn-success" style="margin-top:12px;">Download .hwpx</a>' +
+      '</div>' +
+      (data.preview ? '<div class="preview">' + escapeHtml(data.preview) + '</div>' : '');
+  }
+  el.classList.add('show');
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function submitDirect(e) {
+  e.preventDefault();
+  var form = document.getElementById('form-direct');
+  var fd = new FormData(form);
+  showLoading('direct');
+  fetch('/api/direct', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { showResult('direct', d); })
+    .catch(function(err) { showResult('direct', { error: err.message }); });
+  return false;
+}
+
+function submitLLM(e) {
+  e.preventDefault();
+  var form = document.getElementById('form-llm');
+  var fd = new FormData(form);
+  showLoading('llm');
+  fetch('/api/llm', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { showResult('llm', d); })
+    .catch(function(err) { showResult('llm', { error: err.message }); });
+  return false;
+}
+
+function submitUpload(e) {
+  e.preventDefault();
+  var form = document.getElementById('form-upload');
+  var fd = new FormData(form);
+  showLoading('upload');
+  fetch('/api/convert', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { showResult('upload', d); })
+    .catch(function(err) { showResult('upload', { error: err.message }); });
+  return false;
+}
+
+function previewFile(input) {
+  var preview = document.getElementById('file-preview');
+  if (input.files.length === 0) { preview.style.display = 'none'; return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    preview.textContent = ev.target.result.substring(0, 500);
+    preview.style.display = 'block';
+  };
+  reader.readAsText(input.files[0]);
+}
+</script>
+
+</body>
+</html>

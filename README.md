@@ -1,166 +1,169 @@
 # hwpx-skill
 
-AI 에이전트가 한글 문서(HWPX)를 자동으로 생성, 편집, 검증할 수 있게 하는 CLI 스킬.
+AI agents create, edit, and validate Hancom Office HWPX documents via CLI — no Hancom Office installation required.
 
-[CLI-Anything](https://github.com/HKUDS/CLI-Anything) 프레임워크로 [python-hwpx](https://github.com/airmang/python-hwpx) 라이브러리를 래핑하여, Claude Code 같은 AI 에이전트가 CLI 명령어만으로 `.hwpx` 문서를 조작할 수 있습니다. 한컴오피스 설치가 필요 없습니다.
+Built with the [CLI-Anything](https://github.com/HKUDS/CLI-Anything) framework wrapping [python-hwpx](https://github.com/airmang/python-hwpx), enabling Claude Code, Cursor, OpenClaw, and other AI agents to manipulate `.hwpx` documents through command-line interfaces.
 
-## 아키텍처
+[**한국어 문서**](README_KO.md)
+
+## Architecture
 
 ```
-AI Agent (Claude Code, OpenClaw, Cursor, ...)
-    │  CLI 명령어
+AI Agent (Claude Code, Cursor, OpenClaw, ...)
+    │  CLI commands
     ▼
 cli-anything-hwpx (agent-harness)
-    │  Python API 호출
+    │  Python API calls
     ▼
 python-hwpx (HwpxDocument)
-    │  XML 조작
+    │  XML manipulation
     ▼
-.hwpx 파일 (ZIP + XML)
+.hwpx file (ZIP + XML, OWPML spec)
 ```
 
-| 계층 | 역할 | 디렉토리 |
-|------|------|----------|
-| **CLI-Anything** | 모든 소프트웨어를 에이전트용 CLI로 래핑하는 프레임워크 | `cli-anything-original/` |
-| **python-hwpx** | HWPX 포맷을 순수 Python으로 읽고/쓰고/편집하는 라이브러리 | `python-hwpx-fork/`, `ratiertm-hwpx/` |
-| **agent-harness** | 위 두 개를 결합한 CLI 스킬 (이 프로젝트의 핵심) | `hwpx/agent-harness/` |
+| Layer | Role | Directory |
+|-------|------|-----------|
+| **CLI-Anything** | Framework for wrapping any software as agent-ready CLI | `cli-anything-original/` |
+| **python-hwpx** | Pure Python library for reading/writing HWPX files | `python-hwpx-fork/`, `ratiertm-hwpx/` |
+| **agent-harness** | CLI skill combining the two above (core of this project) | `hwpx/agent-harness/` |
+| **Web UI** | FastAPI server with browser-based document generation | `hwpx/agent-harness/web/` |
 
-## 설치
+## Installation
 
 ```bash
 cd hwpx/agent-harness
 pip install -e .
 ```
 
-요구 사항: Python >= 3.10, python-hwpx >= 2.8.0, click >= 8.0.0
+Requirements: Python >= 3.10, python-hwpx >= 2.8.0, click >= 8.0.0
 
-## 사용법
-
-### 문서 생성 및 편집
+## Quick Start
 
 ```bash
-# 새 문서 만들기
+# Create a new document
 cli-anything-hwpx document new --output report.hwpx
 
-# 텍스트 추가
-cli-anything-hwpx --file report.hwpx text add "제목: 프로그램 구조 설계서"
+# Add text (auto-saves to file)
+cli-anything-hwpx --file report.hwpx text add "Program Structure Design"
 
-# 표 추가
-cli-anything-hwpx --file report.hwpx table add --rows 5 --cols 3
+# Add a table with header and data
+cli-anything-hwpx --file report.hwpx table add -r 3 -c 2 \
+  -h "Name,Role" \
+  -d "CLI-Anything,Framework" \
+  -d "python-hwpx,Library"
 
-# 이미지 삽입
-cli-anything-hwpx --file report.hwpx image add diagram.png --width 150 --height 100
+# Convert Markdown to HWPX
+cli-anything-hwpx convert README.md -o readme.hwpx
 
-# 저장
-cli-anything-hwpx --file report.hwpx document save output.hwpx
-```
-
-### 텍스트 추출 및 변환
-
-```bash
-# 텍스트 추출
+# Extract text
 cli-anything-hwpx --file report.hwpx text extract
-
-# 마크다운으로 변환
-cli-anything-hwpx --file report.hwpx export markdown -o report.md
-
-# HTML로 변환
-cli-anything-hwpx --file report.hwpx export html -o report.html
 ```
 
-### 찾기 및 바꾸기
+## Web UI
+
+A browser-based interface for document generation, LLM instruction, and file conversion.
 
 ```bash
-cli-anything-hwpx --file report.hwpx text find "초안"
-cli-anything-hwpx --file report.hwpx text replace --old "초안" --new "최종본"
+cd hwpx/agent-harness
+pip install fastapi uvicorn python-multipart
+python -m uvicorn web.server:app --port 8080
+# Open http://localhost:8080
 ```
 
-### 검증
+Three tabs:
+- **Direct Input** — type content, select title font size, generate HWPX
+- **LLM Instruction** — write natural language instructions for AI-generated documents
+- **File Upload** — upload HTML/MD/TXT files and convert to HWPX
 
-```bash
-cli-anything-hwpx validate schema document.hwpx
-cli-anything-hwpx validate package document.hwpx
+## Commands
+
+| Group | Commands | Description |
+|-------|----------|-------------|
+| `document` | new, open, save, info | Document lifecycle |
+| `text` | extract, find, replace, add | Text operations |
+| `table` | add (--header, --data), list | Table with data support |
+| `image` | add, list, remove | Image management |
+| `export` | text, markdown, html | Export to formats |
+| `convert` | (source file) -o output.hwpx | HTML/MD/TXT → HWPX |
+| `validate` | schema, package | Document validation |
+| `structure` | sections, add-section, set-header, set-footer, bookmark, hyperlink | Document structure |
+| `undo` / `redo` | — | Up to 50-level undo |
+| `repl` | — | Interactive editing mode |
+
+## Features
+
+- **Auto-save in one-shot mode** — `--file` flag persists changes after each mutation command
+- **Table with data** — `table add -h "A,B" -d "1,2" -d "3,4"` fills cells via `set_cell_text()`
+- **File conversion** — `convert source.md -o output.hwpx` supports HTML, Markdown, plain text
+- **Font size support** — `ensure_run_style(height=2000)` for 20pt text (OWPML spec: 100 hwpunit = 1pt)
+- **Text color** — `ensure_run_style(text_color="#FF0000")` for colored text
+- **JSON output** — `--json` flag for structured agent-consumable output
+- **Cross-platform** — Windows, macOS, Linux, CI/CD (pure Python, no Hancom Office needed)
+
+## Font Size (OWPML Spec)
+
+python-hwpx fork (`ratiertm-hwpx/`) extends `ensure_run_style()` with font size and color:
+
+```python
+from hwpx import HwpxDocument
+
+doc = HwpxDocument.new()
+
+# 20pt bold title
+title = doc.ensure_run_style(bold=True, height=2000)
+doc.add_paragraph("Title", char_pr_id_ref=title)
+
+# 12pt blue text
+blue = doc.ensure_run_style(height=1200, text_color="#0000FF")
+doc.add_paragraph("Blue text", char_pr_id_ref=blue)
+
+doc.save_to_path("styled.hwpx")
 ```
 
-### 대화형 모드 (REPL)
+Height unit: 1 hwpunit = 1/100 pt (OWPML `<hh:charPr height="1000">` = 10pt)
 
-```bash
-cli-anything-hwpx repl
-```
+## What is HWPX?
 
-### JSON 출력 (에이전트용)
+HWPX is the modern document format for Hancom Office, the dominant office suite in South Korea.
 
-모든 명령어에 `--json` 플래그를 붙이면 구조화된 JSON으로 출력합니다:
+- **Format**: ZIP archive containing XML documents (OWPML/OPC specification)
+- **Structure**: `mimetype`, `META-INF/container.xml`, `Contents/` (body), `BinData/` (images/fonts), `header.xml` (metadata)
+- **Replaces**: Legacy binary `.hwp` format
 
-```bash
-cli-anything-hwpx --json --file doc.hwpx document info
-# {"sections": 2, "paragraphs": 15, "images": 3, "text_length": 4520}
-```
-
-## 명령어 목록
-
-| 그룹 | 명령어 | 설명 |
-|------|--------|------|
-| `document` | new, open, save, info | 문서 생성/열기/저장/정보 |
-| `text` | extract, find, replace, add | 텍스트 추출/검색/치환/추가 |
-| `table` | add, list | 표 추가/목록 |
-| `image` | add, list, remove | 이미지 추가/목록/삭제 |
-| `export` | text, markdown, html | 텍스트/마크다운/HTML 변환 |
-| `validate` | schema, package | 스키마/패키지 검증 |
-| `structure` | sections, add-section, set-header, set-footer, bookmark, hyperlink | 구조 조작 |
-| `undo` / `redo` | — | 실행 취소/다시 실행 (최대 50단계) |
-| `repl` | — | 대화형 편집 모드 |
-
-## 프로젝트 구조
+## Project Structure
 
 ```
 hwpx-skill/
-├── hwpx/agent-harness/          # 핵심 — CLI 스킬
+├── hwpx/agent-harness/          # Core — CLI skill + Web UI
 │   ├── cli_anything/hwpx/
-│   │   ├── hwpx_cli.py          # Click 기반 CLI + REPL
-│   │   ├── core/
-│   │   │   ├── session.py       # Undo/Redo 세션 관리
-│   │   │   ├── document.py      # 문서 생성/열기/저장
-│   │   │   ├── text.py          # 텍스트 추출/검색/치환
-│   │   │   ├── table.py         # 표 조작
-│   │   │   ├── image.py         # 이미지 조작
-│   │   │   ├── export.py        # 텍스트/MD/HTML 변환
-│   │   │   ├── validate.py      # 스키마/패키지 검증
-│   │   │   └── structure.py     # 섹션/머리글/바닥글/북마크
-│   │   ├── utils/
-│   │   │   └── repl_skin.py     # REPL 인터페이스
-│   │   └── skills/
-│   │       └── SKILL.md         # AI 에이전트 탐색용 메타데이터
-│   ├── setup.py
-│   └── HWPX.md                  # HWPX 포맷 SOP
-├── cli-anything-original/       # CLI-Anything 프레임워크 원본
-├── python-hwpx-fork/            # python-hwpx 라이브러리 fork
-├── ratiertm-hwpx/               # python-hwpx 수정 fork
-└── docs/                        # 생성된 HWPX 문서 결과물
+│   │   ├── hwpx_cli.py          # Click-based CLI + REPL
+│   │   ├── core/                 # document, text, table, image, export, validate, structure, session
+│   │   ├── utils/repl_skin.py   # REPL interface
+│   │   └── skills/SKILL.md      # AI agent discovery metadata
+│   ├── web/
+│   │   ├── server.py            # FastAPI server
+│   │   └── index.html           # Web UI
+│   ├── tests/                   # 64 tests (core + autosave + convert)
+│   └── setup.py
+├── ratiertm-hwpx/               # python-hwpx fork (font size + color + lxml fix)
+├── cli-anything-original/       # CLI-Anything framework
+└── docs/                        # PDCA documents
 ```
 
-## HWPX 포맷이란?
+## Testing
 
-HWPX는 한컴오피스의 차세대 문서 포맷으로, 기존 바이너리 `.hwp`를 대체합니다.
+```bash
+cd hwpx/agent-harness
+pip install -e ".[dev]"
+pytest tests/ -v
+# 64 tests passing
+```
 
-- **구조**: ZIP 아카이브 안에 XML 문서 (OWPML/OPC 규격)
-- **구성**: `mimetype`, `META-INF/container.xml`, `Contents/` (본문), `BinData/` (이미지/폰트), `header.xml` (메타데이터)
-- **크로스 플랫폼**: Windows, macOS, Linux, CI/CD 어디서든 동작
+## Credits
 
-## python-hwpx 주요 API
+- **python-hwpx**: [github.com/airmang/python-hwpx](https://github.com/airmang/python-hwpx) by Kyuhyun Koh — MIT
+- **CLI-Anything**: [github.com/HKUDS/CLI-Anything](https://github.com/HKUDS/CLI-Anything) — MIT
 
-| 클래스 | 용도 |
-|--------|------|
-| `HwpxDocument` | 문서 편집 API (79개 메서드) |
-| `HwpxPackage` | OPC 컨테이너 처리 |
-| `TextExtractor` | 섹션/문단 순회 및 텍스트 추출 |
-| `ObjectFinder` | 태그/속성/XPath 기반 요소 검색 |
-
-## 참고
-
-- **python-hwpx**: [github.com/airmang/python-hwpx](https://github.com/airmang/python-hwpx) (고규현, MIT)
-- **CLI-Anything**: [github.com/HKUDS/CLI-Anything](https://github.com/HKUDS/CLI-Anything) (MIT)
-
-## 라이선스
+## License
 
 MIT
