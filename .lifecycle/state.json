@@ -7,19 +7,19 @@
     "confirmed": true
   },
   "current": {
-    "stage": 7,
-    "stage_name": "DOCUMENT",
-    "status": "not_started",
-    "feature": "owpml-full-impl",
-    "mode": "release"
+    "stage": 1,
+    "stage_name": "PLAN",
+    "status": "in_progress",
+    "feature": "owpml-phase2-bugfix",
+    "mode": "feature"
   },
   "progress": {
-    "stages_completed": [1, 2, 3, 4, 5, 6],
-    "current_stage_started_at": null,
-    "last_transition_at": "2026-03-28T01:35:00Z"
+    "stages_completed": [],
+    "current_stage_started_at": "2026-03-28T06:00:00Z",
+    "last_transition_at": "2026-03-28T06:00:00Z"
   },
   "session": {
-    "last_active": "2026-03-28T01:35:00Z",
-    "resume_hint": "DEPLOY+TEST done (GitHub install verified). Next: DOCUMENT."
+    "last_active": "2026-03-28T06:00:00Z",
+    "resume_hint": "Phase 2: lxml/ET 호환 수정 + 기존 기능 안정화 + Whale 렌더링 검증"
   }
 }
