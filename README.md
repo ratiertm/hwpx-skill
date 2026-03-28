@@ -1,12 +1,27 @@
 # hwpx-skill
 
-Create, edit, and convert Hancom Office HWPX documents from the command line. No Hancom Office installation required.
+Tell an AI what you want, get a formatted Hancom Office document. No Hancom Office installation required.
 
 [**한국어 문서**](README_KO.md)
 
-## What it does
+## The main idea
 
-Turn a Markdown file into a properly formatted `.hwpx` document with one command:
+Describe your document in plain language to any LLM (Claude Code, Cursor, ChatGPT, ...) and it generates a `.hwpx` file using this skill's CLI commands:
+
+```
+You: "3분기 매출 보고서를 만들어줘. 제목, 개요, 월별 매출 표,
+      핵심 성과 3개를 글머리표로, 마지막에 요약."
+
+AI → runs CLI commands → report.hwpx (ready to open in Hancom Office)
+```
+
+The AI agent reads the CLI skill metadata, picks the right commands (`document new`, `style add`, `table add`, `structure bullet-list`, ...), and assembles the document. You get a formatted `.hwpx` file without writing any code or opening Hancom Office.
+
+This also works with the **Web UI** -- type instructions in the LLM tab and download the result.
+
+## Other ways to create documents
+
+**Convert from Markdown** -- one command, automatic formatting:
 
 ```bash
 cli-anything-hwpx convert report.md -o report.hwpx
@@ -14,7 +29,7 @@ cli-anything-hwpx convert report.md -o report.hwpx
 
 The converter understands headings, bold/italic, bullet lists, numbered lists, code blocks, tables, hyperlinks, and horizontal rules.
 
-You can also build documents step by step:
+**Build step by step** from the CLI:
 
 ```bash
 # Create a blank document
