@@ -1,0 +1,45 @@
+/* Minimal - clean, no decorations */
+
+body {
+    font-family: system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #333333;
+}
+
+h1 { font-size: 1.6em; font-weight: 600; }
+h2 { font-size: 1.3em; font-weight: 600; }
+h3 { font-size: 1.1em; font-weight: 600; }
+h4 { font-size: 1em; font-weight: 600; }
+h5 { font-size: 0.9em; font-weight: 600; }
+h6 { font-size: 0.85em; font-weight: 600; }
+
+a { color: #0563C1; text-decoration: underline; }
+
+code {
+    font-family: "D2Coding", monospace;
+    font-size: 90%;
+    color: #C7254E;
+}
+
+pre {
+    background: #f5f5f5;
+    border: 1px solid #dddddd;
+    padding: 12px;
+}
+
+blockquote {
+    color: #555555;
+    font-style: italic;
+    border-left: 3px solid #cccccc;
+}
+
+table th {
+    background: #d0d0d0;
+    padding: 6px 12px;
+}
+
+hr {
+    border: 0;
+    border-bottom: 1px solid #cccccc;
+}

@@ -1,0 +1,80 @@
+/* VS Code Markdown Preview style (simplified) */
+/* Source: github.com/microsoft/vscode extensions/markdown-language-features/media/markdown.css */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 22px;
+    color: #333333;
+}
+
+h1 {
+    font-size: 2em;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(0,0,0,0.18);
+    padding-bottom: .3em;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+h2 {
+    font-size: 1.5em;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(0,0,0,0.18);
+    padding-bottom: .3em;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+h3 {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+h4 { font-size: 1em; font-weight: 600; }
+h5 { font-size: 0.875em; font-weight: 600; }
+h6 { font-size: 0.85em; font-weight: 600; }
+
+a {
+    color: #4080D0;
+    text-decoration: none;
+}
+
+code {
+    font-family: "SF Mono", Monaco, Menlo, Consolas, monospace;
+    font-size: 1em;
+    color: #333333;
+}
+
+pre {
+    background: #f0f0f0;
+    border: 1px solid #c8c8c8;
+    padding: 16px;
+    border-radius: 3px;
+}
+
+blockquote {
+    border-left: 5px solid rgba(0,0,0,0.18);
+    padding: 0 16px 0 10px;
+    border-radius: 2px;
+    color: #6A737D;
+}
+
+table th {
+    background: #e8e8e8;
+    border-bottom: 1px solid rgba(0,0,0,0.69);
+    padding: 5px 10px;
+    text-align: left;
+}
+
+table td {
+    border-top: 1px solid rgba(0,0,0,0.18);
+    padding: 5px 10px;
+}
+
+hr {
+    border: 0;
+    border-bottom: 1px solid rgba(0,0,0,0.18);
+}

@@ -23,6 +23,8 @@ import click
 from typing import Optional
 
 from cli_anything.hwpx.core.session import Session
+
+_HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 from cli_anything.hwpx.core import document as doc_mod
 from cli_anything.hwpx.core import text as text_mod
 from cli_anything.hwpx.core import table as table_mod
@@ -756,24 +758,112 @@ def table_set_bgcolor(tbl_idx, row, col, color):
     globals()["output"](result, f"Cell ({row},{col}) background set to {color}")
 
 
-def _convert_markdown_to_hwpx(doc, content: str) -> int:
-    """Parse Markdown content and build HWPX document with proper formatting.
+# ── MD→HWPX Style Presets ─────────────────────────────────────────────
 
-    Conversion rules:
-    - # heading     → add_heading (bold + sized font)
-    - **bold**      → inline bold run (run-level split)
-    - *italic*      → inline italic run (run-level split)
-    - [text](url)   → add_hyperlink (Java fieldBegin HYPERLINK structure)
-    - `code`        → inline monospace run
-    - ```block```   → add_code_block (D2Coding + background)
-    - - item        → add_bullet_list / add_nested_bullet_list
-    - 1. item       → add_numbered_list / add_nested_numbered_list
-    - | table |     → add_table (header row: bold + background)
-    - ---           → add_line (horizontal rule)
-    - > quote       → blockquote (indented + left border)
+MD_STYLES: dict[str, dict] = {
+    "github": {
+        "name": "GitHub",
+        "description": "GitHub Flavored Markdown (github-markdown-css)",
+        "body_height": 1000, "body_color": "#1F2328", "body_font": None,
+        "line_spacing": 150,
+        "h1_height": 2000, "h2_height": 1500, "h3_height": 1300,
+        "h4_height": 1000, "h5_height": 900, "h6_height": 850,
+        "h1_h2_border": True, "heading_border_color": "#D1D9E0",
+        "heading_color": None, "heading_spacing": True,
+        "code_height": 850, "code_bg": "#F6F8FA", "code_text": "#1F2328",
+        "code_border": "#D1D9E0", "code_font": "D2Coding",
+        "inline_code_text": "#1F2328",
+        "link_color": "#0969DA",
+        "quote_color": "#59636E", "quote_border_width": "283",
+        "quote_border_color": "#D1D9E0",
+        "hr_color": "#D1D9E0", "hr_width": "283",
+        "table_header_bg": "#F0F0F0", "table_border_color": "#D1D9E0",
+        "table_cell_padding": (450, 975),
+        "bullet_chars": ["•", "◦", "▪", "‣", "⁃"],
+    },
+    "vscode": {
+        "name": "VS Code",
+        "description": "VS Code Markdown Preview (markdown.css)",
+        "body_height": 1000, "body_color": "#333333", "body_font": None,
+        "line_spacing": 157,
+        "h1_height": 2000, "h2_height": 1500, "h3_height": 1300,
+        "h4_height": 1000, "h5_height": 900, "h6_height": 850,
+        "h1_h2_border": True, "heading_border_color": "#C8C8C8",
+        "heading_color": None, "heading_spacing": True,
+        "code_height": 1000, "code_bg": "#F0F0F0", "code_text": "#333333",
+        "code_border": "#C8C8C8", "code_font": "D2Coding",
+        "inline_code_text": "#333333",
+        "link_color": "#4080D0",
+        "quote_color": "#6A737D", "quote_border_width": "375",
+        "quote_border_color": "#C8C8C8",
+        "hr_color": "#C8C8C8", "hr_width": "71",
+        "table_header_bg": "#E8E8E8", "table_border_color": "#C8C8C8",
+        "table_cell_padding": (375, 750),
+        "bullet_chars": ["•", "◦", "▪", "‣", "⁃"],
+    },
+    "minimal": {
+        "name": "Minimal",
+        "description": "Clean, no decorations, tight spacing",
+        "body_height": 1000, "body_color": "#333333", "body_font": None,
+        "line_spacing": 160,
+        "h1_height": 1600, "h2_height": 1300, "h3_height": 1100,
+        "h4_height": 1000, "h5_height": 900, "h6_height": 850,
+        "h1_h2_border": False, "heading_border_color": "#CCCCCC",
+        "heading_color": None, "heading_spacing": True,
+        "code_height": 900, "code_bg": "#F5F5F5", "code_text": "#333333",
+        "code_border": "#DDDDDD", "code_font": "D2Coding",
+        "inline_code_text": "#C7254E",
+        "link_color": "#0563C1",
+        "quote_color": "#555555", "quote_border_width": "71",
+        "quote_border_color": "#CCCCCC",
+        "hr_color": "#CCCCCC", "hr_width": "71",
+        "table_header_bg": "#D0D0D0", "table_border_color": "#CCCCCC",
+        "table_cell_padding": (450, 975),
+        "bullet_chars": ["•", "◦", "▪", "‣", "⁃"],
+    },
+    "academic": {
+        "name": "Academic",
+        "description": "Formal document style, larger headings, serif feel",
+        "body_height": 1100, "body_color": "#000000", "body_font": None,
+        "line_spacing": 180,
+        "h1_height": 2200, "h2_height": 1800, "h3_height": 1400,
+        "h4_height": 1100, "h5_height": 1000, "h6_height": 900,
+        "h1_h2_border": True, "heading_border_color": "#000000",
+        "heading_color": None, "heading_spacing": True,
+        "code_height": 950, "code_bg": "#F8F8F8", "code_text": "#000000",
+        "code_border": "#CCCCCC", "code_font": "D2Coding",
+        "inline_code_text": "#000000",
+        "link_color": "#000080",
+        "quote_color": "#444444", "quote_border_width": "142",
+        "quote_border_color": "#000000",
+        "hr_color": "#000000", "hr_width": "142",
+        "table_header_bg": "#D8D8D8", "table_border_color": "#000000",
+        "table_cell_padding": (450, 975),
+        "bullet_chars": ["•", "–", "·", "‣", "⁃"],
+    },
+}
 
-    Returns element count.
+DEFAULT_STYLE = "github"
+
+
+def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE) -> int:
+    """Parse Markdown and build HWPX with selectable CSS-based styling.
+
+    Style Reference (github-markdown-css):
+        Body:  16px → 10pt (1000 hwpunit), line-height 1.5 → 160%
+        H1:    2em (32px) → 20pt (2000), bold, border-bottom
+        H2:    1.5em (24px) → 15pt (1500), bold, border-bottom
+        H3:    1.25em (20px) → 13pt (1300), bold
+        H4:    1em (16px) → 10pt (1000), bold
+        Code:  85% (12px) → 8.5pt (850), bg #F6F8FA
+        Quote: border-left .25em, color #59636E
+        Link:  color #0969DA, underline on hover
+        Table: header bold, border #D1D9E0, cell padding 6px 13px
+        HR:    .25em height → 1mm line
+        Bullet: disc → circle → square → (• ◦ ▪)
+        Spacing: heading margin-top 24px → empty paragraph before H1/H2/H3
     """
+    s = MD_STYLES.get(style_name, MD_STYLES[DEFAULT_STYLE])
     lines = content.split("\n")
     element_count = 0
     i = 0
@@ -781,7 +871,7 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
     while i < len(lines):
         line = lines[i]
 
-        # --- Code block (```) ---
+        # ── Code block (```) ──
         if line.strip().startswith("```"):
             lang = line.strip()[3:].strip() or None
             code_lines = []
@@ -789,13 +879,18 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
             while i < len(lines) and not lines[i].strip().startswith("```"):
                 code_lines.append(lines[i])
                 i += 1
-            i += 1  # skip closing ```
-            code_text = "\n".join(code_lines)
-            doc.add_code_block(code_text, language=lang)
+            i += 1
+            doc.add_code_block(
+                "\n".join(code_lines), language=lang,
+                font=s.get("code_font", "D2Coding"),
+                font_size=s["code_height"], bg_color=s["code_bg"],
+                text_color=s["code_text"], border_color=s["code_border"],
+            )
             element_count += len(code_lines) + (1 if lang else 0)
+            doc.add_paragraph("")
             continue
 
-        # --- Table (|) ---
+        # ── Table (|) ──
         if line.strip().startswith("|") and "|" in line.strip()[1:]:
             table_lines = []
             while i < len(lines) and lines[i].strip().startswith("|"):
@@ -809,58 +904,107 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
                 rows.append(cells)
             if rows:
                 max_cols = max(len(r) for r in rows)
-                tbl = doc.add_table(len(rows), max_cols)
+                # Content-based column widths (MD preview style)
+                page_width = 42520
+                col_max_len = [0] * max_cols
+                for row_data in rows:
+                    for c_idx, cell_val in enumerate(row_data[:max_cols]):
+                        text_len = len(_strip_inline_md(cell_val))
+                        # CJK characters count as 2
+                        cjk_count = sum(1 for ch in cell_val if ord(ch) > 0x2E80)
+                        effective_len = text_len + cjk_count
+                        col_max_len[c_idx] = max(col_max_len[c_idx], effective_len, 1)
+                total_len = sum(col_max_len)
+                col_widths = [int(page_width * cl / total_len) for cl in col_max_len]
+                # Adjust rounding error
+                diff = page_width - sum(col_widths)
+                if diff != 0 and col_widths:
+                    col_widths[-1] += diff
+
+                tbl = doc.add_table(len(rows), max_cols, width=page_width)
+                # Set individual column widths
+                for c_idx, cw in enumerate(col_widths):
+                    try:
+                        for r_idx in range(len(rows)):
+                            cell = tbl.cell(r_idx, c_idx)
+                            cell_sz = cell.element.find(f"{{{_HP_NS}}}cellSz")
+                            if cell_sz is not None:
+                                cell_sz.set("width", str(cw))
+                    except Exception:
+                        pass
+
+                # Cell padding from style (CSS padding: top/bottom left/right)
+                pad = s.get("table_cell_padding", (450, 975))  # (v, h) in hwpunit
+                pad_v, pad_h = pad[0], pad[1]
+
                 for r_idx, row_data in enumerate(rows):
                     for c_idx, cell_val in enumerate(row_data[:max_cols]):
                         tbl.set_cell_text(r_idx, c_idx, _strip_inline_md(cell_val))
-                        # Center align all cells
                         try:
-                            tbl.set_cell_align(r_idx, c_idx, horizontal="CENTER", vertical="CENTER")
+                            # Header row: center, data rows: left
+                            h_align = "CENTER" if r_idx == 0 else "LEFT"
+                            tbl.set_cell_align(r_idx, c_idx,
+                                               horizontal=h_align, vertical="CENTER")
                         except Exception:
                             pass
-                # Header row: background color
+                        try:
+                            tbl.cell(r_idx, c_idx).set_margin(
+                                left=pad_h, right=pad_h,
+                                top=pad_v, bottom=pad_v)
+                        except Exception:
+                            pass
                 if len(rows) > 1:
                     for c_idx in range(max_cols):
                         try:
-                            tbl.set_cell_background(0, c_idx, "#E8E8E8")
+                            tbl.set_cell_background(0, c_idx, s["table_header_bg"])
                         except Exception:
                             pass
                 element_count += 1
+                doc.add_paragraph("")
             continue
 
-        # --- Horizontal rule ---
+        # ── Horizontal rule ──
         stripped = line.strip()
         if stripped and all(c in "-*_ " for c in stripped) and len(stripped.replace(" ", "")) >= 3:
             clean = stripped.replace(" ", "")
             if len(set(clean)) == 1 and clean[0] in "-*_":
-                doc.add_line(42520, 0, 42520, 0, line_color="#CCCCCC", line_width="71")
+                doc.add_line(42520, 0, 42520, 0,
+                             line_color=s["hr_color"], line_width=s["hr_width"])
                 element_count += 1
                 i += 1
                 continue
 
-        # --- Empty line ---
+        # ── Empty line ──
         if not stripped:
             i += 1
             continue
 
-        # --- Heading (#) ---
+        # ── Heading (#) ──
         heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading_match:
             level = len(heading_match.group(1))
             heading_text = _strip_inline_md(heading_match.group(2))
-            # Rule: add spacing paragraph before H1/H2 headings
-            # (except the very first element) to separate sections
-            if element_count > 0 and level <= 2:
+            if element_count > 0 and s.get("heading_spacing", True):
                 doc.add_paragraph("")
-            heading_sizes = {1: 1600, 2: 1300, 3: 1100, 4: 1000}
-            h_size = heading_sizes.get(level, 1000)
-            char_id = doc.ensure_run_style(bold=True, height=h_size)
+            heading_sizes = {
+                1: s["h1_height"], 2: s["h2_height"], 3: s["h3_height"],
+                4: s["h4_height"], 5: s["h5_height"], 6: s["h6_height"],
+            }
+            h_size = heading_sizes.get(level, s["body_height"])
+            h_color = s.get("heading_color") or s.get("body_color")
+            h_kw = {}
+            if h_color:
+                h_kw["text_color"] = h_color
+            char_id = doc.ensure_run_style(bold=True, height=h_size, **h_kw)
             doc.add_paragraph(heading_text, char_pr_id_ref=char_id)
+            if s["h1_h2_border"] and level <= 2:
+                doc.add_line(42520, 0, 42520, 0,
+                             line_color=s["heading_border_color"], line_width="71")
             element_count += 1
             i += 1
             continue
 
-        # --- Blockquote (>) ---
+        # ── Blockquote (>) ──
         if stripped.startswith(">"):
             quote_lines = []
             while i < len(lines) and lines[i].strip().startswith(">"):
@@ -868,13 +1012,14 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
                 quote_lines.append(qt)
                 i += 1
             quote_text = " ".join(quote_lines)
-            # Indented paragraph with left border effect
-            char_id = doc.ensure_run_style(italic=True, text_color="#555555", height=1000)
+            char_id = doc.ensure_run_style(
+                italic=True, text_color=s["quote_color"], height=s["body_height"])
             doc.add_paragraph(f"  {quote_text}", char_pr_id_ref=char_id)
             element_count += 1
+            doc.add_paragraph("")
             continue
 
-        # --- Bullet list (-/*/+) ---
+        # ── Bullet list (-/*/+) ──
         list_match = re.match(r"^(\s*)([-*+])\s+(.+)$", stripped)
         if list_match:
             bullet_items = []
@@ -885,17 +1030,16 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
                 indent_level = len(bm.group(1)) // 2
                 bullet_items.append((indent_level, _strip_inline_md(bm.group(3))))
                 i += 1
+            chars = s["bullet_chars"]
             if any(level > 0 for level, _ in bullet_items):
-                doc.add_nested_bullet_list(
-                    bullet_items,
-                    bullet_chars=["•", "◦", "▪", "‣", "⁃"],
-                )
+                doc.add_nested_bullet_list(bullet_items, bullet_chars=chars)
             else:
-                doc.add_bullet_list([text for _, text in bullet_items], bullet_char="•")
+                doc.add_bullet_list(
+                    [text for _, text in bullet_items], bullet_char=chars[0])
             element_count += len(bullet_items)
             continue
 
-        # --- Numbered list (1.) ---
+        # ── Numbered list (1.) ──
         num_match = re.match(r"^(\s*)\d+[.)]\s+(.+)$", stripped)
         if num_match:
             num_items = []
@@ -913,8 +1057,8 @@ def _convert_markdown_to_hwpx(doc, content: str) -> int:
             element_count += len(num_items)
             continue
 
-        # --- Regular paragraph with inline formatting ---
-        _add_rich_paragraph(doc, stripped)
+        # ── Regular paragraph (inline formatting) ──
+        _add_rich_paragraph(doc, stripped, style=s)
         element_count += 1
         i += 1
 
@@ -963,7 +1107,7 @@ def _parse_inline_segments(text: str) -> list[tuple[str, str]]:
     return segments
 
 
-def _add_rich_paragraph(doc, md_text: str) -> None:
+def _add_rich_paragraph(doc, md_text: str, style: dict | None = None) -> None:
     """Add a single paragraph with inline bold/italic/code/hyperlink formatting.
 
     All segments (including hyperlinks) are placed in one paragraph
@@ -972,7 +1116,6 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
     import xml.etree.ElementTree as ET
     import uuid as _uuid
 
-    _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
     _HP = f"{{{_HP_NS}}}"
 
     segments = _parse_inline_segments(md_text)
@@ -988,7 +1131,7 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
         # First segment is a link — create empty paragraph first
         para = doc.add_paragraph("", include_run=False)
     else:
-        char_id = _style_for_segment(doc, first_style)
+        char_id = _style_for_segment(doc, first_style, style=style)
         para = doc.add_paragraph(first_text, char_pr_id_ref=char_id)
 
     def _mk(parent, tag, attrib=None):
@@ -999,12 +1142,12 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
     # If first segment was a link, we still need to add it
     start_idx = 0 if first_style.startswith("link:") else 1
 
-    for style, text in segments[start_idx:]:
+    for seg_type, text in segments[start_idx:]:
         if not text:
             continue
 
-        if style.startswith("link:"):
-            url = style[5:]
+        if seg_type.startswith("link:"):
+            url = seg_type[5:]
             field_id = str(_uuid.uuid4().int % (2**31))
             begin_id = str(_uuid.uuid4().int % (2**31))
 
@@ -1032,7 +1175,7 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
 
             # Run: link text (blue + underline)
             link_char_id = doc.ensure_run_style(
-                underline=True, text_color="#0563C1", height=1000,
+                underline=True, text_color="#0969DA", height=1000,
             )
             run2 = _mk(para.element, f"{_HP}run", {"charPrIDRef": str(link_char_id)})
             t = _mk(run2, f"{_HP}t")
@@ -1044,7 +1187,7 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
             _mk(ctrl3, f"{_HP}fieldEnd", {"beginIDRef": begin_id, "fieldid": field_id})
         else:
             # Normal/bold/italic/code — just add a styled run
-            seg_char_id = _style_for_segment(doc, style)
+            seg_char_id = _style_for_segment(doc, seg_type, style=style)
             run = para.element.makeelement(f"{_HP}run", {"charPrIDRef": str(seg_char_id)})
             t = run.makeelement(f"{_HP}t", {})
             t.text = text
@@ -1052,21 +1195,26 @@ def _add_rich_paragraph(doc, md_text: str) -> None:
             para.element.append(run)
 
 
-def _style_for_segment(doc, style: str) -> str:
-    """Return a charPrIDRef for the given inline style.
-
-    All styles explicitly set height=1000 (10pt) to match surrounding
-    body text and prevent size mismatch.
-    """
-    if style == "bold":
-        return doc.ensure_run_style(bold=True, height=1000)
-    elif style == "italic":
-        return doc.ensure_run_style(italic=True, height=1000)
-    elif style == "bold_italic":
-        return doc.ensure_run_style(bold=True, italic=True, height=1000)
-    elif style == "code":
-        return doc.ensure_run_style(font_latin="D2Coding", font_hangul="D2Coding",
-                                    height=1000, text_color="#C7254E")
+def _style_for_segment(doc, seg_style: str, style: dict | None = None) -> str:
+    """Return a charPrIDRef using the active MD style preset."""
+    s = style or MD_STYLES[DEFAULT_STYLE]
+    h = s["body_height"]
+    color = s.get("body_color")
+    font = s.get("body_font")
+    font_kw = {}
+    if font:
+        font_kw = {"font_hangul": font, "font_latin": font}
+    if seg_style == "bold":
+        return doc.ensure_run_style(bold=True, height=h, text_color=color, **font_kw)
+    elif seg_style == "italic":
+        return doc.ensure_run_style(italic=True, height=h, text_color=color, **font_kw)
+    elif seg_style == "bold_italic":
+        return doc.ensure_run_style(bold=True, italic=True, height=h, text_color=color, **font_kw)
+    elif seg_style == "code":
+        code_font = s.get("code_font", "D2Coding")
+        return doc.ensure_run_style(
+            font_latin=code_font, font_hangul=code_font,
+            height=s["code_height"], text_color=s["inline_code_text"])
     return "0"
 
 
