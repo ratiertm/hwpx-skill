@@ -17,7 +17,7 @@ AI → runs CLI commands → report.hwpx (ready to open in Hancom Office)
 
 The AI agent reads the CLI skill metadata, picks the right commands (`document new`, `style add`, `table add`, `structure bullet-list`, ...), and assembles the document. You get a formatted `.hwpx` file without writing any code or opening Hancom Office.
 
-This also works with the **Web UI** -- type instructions in the LLM tab and download the result.
+The **Web UI** provides a simple browser interface for direct text input and file conversion (LLM integration is a stub -- for actual AI-generated documents, use an AI agent like Claude Code with this skill's CLI).
 
 ## Other ways to create documents
 
@@ -154,7 +154,7 @@ python -m uvicorn web.server:app --port 8080
 ```
 
 - **Direct Input** -- type text, pick font size, download `.hwpx`
-- **LLM Instruction** -- describe what you want, AI generates the document
+- **LLM Instruction** -- stub (returns template text; for real AI generation, use Claude Code CLI)
 - **File Upload** -- drag in MD/HTML/TXT, get `.hwpx` back
 
 ## Python API
