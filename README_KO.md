@@ -159,6 +159,59 @@ python -m uvicorn web.server:app --port 8080
 
 [Claude Code](https://claude.ai/claude-code) 설치 + 인증 필요 (`claude auth login`).
 
+## CSS 기반 문서 스타일링
+
+HWPX 문서의 스타일을 CSS 파일로 제어합니다. CSS 속성을 수정하면 HWPX 출력에 자동 반영됩니다.
+
+### 기본 제공 프리셋
+
+`hwpx/agent-harness/web/styles/` 폴더에 4개 CSS 파일:
+
+| 파일 | 스타일 | 출처 |
+|------|--------|------|
+| `github.css` | GitHub 마크다운 | [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) |
+| `vscode.css` | VS Code 프리뷰 | VS Code 내장 |
+| `minimal.css` | 깔끔, 장식 없음 | 자체 제작 |
+| `academic.css` | 학술/공식 문서 | 자체 제작 |
+
+### 작동 방식
+
+CSS 속성이 HWPX XML 속성으로 자동 매핑됩니다:
+
+```css
+/* github.css를 수정하면 출력이 바뀜 */
+h1  { font-size: 2em; border-bottom: 1px solid #d1d9e0; }  /* → 헤딩 20pt + 구분선 */
+pre { background: #f6f8fa; font-size: 85%; }                /* → 코드 블록 배경 + 크기 */
+a   { color: #0969da; }                                      /* → 하이퍼링크 색상 */
+table th { background: #f0f0f0; padding: 6px 13px; }        /* → 표 헤더 배경 + 셀 패딩 */
+```
+
+### CSS → HWPX 매핑
+
+| CSS 속성 | HWPX 대응 | 예시 |
+|----------|----------|------|
+| `body font-size` | charPr height | `16px` → 1000 (10pt) |
+| `body color` | charPr textColor | `#1f2328` |
+| `body line-height` | paraPr lineSpacing | `1.5` → 150% |
+| `h1-h6 font-size` | 헤딩 charPr height | `2em` → 2000 |
+| `code font-family` | 코드 블록 fontRef | `monospace` → D2Coding |
+| `pre background` | 코드 블록 borderFill | `#f6f8fa` |
+| `a color` | 하이퍼링크 textColor | `#0969da` |
+| `table th background` | 헤더 셀 borderFill | `#f0f0f0` |
+| `table td padding` | 셀 margin (hasMargin=1) | `6px 13px` |
+
+### 커스텀 CSS
+
+`web/styles/` 폴더에 `.css` 파일을 추가하거나 Web UI에서 업로드하세요. 서버 재시작 없이 즉시 반영됩니다.
+
+```css
+/* my-company.css */
+body { font-size: 11pt; color: #000; }
+h1   { font-size: 18pt; border-bottom: 2px solid #003366; }
+a    { color: #003366; }
+table th { background: #003366; padding: 8px 16px; }
+```
+
 ## Python API
 
 CLI 없이 코드에서 직접 사용:

@@ -159,6 +159,68 @@ python -m uvicorn web.server:app --port 8080
 
 Requires [Claude Code](https://claude.ai/claude-code) installed and authenticated (`claude auth login`).
 
+## CSS-Driven Document Styling
+
+HWPX documents are styled using standard CSS files. The converter reads CSS properties and maps them to HWPX XML attributes -- so you control the output by editing CSS.
+
+### Built-in presets
+
+4 CSS files in `hwpx/agent-harness/web/styles/`:
+
+| File | Style | Source |
+|------|-------|--------|
+| `github.css` | GitHub Flavored Markdown | [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) |
+| `vscode.css` | VS Code Markdown Preview | VS Code built-in |
+| `minimal.css` | Clean, no decorations | Custom |
+| `academic.css` | Formal/academic documents | Custom |
+
+### How it works
+
+CSS properties are parsed and mapped to HWPX values automatically:
+
+```css
+/* Edit github.css to change the output */
+h1  { font-size: 2em; border-bottom: 1px solid #d1d9e0; }  /* → charPr height=2000, bold */
+h2  { font-size: 1.5em; }                                   /* → charPr height=1500 */
+pre { background: #f6f8fa; font-size: 85%; }                /* → code block bg + font size */
+a   { color: #0969da; }                                      /* → hyperlink color */
+blockquote { color: #59636e; }                               /* → quote text color */
+table th { background: #f0f0f0; padding: 6px 13px; }        /* → header bg + cell padding */
+hr  { border-bottom: 1px solid #d1d9e0; }                   /* → horizontal rule */
+```
+
+### CSS → HWPX mapping
+
+| CSS Property | HWPX Equivalent | Example |
+|-------------|----------------|---------|
+| `body font-size` | charPr height | `16px` → 1000 hwpunit (10pt) |
+| `body color` | charPr textColor | `#1f2328` |
+| `body line-height` | paraPr lineSpacing | `1.5` → 150% |
+| `h1-h6 font-size` | heading charPr height | `2em` → 2000 |
+| `h1 border-bottom` | line after heading | `1px solid #d1d9e0` |
+| `code font-family` | code block fontRef | `monospace` → D2Coding |
+| `code font-size` | code charPr height | `85%` → 850 |
+| `pre background` | code block borderFill | `#f6f8fa` |
+| `a color` | hyperlink textColor | `#0969da` |
+| `blockquote color` | quote textColor | `#59636e` |
+| `table th background` | header cell borderFill | `#f0f0f0` |
+| `table td padding` | cell margin (hasMargin=1) | `6px 13px` |
+| `hr` | line shape | color + width |
+
+### Custom CSS
+
+Add your own `.css` file to `web/styles/` or upload via the Web UI. Changes apply immediately -- no server restart needed.
+
+```css
+/* my-company.css */
+body { font-size: 11pt; color: #000; }
+h1   { font-size: 18pt; border-bottom: 2px solid #003366; }
+h2   { font-size: 14pt; }
+a    { color: #003366; }
+pre  { background: #f0f4f8; }
+table th { background: #003366; padding: 8px 16px; }
+```
+
 ## Python API
 
 For programmatic use without the CLI:
