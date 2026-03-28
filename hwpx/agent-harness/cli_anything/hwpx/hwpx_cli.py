@@ -490,6 +490,179 @@ def structure_hyperlink(url, text):
     globals()["output"](result, f"Hyperlink added: {url}")
 
 
+@structure_group.command("page-number")
+@click.option("--pos", default="BOTTOM_CENTER", help="Position (BOTTOM_CENTER, TOP_LEFT, etc.)")
+@click.option("--format", "fmt", default="DIGIT", help="Format (DIGIT, ROMAN_CAPITAL, etc.)")
+@handle_error
+def structure_page_number(pos, fmt):
+    """Add page number."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_page_number(sess.get_doc(), pos=pos, format_type=fmt)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Page number added: {pos}")
+
+
+@structure_group.command("footnote")
+@click.argument("text")
+@click.option("--anchor", "-a", default="", help="Anchor text in main body")
+@handle_error
+def structure_footnote(text, anchor):
+    """Add a footnote."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_footnote(sess.get_doc(), text, anchor=anchor)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Footnote added")
+
+
+@structure_group.command("endnote")
+@click.argument("text")
+@click.option("--anchor", "-a", default="", help="Anchor text in main body")
+@handle_error
+def structure_endnote(text, anchor):
+    """Add an endnote."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_endnote(sess.get_doc(), text, anchor=anchor)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Endnote added")
+
+
+@structure_group.command("equation")
+@click.argument("script")
+@handle_error
+def structure_equation(script):
+    """Add an equation (Hancom equation syntax)."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_equation(sess.get_doc(), script)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Equation added")
+
+
+@structure_group.command("rectangle")
+@click.option("--width", "-w", type=int, default=14400, help="Width in hwpunit")
+@click.option("--height", "-h", type=int, default=7200, help="Height in hwpunit")
+@click.option("--color", default="#000000", help="Line color (#RRGGBB)")
+@click.option("--line-width", default="283", help="Line thickness (283=1mm, 566=2mm, 850=3mm)")
+@click.option("--fill", default=None, help="Fill color (#RRGGBB)")
+@handle_error
+def structure_rectangle(width, height, color, line_width, fill):
+    """Add a rectangle shape."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_rectangle(sess.get_doc(), width, height,
+                                      line_color=color, line_width=line_width, fill_color=fill)
+    _auto_save_if_needed()
+    globals()["output"](result, "Rectangle added")
+
+
+@structure_group.command("ellipse")
+@click.option("--width", "-w", type=int, default=14400, help="Width in hwpunit")
+@click.option("--height", "-h", type=int, default=7200, help="Height in hwpunit")
+@click.option("--color", default="#000000", help="Line color (#RRGGBB)")
+@click.option("--line-width", default="283", help="Line thickness (283=1mm, 566=2mm, 850=3mm)")
+@click.option("--fill", default=None, help="Fill color (#RRGGBB)")
+@handle_error
+def structure_ellipse(width, height, color, line_width, fill):
+    """Add an ellipse shape."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_ellipse(sess.get_doc(), width, height,
+                                    line_color=color, line_width=line_width, fill_color=fill)
+    _auto_save_if_needed()
+    globals()["output"](result, "Ellipse added")
+
+
+@structure_group.command("line")
+@click.option("--length", "-l", type=int, default=20000, help="Line length in hwpunit")
+@click.option("--color", default="#000000", help="Line color (#RRGGBB)")
+@click.option("--line-width", default="283", help="Line thickness (283=1mm, 566=2mm, 850=3mm)")
+@handle_error
+def structure_line(length, color, line_width):
+    """Add a horizontal line."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_line(sess.get_doc(), length=length, line_color=color, line_width=line_width)
+    _auto_save_if_needed()
+    globals()["output"](result, "Line added")
+
+
+@structure_group.command("bullet-list")
+@click.argument("items")
+@click.option("--char", default="●", help="Bullet character (●, ○, ■, ◆)")
+@handle_error
+def structure_bullet_list(items, char):
+    """Add a bullet list. Items separated by commas."""
+    sess = get_session()
+    sess.snapshot()
+    item_list = [i.strip() for i in items.split(",")]
+    result = struct_mod.add_bullet_list(sess.get_doc(), item_list, bullet_char=char)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Bullet list added ({len(item_list)} items)")
+
+
+@structure_group.command("numbered-list")
+@click.argument("items")
+@click.option("--format", "fmt", default="^1.", help="Number format (^1. or ^1))")
+@handle_error
+def structure_numbered_list(items, fmt):
+    """Add a numbered list. Items separated by commas."""
+    sess = get_session()
+    sess.snapshot()
+    item_list = [i.strip() for i in items.split(",")]
+    result = struct_mod.add_numbered_list(sess.get_doc(), item_list, format_string=fmt)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Numbered list added ({len(item_list)} items)")
+
+
+# ── Style Commands ────────────────────────────────────────────────────
+
+@cli.group("style")
+def style_group():
+    """Text styling — bold, italic, color, size."""
+    pass
+
+
+@style_group.command("add")
+@click.argument("content")
+@click.option("--bold", "-b", is_flag=True, help="Bold text")
+@click.option("--italic", "-i", is_flag=True, help="Italic text")
+@click.option("--underline", "-u", is_flag=True, help="Underline text")
+@click.option("--font-size", "-s", type=int, default=None, help="Font size in pt")
+@click.option("--color", "-c", default=None, help="Text color (#RRGGBB)")
+@handle_error
+def style_add(content, bold, italic, underline, font_size, color):
+    """Add styled text to the document."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.add_styled_text(
+        sess.get_doc(), content,
+        bold=bold, italic=italic, underline=underline,
+        font_size=font_size, text_color=color,
+    )
+    _auto_save_if_needed()
+    globals()["output"](result, f"Styled text added: {content[:50]}...")
+
+
+# ── Table Background ──────────────────────────────────────────────────
+
+@table.command("set-bgcolor")
+@click.option("--table", "tbl_idx", type=int, default=0, help="Table index (0-based)")
+@click.option("--row", "-r", type=int, required=True, help="Row index")
+@click.option("--col", "-c", type=int, required=True, help="Column index")
+@click.option("--color", required=True, help="Background color (#RRGGBB)")
+@handle_error
+def table_set_bgcolor(tbl_idx, row, col, color):
+    """Set table cell background color."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.set_cell_background(sess.get_doc(), tbl_idx, row, col, color)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Cell ({row},{col}) background set to {color}")
+
+
 # ── Convert Commands ──────────────────────────────────────────────────
 # SPEC: e2e-hwpx-skill-v1-021 -- File Upload Screen
 # SPEC: e2e-hwpx-skill-v1-022 -- File Upload Parse Connection
