@@ -147,9 +147,9 @@ AI 에이전트가 한글 문서를 자동으로 생성합니다.
         <input type="text" name="filename" value="ai-generated.hwpx" required>
       </div>
       <div class="field">
-        <label>AI Instruction (자연어 지시문)</label>
-        <textarea name="instruction" rows="4" placeholder="예: 이 프로그램의 특징을 10가지로 정리해서 한글 문서로 만들어줘">이 프로그램의 특징을 한글로 적어줘</textarea>
-        <p class="info">AI 에이전트가 SKILL.md를 읽고 CLI 명령어 시퀀스를 생성합니다.</p>
+        <label>AI Instruction (원하는 문서를 자연어로 설명하세요)</label>
+        <textarea name="instruction" rows="4" placeholder="예: 3분기 매출 보고서를 만들어줘. 제목, 개요, 월별 매출 표, 핵심 성과 3개를 글머리표로.">프로젝트 기획서를 만들어줘. 제목, 배경, 목표, 일정표, 예산표를 포함해서.</textarea>
+        <p class="info">Claude가 마크다운을 생성 → 서식 적용된 HWPX로 자동 변환 (Claude Code OAuth 인증 사용, API 키 불필요)</p>
       </div>
       <button type="submit" class="btn btn-primary">Generate with AI</button>
     </form>

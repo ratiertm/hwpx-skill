@@ -2,14 +2,17 @@
 
 Wraps python-hwpx to provide a web UI for:
 1. Direct text input → HWPX
-2. LLM instruction → HWPX (generates content from instruction)
+2. LLM instruction → Markdown → HWPX (Claude via subprocess, OAuth auth)
 3. File upload (HTML/MD/TXT) → HWPX conversion
 """
 
 from __future__ import annotations
 
 import html as html_lib
+import json
+import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -22,10 +25,26 @@ app = FastAPI(title="HWPX Document Generator")
 
 OUTPUT_DIR = Path(tempfile.mkdtemp(prefix="hwpx_"))
 
+# Reuse the enhanced markdown converter from CLI
+import sys
+_cli_path = str(Path(__file__).resolve().parent.parent)
+if _cli_path not in sys.path:
+    sys.path.insert(0, _cli_path)
+from cli_anything.hwpx.hwpx_cli import _convert_markdown_to_hwpx
 
-def _create_hwpx(paragraphs: list[str], filename: str,
-                  font_sizes: dict[int, int] | None = None) -> Path:
-    """Create HWPX file from paragraphs. Returns file path."""
+
+def _create_hwpx_from_markdown(markdown: str, filename: str) -> Path:
+    """Create a formatted HWPX file from Markdown content."""
+    doc = HwpxDocument.new()
+    _convert_markdown_to_hwpx(doc, markdown)
+    out = OUTPUT_DIR / filename
+    doc.save_to_path(str(out))
+    return out
+
+
+def _create_hwpx_simple(paragraphs: list[str], filename: str,
+                         font_sizes: dict[int, int] | None = None) -> Path:
+    """Create HWPX file from plain paragraphs (no formatting)."""
     doc = HwpxDocument.new()
     for i, text in enumerate(paragraphs):
         if font_sizes and i in font_sizes:
@@ -38,20 +57,87 @@ def _create_hwpx(paragraphs: list[str], filename: str,
     return out
 
 
-def _parse_html(content: str) -> list[str]:
-    content = re.sub(r"<br\s*/?>", "\n", content)
-    content = re.sub(r"</(?:p|div|h[1-6]|li|tr|blockquote)>", "\n", content, flags=re.IGNORECASE)
-    content = re.sub(r"<[^>]+>", "", content)
-    content = html_lib.unescape(content)
-    return [line.strip() for line in content.split("\n") if line.strip()]
+# ── LLM Integration (Claude subprocess with OAuth) ──────────────────
+
+_SYSTEM_PROMPT = (
+    "You are a document writer. The user will give you an instruction "
+    "to create a document. Generate the document content in Markdown format.\n\n"
+    "Rules:\n"
+    "- Use # for title, ## for sections, ### for subsections\n"
+    "- Use **bold** and *italic* for emphasis\n"
+    "- Use - for bullet lists, 1. for numbered lists\n"
+    "- Use | table | format for data tables\n"
+    "- Use ```language for code blocks when appropriate\n"
+    "- Use > for important quotes or notes\n"
+    "- Use --- for section separators when needed\n"
+    "- Write in the same language as the user's instruction\n"
+    "- Output ONLY the Markdown content, no explanations or commentary\n"
+    "- Create realistic, detailed, professional content\n"
+)
 
 
-def _parse_md(content: str) -> list[str]:
-    return [line.strip() for line in content.split("\n") if line.strip()]
+def _call_claude_subprocess(instruction: str) -> str:
+    """Call Claude via 'claude -p' subprocess using OAuth authentication.
+
+    This uses Claude Code's headless mode (-p) which inherits the user's
+    existing OAuth session — no API key needed.
+    """
+    # Find claude CLI
+    claude_path = _find_claude_cli()
+    if not claude_path:
+        raise ValueError(
+            "claude CLI를 찾을 수 없습니다.\n"
+            "Claude Code가 설치되어 있는지 확인하세요."
+        )
+
+    # Remove ANTHROPIC_API_KEY from env to force OAuth
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+
+    prompt = f"{_SYSTEM_PROMPT}\n\nUser instruction:\n{instruction}"
+
+    result = subprocess.run(
+        [claude_path, "-p", prompt, "--output-format", "text"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        stdin=subprocess.DEVNULL,
+    )
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        raise ValueError(f"Claude CLI 오류: {stderr or 'unknown error'}")
+
+    output = result.stdout.strip()
+    if not output:
+        raise ValueError("Claude가 빈 응답을 반환했습니다.")
+
+    return output
 
 
-def _parse_txt(content: str) -> list[str]:
-    return [line.strip() for line in content.split("\n") if line.strip()]
+def _find_claude_cli() -> str | None:
+    """Find the claude CLI binary path."""
+    # Common locations
+    candidates = [
+        os.path.expanduser("~/.local/bin/claude"),
+        "/usr/local/bin/claude",
+        "/opt/homebrew/bin/claude",
+    ]
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+
+    # Try which
+    try:
+        result = subprocess.run(
+            ["which", "claude"], capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return None
 
 
 # ── API Endpoints ─────────────────────────────────────────────────────
@@ -71,9 +157,8 @@ async def direct_input(
     if not lines:
         return {"error": "내용을 입력해주세요"}
 
-    # First line as title with larger font
     font_sizes = {0: title_size * 100}
-    path = _create_hwpx(lines, filename, font_sizes)
+    path = _create_hwpx_simple(lines, filename, font_sizes)
     return {
         "filename": filename,
         "paragraphs": len(lines),
@@ -90,34 +175,24 @@ async def llm_instruction(
     if not instruction.strip():
         return {"error": "지시문을 입력해주세요"}
 
-    # AI가 지시문을 해석해서 내용을 생성하는 부분
-    # 실제로는 LLM API를 호출하지만, 여기서는 지시문 기반 템플릿 생성
-    paragraphs = _generate_from_instruction(instruction)
-    font_sizes = {0: 2000}  # 20pt title
-    path = _create_hwpx(paragraphs, filename, font_sizes)
+    try:
+        markdown = _call_claude_subprocess(instruction)
+    except ValueError as e:
+        return {"error": str(e)}
+    except subprocess.TimeoutExpired:
+        return {"error": "Claude 응답 시간 초과 (120초). 더 짧은 지시문을 시도하세요."}
+    except Exception as e:
+        return {"error": f"오류 발생: {e}"}
+
+    path = _create_hwpx_from_markdown(markdown, filename)
+
     return {
         "filename": filename,
-        "paragraphs": len(paragraphs),
+        "paragraphs": markdown.count("\n") + 1,
         "download": f"/download/{filename}",
-        "preview": "\n".join(paragraphs),
+        "preview": markdown,
         "instruction": instruction,
     }
-
-
-def _generate_from_instruction(instruction: str) -> list[str]:
-    """Generate document content from instruction.
-
-    In production, this would call an LLM API.
-    For now, creates structured content based on the instruction.
-    """
-    return [
-        instruction,
-        "",
-        "이 문서는 AI 에이전트가 자동으로 생성했습니다.",
-        "",
-        "cli-anything-hwpx를 사용하여 HWPX 문서를 생성합니다.",
-        "한컴오피스 설치 없이, Python만으로 동작합니다.",
-    ]
 
 
 @app.post("/api/convert")
@@ -128,26 +203,40 @@ async def convert_file(
     content = (await file.read()).decode("utf-8")
     ext = Path(file.filename or "").suffix.lower()
 
-    if ext in (".html", ".htm"):
-        paragraphs = _parse_html(content)
-    elif ext in (".md", ".markdown"):
-        paragraphs = _parse_md(content)
-    elif ext in (".txt", ".text"):
-        paragraphs = _parse_txt(content)
-    else:
+    supported = {".html", ".htm", ".md", ".markdown", ".txt", ".text"}
+    if ext not in supported:
         return {"error": f"지원하지 않는 형식: {ext}. html, md, txt만 가능합니다."}
 
-    if not paragraphs:
+    if not content.strip():
         return {"error": "파일에 내용이 없습니다"}
 
-    path = _create_hwpx(paragraphs, filename)
+    if ext in (".md", ".markdown"):
+        path = _create_hwpx_from_markdown(content, filename)
+        paragraphs_count = content.count("\n") + 1
+    elif ext in (".html", ".htm"):
+        paragraphs = _parse_html(content)
+        path = _create_hwpx_simple(paragraphs, filename)
+        paragraphs_count = len(paragraphs)
+    else:
+        paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
+        path = _create_hwpx_simple(paragraphs, filename)
+        paragraphs_count = len(paragraphs)
+
     return {
         "source": file.filename,
         "format": ext.lstrip("."),
-        "paragraphs": len(paragraphs),
+        "paragraphs": paragraphs_count,
         "download": f"/download/{filename}",
-        "preview": "\n".join(paragraphs[:20]),
+        "preview": content[:2000],
     }
+
+
+def _parse_html(content: str) -> list[str]:
+    content = re.sub(r"<br\s*/?>", "\n", content)
+    content = re.sub(r"</(?:p|div|h[1-6]|li|tr|blockquote)>", "\n", content, flags=re.IGNORECASE)
+    content = re.sub(r"<[^>]+>", "", content)
+    content = html_lib.unescape(content)
+    return [line.strip() for line in content.split("\n") if line.strip()]
 
 
 @app.get("/download/{filename}")

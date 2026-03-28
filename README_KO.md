@@ -17,7 +17,7 @@ AI → CLI 명령어 실행 → 보고서.hwpx (한컴오피스에서 바로 열
 
 AI 에이전트가 CLI 스킬 메타데이터를 읽고, 적절한 명령어(`document new`, `style add`, `table add`, `structure bullet-list`, ...)를 골라서 문서를 조립합니다. 코드를 작성하거나 한컴오피스를 열 필요 없이 서식이 적용된 `.hwpx` 파일을 받습니다.
 
-**웹 UI**는 텍스트 입력과 파일 변환용 브라우저 인터페이스입니다 (LLM 탭은 스텁 -- 실제 AI 문서 생성은 Claude Code 같은 에이전트에서 이 스킬의 CLI를 사용하세요).
+**웹 UI**에서도 가능합니다 -- LLM 탭에서 원하는 문서를 설명하면 Claude가 생성하고 `.hwpx`로 다운로드됩니다. Claude Code의 OAuth 인증을 사용하므로 API 키가 필요 없습니다.
 
 ## 다른 방법들
 
@@ -154,8 +154,10 @@ python -m uvicorn web.server:app --port 8080
 ```
 
 - **Direct Input** -- 텍스트 입력 + 폰트 크기 선택 → `.hwpx` 다운로드
-- **LLM Instruction** -- 스텁 (템플릿만 반환; 실제 AI 생성은 Claude Code CLI 사용)
+- **LLM Instruction** -- 원하는 문서를 자연어로 설명 → Claude가 서식 적용된 문서 생성
 - **File Upload** -- MD/HTML/TXT 파일 업로드 → `.hwpx` 변환
+
+[Claude Code](https://claude.ai/claude-code) 설치 + 인증 필요 (`claude auth login`).
 
 ## Python API
 
