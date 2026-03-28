@@ -17,6 +17,7 @@ Usage:
 
 import sys
 import os
+import re
 import json
 import click
 from typing import Optional
@@ -617,6 +618,98 @@ def structure_numbered_list(items, fmt):
     globals()["output"](result, f"Numbered list added ({len(item_list)} items)")
 
 
+@structure_group.command("code-block")
+@click.argument("code")
+@click.option("--lang", default=None, help="Language label (e.g. python, javascript)")
+@click.option("--font", default="D2Coding", help="Monospace font name")
+@handle_error
+def structure_code_block(code, lang, font):
+    """Add a code block with monospace font and background."""
+    sess = get_session()
+    sess.snapshot()
+    # Replace \\n with actual newlines for multi-line code
+    code_text = code.replace("\\n", "\n")
+    result = struct_mod.add_code_block(sess.get_doc(), code_text, language=lang, font=font)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Code block added ({result['lines']} lines)")
+
+
+@structure_group.command("nested-bullet-list")
+@click.argument("items")
+@handle_error
+def structure_nested_bullet_list(items):
+    """Add a nested bullet list. Format: 'level:text,level:text,...'
+    Example: '0:Item 1,1:Sub A,1:Sub B,0:Item 2'"""
+    sess = get_session()
+    sess.snapshot()
+    parsed = []
+    for item in items.split(","):
+        parts = item.strip().split(":", 1)
+        if len(parts) == 2:
+            parsed.append((int(parts[0]), parts[1].strip()))
+        else:
+            parsed.append((0, parts[0].strip()))
+    result = struct_mod.add_nested_bullet_list(sess.get_doc(), parsed)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Nested bullet list added ({result['items']} items)")
+
+
+@structure_group.command("nested-numbered-list")
+@click.argument("items")
+@handle_error
+def structure_nested_numbered_list(items):
+    """Add a nested numbered list. Format: 'level:text,level:text,...'
+    Example: '0:First,1:Sub A,0:Second'"""
+    sess = get_session()
+    sess.snapshot()
+    parsed = []
+    for item in items.split(","):
+        parts = item.strip().split(":", 1)
+        if len(parts) == 2:
+            parsed.append((int(parts[0]), parts[1].strip()))
+        else:
+            parsed.append((0, parts[0].strip()))
+    result = struct_mod.add_nested_numbered_list(sess.get_doc(), parsed)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Nested numbered list added ({result['items']} items)")
+
+
+@structure_group.command("set-columns")
+@click.option("--count", "-n", type=int, default=2, help="Number of columns")
+@click.option("--gap", "-g", type=int, default=1200, help="Gap between columns (hwpunit)")
+@click.option("--separator", default=None, help="Separator line type (SOLID, DASH, etc.)")
+@handle_error
+def structure_set_columns(count, gap, separator):
+    """Set column layout (e.g. 2-column)."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.set_columns(sess.get_doc(), count, gap=gap, separator=separator)
+    _auto_save_if_needed()
+    globals()["output"](result, f"Set {count}-column layout")
+
+
+@table.command("set-gradient")
+@click.option("--table", "tbl_idx", type=int, default=0, help="Table index (0-based)")
+@click.option("--row", "-r", type=int, required=True, help="Row index")
+@click.option("--col", "-c", type=int, required=True, help="Column index")
+@click.option("--start", required=True, help="Start color (#RRGGBB)")
+@click.option("--end", required=True, help="End color (#RRGGBB)")
+@click.option("--type", "grad_type", default="LINEAR", help="Gradient type (LINEAR, RADIAL, CONICAL, SQUARE)")
+@click.option("--angle", type=int, default=0, help="Angle in degrees (for LINEAR)")
+@handle_error
+def table_set_gradient(tbl_idx, row, col, start, end, grad_type, angle):
+    """Set gradient fill on a table cell."""
+    sess = get_session()
+    sess.snapshot()
+    result = struct_mod.set_cell_gradient(
+        sess.get_doc(), tbl_idx, row, col,
+        start_color=start, end_color=end,
+        gradient_type=grad_type, angle=angle,
+    )
+    _auto_save_if_needed()
+    globals()["output"](result, f"Cell ({row},{col}) gradient set {start} → {end}")
+
+
 # ── Style Commands ────────────────────────────────────────────────────
 
 @cli.group("style")
@@ -663,6 +756,334 @@ def table_set_bgcolor(tbl_idx, row, col, color):
     globals()["output"](result, f"Cell ({row},{col}) background set to {color}")
 
 
+def _convert_markdown_to_hwpx(doc, content: str) -> int:
+    """Parse Markdown content and build HWPX document with proper formatting.
+
+    Conversion rules:
+    - # heading     → add_heading (bold + sized font)
+    - **bold**      → inline bold run (run-level split)
+    - *italic*      → inline italic run (run-level split)
+    - [text](url)   → add_hyperlink (Java fieldBegin HYPERLINK structure)
+    - `code`        → inline monospace run
+    - ```block```   → add_code_block (D2Coding + background)
+    - - item        → add_bullet_list / add_nested_bullet_list
+    - 1. item       → add_numbered_list / add_nested_numbered_list
+    - | table |     → add_table (header row: bold + background)
+    - ---           → add_line (horizontal rule)
+    - > quote       → blockquote (indented + left border)
+
+    Returns element count.
+    """
+    lines = content.split("\n")
+    element_count = 0
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+
+        # --- Code block (```) ---
+        if line.strip().startswith("```"):
+            lang = line.strip()[3:].strip() or None
+            code_lines = []
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith("```"):
+                code_lines.append(lines[i])
+                i += 1
+            i += 1  # skip closing ```
+            code_text = "\n".join(code_lines)
+            doc.add_code_block(code_text, language=lang)
+            element_count += len(code_lines) + (1 if lang else 0)
+            continue
+
+        # --- Table (|) ---
+        if line.strip().startswith("|") and "|" in line.strip()[1:]:
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                table_lines.append(lines[i])
+                i += 1
+            rows = []
+            for tl in table_lines:
+                cells = [c.strip() for c in tl.strip().strip("|").split("|")]
+                if all(set(c) <= {"-", ":", " "} for c in cells):
+                    continue
+                rows.append(cells)
+            if rows:
+                max_cols = max(len(r) for r in rows)
+                tbl = doc.add_table(len(rows), max_cols)
+                for r_idx, row_data in enumerate(rows):
+                    for c_idx, cell_val in enumerate(row_data[:max_cols]):
+                        tbl.set_cell_text(r_idx, c_idx, _strip_inline_md(cell_val))
+                        # Center align all cells
+                        try:
+                            tbl.set_cell_align(r_idx, c_idx, horizontal="CENTER", vertical="CENTER")
+                        except Exception:
+                            pass
+                # Header row: background color
+                if len(rows) > 1:
+                    for c_idx in range(max_cols):
+                        try:
+                            tbl.set_cell_background(0, c_idx, "#E8E8E8")
+                        except Exception:
+                            pass
+                element_count += 1
+            continue
+
+        # --- Horizontal rule ---
+        stripped = line.strip()
+        if stripped and all(c in "-*_ " for c in stripped) and len(stripped.replace(" ", "")) >= 3:
+            clean = stripped.replace(" ", "")
+            if len(set(clean)) == 1 and clean[0] in "-*_":
+                doc.add_line(42520, 0, 42520, 0, line_color="#CCCCCC", line_width="71")
+                element_count += 1
+                i += 1
+                continue
+
+        # --- Empty line ---
+        if not stripped:
+            i += 1
+            continue
+
+        # --- Heading (#) ---
+        heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading_match:
+            level = len(heading_match.group(1))
+            heading_text = _strip_inline_md(heading_match.group(2))
+            # Rule: add spacing paragraph before H1/H2 headings
+            # (except the very first element) to separate sections
+            if element_count > 0 and level <= 2:
+                doc.add_paragraph("")
+            heading_sizes = {1: 1600, 2: 1300, 3: 1100, 4: 1000}
+            h_size = heading_sizes.get(level, 1000)
+            char_id = doc.ensure_run_style(bold=True, height=h_size)
+            doc.add_paragraph(heading_text, char_pr_id_ref=char_id)
+            element_count += 1
+            i += 1
+            continue
+
+        # --- Blockquote (>) ---
+        if stripped.startswith(">"):
+            quote_lines = []
+            while i < len(lines) and lines[i].strip().startswith(">"):
+                qt = re.sub(r"^>\s?", "", lines[i].strip())
+                quote_lines.append(qt)
+                i += 1
+            quote_text = " ".join(quote_lines)
+            # Indented paragraph with left border effect
+            char_id = doc.ensure_run_style(italic=True, text_color="#555555", height=1000)
+            doc.add_paragraph(f"  {quote_text}", char_pr_id_ref=char_id)
+            element_count += 1
+            continue
+
+        # --- Bullet list (-/*/+) ---
+        list_match = re.match(r"^(\s*)([-*+])\s+(.+)$", stripped)
+        if list_match:
+            bullet_items = []
+            while i < len(lines):
+                bm = re.match(r"^(\s*)([-*+])\s+(.+)$", lines[i])
+                if not bm:
+                    break
+                indent_level = len(bm.group(1)) // 2
+                bullet_items.append((indent_level, _strip_inline_md(bm.group(3))))
+                i += 1
+            if any(level > 0 for level, _ in bullet_items):
+                doc.add_nested_bullet_list(
+                    bullet_items,
+                    bullet_chars=["•", "◦", "▪", "‣", "⁃"],
+                )
+            else:
+                doc.add_bullet_list([text for _, text in bullet_items], bullet_char="•")
+            element_count += len(bullet_items)
+            continue
+
+        # --- Numbered list (1.) ---
+        num_match = re.match(r"^(\s*)\d+[.)]\s+(.+)$", stripped)
+        if num_match:
+            num_items = []
+            while i < len(lines):
+                nm = re.match(r"^(\s*)\d+[.)]\s+(.+)$", lines[i])
+                if not nm:
+                    break
+                indent_level = len(nm.group(1)) // 2
+                num_items.append((indent_level, _strip_inline_md(nm.group(2))))
+                i += 1
+            if any(level > 0 for level, _ in num_items):
+                doc.add_nested_numbered_list(num_items)
+            else:
+                doc.add_numbered_list([text for _, text in num_items])
+            element_count += len(num_items)
+            continue
+
+        # --- Regular paragraph with inline formatting ---
+        _add_rich_paragraph(doc, stripped)
+        element_count += 1
+        i += 1
+
+    return element_count
+
+
+def _parse_inline_segments(text: str) -> list[tuple[str, str]]:
+    """Parse inline markdown into segments of (style, text).
+
+    style is one of: 'normal', 'bold', 'italic', 'bold_italic',
+    'code', 'link:URL'.
+    """
+    segments: list[tuple[str, str]] = []
+    # Pattern matches: ***bold_italic***, **bold**, *italic*, `code`, [text](url), ![alt](url)
+    pattern = re.compile(
+        r"!\[([^\]]*)\]\([^)]+\)"        # image ![alt](url) → alt text
+        r"|\[([^\]]+)\]\(([^)]+)\)"       # link [text](url)
+        r"|`([^`]+)`"                     # inline code
+        r"|\*\*\*(.+?)\*\*\*"            # bold+italic
+        r"|\*\*(.+?)\*\*"                # bold
+        r"|\*(.+?)\*"                     # italic
+    )
+    last_end = 0
+    for m in pattern.finditer(text):
+        # Text before this match
+        if m.start() > last_end:
+            segments.append(("normal", text[last_end:m.start()]))
+        if m.group(1) is not None:      # image
+            segments.append(("normal", m.group(1) or ""))
+        elif m.group(2) is not None:    # link
+            segments.append((f"link:{m.group(3)}", m.group(2)))
+        elif m.group(4) is not None:    # code
+            segments.append(("code", m.group(4)))
+        elif m.group(5) is not None:    # bold+italic
+            segments.append(("bold_italic", m.group(5)))
+        elif m.group(6) is not None:    # bold
+            segments.append(("bold", m.group(6)))
+        elif m.group(7) is not None:    # italic
+            segments.append(("italic", m.group(7)))
+        last_end = m.end()
+    # Remaining text
+    if last_end < len(text):
+        segments.append(("normal", text[last_end:]))
+    if not segments:
+        segments.append(("normal", text))
+    return segments
+
+
+def _add_rich_paragraph(doc, md_text: str) -> None:
+    """Add a single paragraph with inline bold/italic/code/hyperlink formatting.
+
+    All segments (including hyperlinks) are placed in one paragraph
+    to avoid unwanted line breaks.
+    """
+    import xml.etree.ElementTree as ET
+    import uuid as _uuid
+
+    _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+    _HP = f"{{{_HP_NS}}}"
+
+    segments = _parse_inline_segments(md_text)
+
+    # Fast path: no formatting at all
+    if len(segments) == 1 and segments[0][0] == "normal":
+        doc.add_paragraph(segments[0][1])
+        return
+
+    # Create one paragraph, append all segments as runs
+    first_style, first_text = segments[0]
+    if first_style.startswith("link:"):
+        # First segment is a link — create empty paragraph first
+        para = doc.add_paragraph("", include_run=False)
+    else:
+        char_id = _style_for_segment(doc, first_style)
+        para = doc.add_paragraph(first_text, char_pr_id_ref=char_id)
+
+    def _mk(parent, tag, attrib=None):
+        child = parent.makeelement(tag, attrib or {})
+        parent.append(child)
+        return child
+
+    # If first segment was a link, we still need to add it
+    start_idx = 0 if first_style.startswith("link:") else 1
+
+    for style, text in segments[start_idx:]:
+        if not text:
+            continue
+
+        if style.startswith("link:"):
+            url = style[5:]
+            field_id = str(_uuid.uuid4().int % (2**31))
+            begin_id = str(_uuid.uuid4().int % (2**31))
+
+            # Run: fieldBegin
+            run1 = _mk(para.element, f"{_HP}run", {"charPrIDRef": "0"})
+            ctrl1 = _mk(run1, f"{_HP}ctrl")
+            fb = _mk(ctrl1, f"{_HP}fieldBegin", {
+                "id": begin_id, "type": "HYPERLINK", "name": "",
+                "editable": "0", "dirty": "0", "zorder": "-1", "fieldid": field_id,
+            })
+            params = _mk(fb, f"{_HP}parameters", {"cnt": "6", "name": ""})
+            p0 = _mk(params, f"{_HP}integerParam", {"name": "Prop"})
+            p0.text = "0"
+            escaped_url = url.replace(":", "\\:")
+            p1 = _mk(params, f"{_HP}stringParam", {"name": "Command"})
+            p1.text = f"{escaped_url};1;0;0;"
+            p2 = _mk(params, f"{_HP}stringParam", {"name": "Path"})
+            p2.text = url
+            p3 = _mk(params, f"{_HP}stringParam", {"name": "Category"})
+            p3.text = "HWPHYPERLINK_TYPE_URL"
+            p4 = _mk(params, f"{_HP}stringParam", {"name": "TargetType"})
+            p4.text = "HWPHYPERLINK_TARGET_BOOKMARK"
+            p5 = _mk(params, f"{_HP}stringParam", {"name": "DocOpenType"})
+            p5.text = "HWPHYPERLINK_JUMP_CURRENTTAB"
+
+            # Run: link text (blue + underline)
+            link_char_id = doc.ensure_run_style(
+                underline=True, text_color="#0563C1", height=1000,
+            )
+            run2 = _mk(para.element, f"{_HP}run", {"charPrIDRef": str(link_char_id)})
+            t = _mk(run2, f"{_HP}t")
+            t.text = text
+
+            # Run: fieldEnd
+            run3 = _mk(para.element, f"{_HP}run", {"charPrIDRef": "0"})
+            ctrl3 = _mk(run3, f"{_HP}ctrl")
+            _mk(ctrl3, f"{_HP}fieldEnd", {"beginIDRef": begin_id, "fieldid": field_id})
+        else:
+            # Normal/bold/italic/code — just add a styled run
+            seg_char_id = _style_for_segment(doc, style)
+            run = para.element.makeelement(f"{_HP}run", {"charPrIDRef": str(seg_char_id)})
+            t = run.makeelement(f"{_HP}t", {})
+            t.text = text
+            run.append(t)
+            para.element.append(run)
+
+
+def _style_for_segment(doc, style: str) -> str:
+    """Return a charPrIDRef for the given inline style.
+
+    All styles explicitly set height=1000 (10pt) to match surrounding
+    body text and prevent size mismatch.
+    """
+    if style == "bold":
+        return doc.ensure_run_style(bold=True, height=1000)
+    elif style == "italic":
+        return doc.ensure_run_style(italic=True, height=1000)
+    elif style == "bold_italic":
+        return doc.ensure_run_style(bold=True, italic=True, height=1000)
+    elif style == "code":
+        return doc.ensure_run_style(font_latin="D2Coding", font_hangul="D2Coding",
+                                    height=1000, text_color="#C7254E")
+    return "0"
+
+
+def _strip_inline_md(text: str) -> str:
+    """Strip inline markdown formatting (bold, italic, code, links)."""
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"\*\*\*(.+?)\*\*\*", r"\1", text)
+    text = re.sub(r"___(.+?)___", r"\1", text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    return text
+
+
 # ── Convert Commands ──────────────────────────────────────────────────
 # SPEC: e2e-hwpx-skill-v1-021 -- File Upload Screen
 # SPEC: e2e-hwpx-skill-v1-022 -- File Upload Parse Connection
@@ -674,7 +1095,6 @@ def table_set_bgcolor(tbl_idx, row, col, color):
 @handle_error
 def convert_file(source, output):
     """Convert HTML, Markdown, or plain text file to HWPX document."""
-    import re
     from pathlib import Path
 
     src = Path(source)
@@ -687,7 +1107,9 @@ def convert_file(source, output):
     if not content.strip():
         raise ValueError(f"File is empty: {source}")
 
-    # Parse into paragraphs based on format
+    doc = doc_mod.new_document()
+    element_count = 0
+
     if ext in (".html", ".htm"):
         # Strip HTML tags, split by block elements
         content = re.sub(r"<br\s*/?>", "\n", content)
@@ -695,28 +1117,33 @@ def convert_file(source, output):
         content = re.sub(r"<[^>]+>", "", content)
         import html as html_mod_builtin
         content = html_mod_builtin.unescape(content)
-        paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
+        for line in content.split("\n"):
+            line = line.strip()
+            if line:
+                doc.add_paragraph(line)
+                element_count += 1
+
     elif ext in (".md", ".markdown"):
-        # Keep headings and paragraphs, strip markdown syntax minimally
-        paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
+        element_count = _convert_markdown_to_hwpx(doc, content)
+
     else:
         # Plain text: each non-empty line is a paragraph
-        paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
+        for line in content.split("\n"):
+            line = line.strip()
+            if line:
+                doc.add_paragraph(line)
+                element_count += 1
 
-    # Create HWPX document
-    doc = doc_mod.new_document()
-    for para in paragraphs:
-        doc.add_paragraph(para)
     doc_mod.save_document(doc, output)
 
     # SPEC: e2e-hwpx-skill-v1-024 -- File Convert Response
     result = {
         "source": source,
         "format": ext.lstrip("."),
-        "paragraphs": len(paragraphs),
+        "paragraphs": element_count,
         "output": output,
     }
-    globals()["output"](result, f"Converted {len(paragraphs)} paragraphs from {source} to {output}")
+    globals()["output"](result, f"Converted {element_count} paragraphs from {source} to {output}")
 
 
 # ── Session Commands ───────────────────────────────────────────────────

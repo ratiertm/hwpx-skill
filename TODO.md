@@ -87,5 +87,6 @@ Whale이 렌더링하지 못하는 기능 (XML은 정상):
 - 머리말/꼬리말 (`header/footer`)
 - 도형 (arc, polygon, equation)
 - 이미지 (insert_image — 미확인)
+- 하이퍼링크 (`<hp:fieldBegin type="HYPERLINK">`) — 2026-03-28 확인, XML은 한컴 실제 파일과 동일한 6-param 구조
 
 이 기능들은 한컴오피스에서 검증 필요.

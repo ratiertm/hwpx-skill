@@ -69,7 +69,8 @@ class TestConvertMarkdown:
         assert result.exit_code == 0
         doc = doc_mod.open_document(out)
         text = text_mod.extract_text(doc)
-        assert "# 제목" in text
+        # Heading is now properly formatted (no # prefix in output)
+        assert "제목" in text
         assert "항목1" in text
 
     def test_markdown_preserves_structure(self, tmp_path):
@@ -82,9 +83,10 @@ class TestConvertMarkdown:
 
         doc = doc_mod.open_document(out)
         text = text_mod.extract_text(doc)
-        assert "# H1" in text
-        assert "## H2" in text
-        assert "- List" in text
+        # Headings are rendered as formatted text (no # prefix)
+        assert "H1" in text
+        assert "H2" in text
+        assert "List" in text
 
 
 class TestConvertText:

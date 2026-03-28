@@ -134,3 +134,48 @@ def add_styled_text(doc: HwpxDocument, text: str, *,
     char_id = doc.ensure_run_style(**kwargs)
     doc.add_paragraph(text, char_pr_id_ref=char_id)
     return {"text": text[:50], "bold": bold, "italic": italic, "status": "added"}
+
+
+def add_code_block(doc: HwpxDocument, code: str, *,
+                   language: str | None = None,
+                   font: str = "D2Coding") -> dict:
+    """Add a code block with monospace font and background."""
+    paras = doc.add_code_block(code, language=language, font=font)
+    return {"lines": len(paras), "language": language, "status": "added"}
+
+
+def add_nested_bullet_list(doc: HwpxDocument, items: list[tuple[int, str]]) -> dict:
+    """Add a nested bullet list. Each item is (level, text)."""
+    paras = doc.add_nested_bullet_list(items)
+    return {"items": len(paras), "levels": len(set(l for l, _ in items)), "status": "added"}
+
+
+def add_nested_numbered_list(doc: HwpxDocument, items: list[tuple[int, str]]) -> dict:
+    """Add a nested numbered list. Each item is (level, text)."""
+    paras = doc.add_nested_numbered_list(items)
+    return {"items": len(paras), "levels": len(set(l for l, _ in items)), "status": "added"}
+
+
+def set_columns(doc: HwpxDocument, col_count: int = 2, *,
+                gap: int = 1200, separator: str | None = None) -> dict:
+    """Set column layout for the document."""
+    kwargs: dict = {}
+    if separator:
+        kwargs["separator_type"] = separator
+    doc.set_columns(col_count, same_gap=gap, **kwargs)
+    return {"columns": col_count, "gap": gap, "separator": separator, "status": "set"}
+
+
+def set_cell_gradient(doc: HwpxDocument, table_index: int,
+                      row: int, col: int, *,
+                      start_color: str = "#FFFFFF",
+                      end_color: str = "#000000",
+                      gradient_type: str = "LINEAR",
+                      angle: int = 0) -> dict:
+    """Set gradient fill on a table cell."""
+    doc.set_cell_gradient(table_index, row, col,
+                          start_color=start_color, end_color=end_color,
+                          gradient_type=gradient_type, angle=angle)
+    return {"table": table_index, "row": row, "col": col,
+            "start": start_color, "end": end_color,
+            "type": gradient_type, "status": "set"}
