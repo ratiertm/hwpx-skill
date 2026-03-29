@@ -24,13 +24,13 @@ def add_section(doc: HwpxDocument) -> dict:
 
 def set_header(doc: HwpxDocument, text: str, section_idx: int = 0) -> dict:
     """Set header text using real Hancom ctrl structure."""
-    doc.add_header(text)
+    doc.add_header(text, section_index=section_idx)
     return {"text": text, "section": section_idx, "status": "set"}
 
 
 def set_footer(doc: HwpxDocument, text: str, section_idx: int = 0) -> dict:
     """Set footer text using real Hancom ctrl structure."""
-    doc.add_footer(text)
+    doc.add_footer(text, section_index=section_idx)
     return {"text": text, "section": section_idx, "status": "set"}
 
 

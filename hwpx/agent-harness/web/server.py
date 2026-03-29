@@ -21,16 +21,25 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from hwpx import HwpxDocument
 
-app = FastAPI(title="HWPX Document Generator")
+import shutil
+from contextlib import asynccontextmanager
+
 
 OUTPUT_DIR = Path(tempfile.mkdtemp(prefix="hwpx_"))
 
-# Reuse the enhanced markdown converter from CLI
-import sys
-_cli_path = str(Path(__file__).resolve().parent.parent)
-if _cli_path not in sys.path:
-    sys.path.insert(0, _cli_path)
-from cli_anything.hwpx.hwpx_cli import _convert_markdown_to_hwpx, MD_STYLES
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    # Cleanup temp files on shutdown
+    if OUTPUT_DIR.exists():
+        shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+
+
+app = FastAPI(title="HWPX Document Generator", lifespan=lifespan)
+
+# Import converter from shared module (no sys.path hack needed)
+from cli_anything.hwpx.core.converter import convert_markdown_to_hwpx as _convert_markdown_to_hwpx, MD_STYLES
 from web.css_parser import load_all_styles
 
 
