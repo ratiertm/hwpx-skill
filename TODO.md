@@ -77,6 +77,7 @@
 - [ ] 텍스트 방향 (secPr/@textDirection)
 - [ ] 기본 탭 간격 (secPr/@tabStopVal)
 - [ ] 프레젠테이션 설정 (presentation)
+- [ ] 폰트 임베딩 (isEmbedded=1 + binaryItemIDRef로 .ttf를 BinData/에 포함, add_image 패턴 활용)
 - [ ] lxml/ET 전체 통합 (근본적 리팩토링 — stdlib ET 의존 제거)
 
 ## Whale 뷰어 한계 (한컴오피스 필요)
