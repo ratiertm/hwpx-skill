@@ -167,21 +167,13 @@ async def index():
 async def direct_input(
     filename: str = Form("output.hwpx"),
     content: str = Form(""),
-    title_size: int = Form(20),
     style: str = Form("github"),
 ):
     if not content.strip():
         return {"error": "내용을 입력해주세요"}
 
     _reload_css_styles()
-    has_markdown_heading = bool(re.search(r"^#{1,6}\s", content, re.MULTILINE))
-
-    if has_markdown_heading:
-        path = _create_hwpx_from_markdown(content, filename, style_name=style)
-    else:
-        lines = [line for line in content.split("\n") if line.strip()]
-        font_sizes = {0: title_size * 100}
-        path = _create_hwpx_simple(lines, filename, font_sizes)
+    path = _create_hwpx_from_markdown(content, filename, style_name=style)
 
     lines = [line for line in content.split("\n") if line.strip()]
     return {
