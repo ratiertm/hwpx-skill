@@ -282,6 +282,32 @@ This project is functional but has real constraints that affect practical use:
 
 **CSS-to-HWPX mapping is incomplete.** Only 46 of hundreds of CSS properties have HWPX equivalents. Features like border-radius, box-shadow, CSS Grid layout, and syntax highlighting have no HWPX counterpart. The styling system works within these bounds but cannot reproduce arbitrary web designs.
 
+**Image text recognition gap.** OpenCV detects grid structure (line positions, proportions, merges) with mathematical precision, but reading text inside cells is a separate problem. EasyOCR Korean accuracy is 70-80% -- not production-ready. Claude can read images within a conversation, but the server cannot independently send images to Claude via OAuth -- an Anthropic API key is required. Currently, grid structure is auto-detected but text must be entered manually.
+
+## Roadmap
+
+**Image→HWPX automation pipeline (in progress)**
+- OpenCV grid detection → Anthropic Vision API text recognition → cell editing UI → HWPX generation
+- Requires API key for cell text auto-recognition
+- Detected grid shown as HTML table for user review/edit before generation
+
+**Form template system**
+- YAML-based form definition → template.hwpx auto-generation
+- Customer provides capture/scan → detect → review → finalize → reuse
+- Template metadata tracks which cells accept user data
+
+**python-hwpx library expansion**
+- Font embedding (ttf files inside HWPX)
+- Internal HWPX rendering or viewer integration (eliminate screenshot cycle)
+- ~65 unimplemented OWPML features (shapes, fields, OLE, etc.)
+
+**HWPX generation rules (HWPX_RULEBOOK.md)**
+- Cell newlines must be separate `<hp:p>` elements, not `\n` in `<hp:t>`
+- Merged cells must be physically removed from `<hp:tr>`, no empty rows
+- Hyperlinks require 6-parameter fieldBegin structure
+- Cell padding requires `hasMargin="1"`
+- CSS files control document styling, changes apply without server restart
+
 ## License
 
 MIT
