@@ -86,6 +86,9 @@ _SYSTEM_PROMPT = (
     "- Write in the same language as the user's instruction\n"
     "- Output ONLY the Markdown content, no explanations or commentary\n"
     "- Create realistic, detailed, professional content\n"
+    "- NEVER use HTML tags (no <iframe>, <div>, <style>, <script>, <span>, <br>, etc.)\n"
+    "- NEVER use inline HTML or raw HTML blocks\n"
+    "- Use only pure Markdown syntax\n"
 )
 
 

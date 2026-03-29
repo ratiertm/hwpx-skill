@@ -864,6 +864,13 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
         Spacing: heading margin-top 24px → empty paragraph before H1/H2/H3
     """
     s = MD_STYLES.get(style_name, MD_STYLES[DEFAULT_STYLE])
+    # Strip HTML tags — HWPX has no HTML equivalent
+    content = re.sub(r"<(?:iframe|div|style|script|span|br|img|video|audio|embed|object|form|input|button|select|textarea|label|fieldset|legend|details|summary|dialog|template|slot|canvas|svg|math)[^>]*>", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"</(?:iframe|div|style|script|span|br|img|video|audio|embed|object|form|input|button|select|textarea|label|fieldset|legend|details|summary|dialog|template|slot|canvas|svg|math)>", "", content, flags=re.IGNORECASE)
+    # Remove any remaining style/script block content
+    content = re.sub(r"<style[^>]*>.*?</style>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
+
     lines = content.split("\n")
     element_count = 0
     i = 0
