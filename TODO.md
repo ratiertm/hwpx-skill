@@ -77,9 +77,21 @@
 - [ ] 텍스트 방향 (secPr/@textDirection)
 - [ ] 기본 탭 간격 (secPr/@tabStopVal)
 - [ ] 프레젠테이션 설정 (presentation)
-- [ ] merge_cells 수정 — 피병합 셀을 물리적으로 제거해야 함 (현재는 span만 변경, 한컴 실제 파일 분석 결과 피병합 셀이 tr에서 제거됨)
+- [x] merge_cells 수정 — 피병합 셀을 물리적으로 제거 (2026-03-29 완료)
+- [x] set_cell_text 줄바꿈 — \n을 별도 `<hp:p>`로 분리 (2026-03-29 완료)
+- [x] set_margin hasMargin="1" — 셀 패딩 인식 수정 (2026-03-29 완료)
+- [x] set_row_heights / set_col_widths API 추가 (2026-03-29 완료)
 - [ ] 폰트 임베딩 (isEmbedded=1 + binaryItemIDRef로 .ttf를 BinData/에 포함, add_image 패턴 활용)
 - [ ] lxml/ET 전체 통합 (근본적 리팩토링 — stdlib ET 의존 제거)
+
+## Phase 6: 양식 템플릿 시스템
+
+- [ ] YAML → HWPX 변환기 (YAML로 양식 정의 → template.hwpx 자동 생성)
+- [ ] grid_detector 정확도 개선 (내부 짧은 선 감지, OCR 한국어 정확도)
+- [ ] Web UI에서 감지 결과 시각적 확인/수정 화면
+- [ ] 고객 캡처/PDF → 자동 감지 → YAML → 검토 → template.hwpx 파이프라인
+- [ ] template.hwpx에서 입력칸 위치를 메타데이터로 관리 (어느 셀에 데이터를 넣을지)
+- [ ] 기존 HWP/HWPX 파일에서 내용 비우고 template으로 변환
 
 ## Whale 뷰어 한계 (한컴오피스 필요)
 
