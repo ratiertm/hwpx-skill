@@ -296,6 +296,58 @@ def _parse_html(content: str) -> list[str]:
     return [line.strip() for line in content.split("\n") if line.strip()]
 
 
+@app.post("/api/image-to-hwpx")
+async def image_to_hwpx(
+    file: UploadFile = File(...),
+    filename: str = Form("form-output.hwpx"),
+):
+    """Upload a form image → detect grid + OCR → generate HWPX."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".bmp", ".tiff"):
+        return JSONResponse(
+            content={"error": f"이미지 파일만 지원합니다 (png, jpg). 현재: {ext}"},
+            status_code=400)
+
+    # Save uploaded image to temp
+    import tempfile as _tf
+    tmp = _tf.NamedTemporaryFile(suffix=ext, delete=False)
+    tmp.write(await file.read())
+    tmp.close()
+
+    try:
+        from web.image_to_hwpx import analyze_image, generate_hwpx
+        form = analyze_image(tmp.name)
+
+        safe_filename = _sanitize_filename(filename)
+        out_path = str(OUTPUT_DIR / safe_filename)
+        generate_hwpx(form, out_path)
+
+        # Build cell summary for preview
+        cell_summary = []
+        for c in form.cells:
+            info = f"[{c['row']},{c['col']}]"
+            if c["row_span"] > 1 or c["col_span"] > 1:
+                info += f" span({c['row_span']},{c['col_span']})"
+            if c["text"]:
+                info += f": {c['text'][:30]}"
+            cell_summary.append(info)
+
+        return {
+            "filename": safe_filename,
+            "download": f"/download/{safe_filename}",
+            "grid": f"{form.rows}x{form.cols}",
+            "cells": len(form.cells),
+            "row_heights_pct": form.row_heights_pct,
+            "col_widths_pct": form.col_widths_pct,
+            "preview": "\n".join(cell_summary),
+        }
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"이미지 분석 실패: {e}"}, status_code=500)
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
+
+
 @app.get("/api/styles")
 async def list_styles():
     """Return available style presets (reloads CSS from disk)."""

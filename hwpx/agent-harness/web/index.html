@@ -112,6 +112,7 @@
     <div class="tab active" onclick="switchTab('direct')">Direct Input</div>
     <div class="tab" onclick="switchTab('llm')">LLM Instruction</div>
     <div class="tab" onclick="switchTab('upload')">File Upload</div>
+    <div class="tab" onclick="switchTab('image')">Image → HWPX</div>
   </div>
 
   <!-- Tab 1: Direct Input -->
@@ -175,6 +176,27 @@ CLI-Anything과 python-hwpx를 결합하여 AI 에이전트가 한글 문서를 
     </form>
     <div id="loading-upload" class="loading"><div class="spinner"></div><p>Converting file...</p></div>
     <div id="result-upload" class="result"></div>
+  </div>
+
+  <!-- Tab 4: Image to HWPX -->
+  <div id="panel-image" class="panel">
+    <form id="form-image" onsubmit="return submitImage(event)">
+      <div class="field">
+        <label>양식 이미지 (캡처/스캔 PNG, JPG)</label>
+        <input type="file" name="file" accept=".png,.jpg,.jpeg,.bmp,.tiff" class="file-input" onchange="previewImage(this)">
+        <div id="image-preview" style="display:none; margin-top:8px; max-height:200px; overflow:hidden;">
+          <img id="image-preview-img" style="max-width:100%; max-height:200px; border:1px solid #ddd; border-radius:4px;">
+        </div>
+      </div>
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" name="filename" value="form-output.hwpx" required>
+      </div>
+      <p class="info">OpenCV로 표 그리드를 감지하고, EasyOCR로 셀 텍스트를 추출합니다. 처리에 1~2분 소요될 수 있습니다.</p>
+      <button type="submit" class="btn btn-primary">Detect & Generate HWPX</button>
+    </form>
+    <div id="loading-image" class="loading"><div class="spinner"></div><p>이미지 분석 중... (OpenCV + OCR)</p></div>
+    <div id="result-image" class="result"></div>
   </div>
 </div>
 
@@ -295,6 +317,51 @@ function uploadStyle(input) {
         document.getElementById('style-select').value = d.key;
       }, 500);
     });
+}
+
+function previewImage(input) {
+  var preview = document.getElementById('image-preview');
+  var img = document.getElementById('image-preview-img');
+  if (input.files.length === 0) { preview.style.display = 'none'; return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    img.src = ev.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function submitImage(e) {
+  e.preventDefault();
+  var form = document.getElementById('form-image');
+  var fd = new FormData(form);
+  showLoading('image');
+  fetch('/api/image-to-hwpx', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      hideLoading('image');
+      var el = document.getElementById('result-image');
+      if (d.error) {
+        el.innerHTML = '<div class="result-box error"><h3>Error</h3><p>' + d.error + '</p></div>';
+      } else {
+        el.innerHTML =
+          '<div class="result-box">' +
+            '<h3>Form Detected & Generated</h3>' +
+            '<p><strong>Grid:</strong> ' + d.grid + '</p>' +
+            '<p><strong>Cells:</strong> ' + d.cells + '</p>' +
+            '<p><strong>Row heights:</strong> ' + d.row_heights_pct.join('%, ') + '%</p>' +
+            '<p><strong>Col widths:</strong> ' + d.col_widths_pct.join('%, ') + '%</p>' +
+            '<a href="' + d.download + '" class="btn btn-success" style="margin-top:12px;">Download .hwpx</a>' +
+          '</div>' +
+          '<div class="preview">' + escapeHtml(d.preview) + '</div>';
+      }
+      el.classList.add('show');
+    })
+    .catch(function(err) {
+      hideLoading('image');
+      showResult('image', { error: err.message });
+    });
+  return false;
 }
 
 function previewFile(input) {
