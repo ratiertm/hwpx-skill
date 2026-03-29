@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from hwpx import HwpxDocument
 
@@ -163,6 +163,9 @@ async def index():
     return Path(__file__).parent.joinpath("index.html").read_text(encoding="utf-8")
 
 
+_MAX_INSTRUCTION_LENGTH = 10000
+
+
 @app.post("/api/direct")
 async def direct_input(
     filename: str = Form("output.hwpx"),
@@ -170,16 +173,18 @@ async def direct_input(
     style: str = Form("github"),
 ):
     if not content.strip():
-        return {"error": "내용을 입력해주세요"}
+        return JSONResponse(
+            content={"error": "내용을 입력해주세요"}, status_code=400)
 
     _reload_css_styles()
-    path = _create_hwpx_from_markdown(content, filename, style_name=style)
+    safe_filename = _sanitize_filename(filename)
+    path = _create_hwpx_from_markdown(content, safe_filename, style_name=style)
 
     lines = [line for line in content.split("\n") if line.strip()]
     return {
-        "filename": filename,
+        "filename": safe_filename,
         "paragraphs": len(lines),
-        "download": f"/download/{filename}",
+        "download": f"/download/{safe_filename}",
         "preview": content,
     }
 
@@ -191,25 +196,35 @@ async def llm_instruction(
     style: str = Form("github"),
 ):
     if not instruction.strip():
-        return {"error": "지시문을 입력해주세요"}
+        return JSONResponse(
+            content={"error": "지시문을 입력해주세요"}, status_code=400)
+    if len(instruction) > _MAX_INSTRUCTION_LENGTH:
+        return JSONResponse(
+            content={"error": f"지시문이 너무 깁니다 (최대 {_MAX_INSTRUCTION_LENGTH}자)"},
+            status_code=400)
 
     _reload_css_styles()
 
     try:
         markdown = _call_claude_subprocess(instruction)
     except ValueError as e:
-        return {"error": str(e)}
+        return JSONResponse(
+            content={"error": str(e)}, status_code=500)
     except subprocess.TimeoutExpired:
-        return {"error": "Claude 응답 시간 초과 (120초). 더 짧은 지시문을 시도하세요."}
+        return JSONResponse(
+            content={"error": "Claude 응답 시간 초과 (120초). 더 짧은 지시문을 시도하세요."},
+            status_code=504)
     except Exception as e:
-        return {"error": f"오류 발생: {e}"}
+        return JSONResponse(
+            content={"error": f"오류 발생: {e}"}, status_code=500)
 
-    path = _create_hwpx_from_markdown(markdown, filename, style_name=style)
+    safe_filename = _sanitize_filename(filename)
+    path = _create_hwpx_from_markdown(markdown, safe_filename, style_name=style)
 
     return {
-        "filename": filename,
+        "filename": safe_filename,
         "paragraphs": markdown.count("\n") + 1,
-        "download": f"/download/{filename}",
+        "download": f"/download/{safe_filename}",
         "preview": markdown,
         "instruction": instruction,
         "style": style,
@@ -222,35 +237,44 @@ async def convert_file(
     filename: str = Form("converted.hwpx"),
     style: str = Form("github"),
 ):
-    content = (await file.read()).decode("utf-8")
-    ext = Path(file.filename or "").suffix.lower()
+    try:
+        content = (await file.read()).decode("utf-8")
+    except UnicodeDecodeError:
+        return JSONResponse(
+            content={"error": "UTF-8 텍스트 파일만 지원합니다."},
+            status_code=400)
 
+    ext = Path(file.filename or "").suffix.lower()
     supported = {".html", ".htm", ".md", ".markdown", ".txt", ".text"}
     if ext not in supported:
-        return {"error": f"지원하지 않는 형식: {ext}. html, md, txt만 가능합니다."}
+        return JSONResponse(
+            content={"error": f"지원하지 않는 형식: {ext}. html, md, txt만 가능합니다."},
+            status_code=400)
 
     if not content.strip():
-        return {"error": "파일에 내용이 없습니다"}
+        return JSONResponse(
+            content={"error": "파일에 내용이 없습니다"}, status_code=400)
 
     _reload_css_styles()
+    safe_filename = _sanitize_filename(filename)
 
     if ext in (".md", ".markdown"):
-        path = _create_hwpx_from_markdown(content, filename, style_name=style)
+        path = _create_hwpx_from_markdown(content, safe_filename, style_name=style)
         paragraphs_count = content.count("\n") + 1
     elif ext in (".html", ".htm"):
         paragraphs = _parse_html(content)
-        path = _create_hwpx_simple(paragraphs, filename)
+        path = _create_hwpx_simple(paragraphs, safe_filename)
         paragraphs_count = len(paragraphs)
     else:
         paragraphs = [line.strip() for line in content.split("\n") if line.strip()]
-        path = _create_hwpx_simple(paragraphs, filename)
+        path = _create_hwpx_simple(paragraphs, safe_filename)
         paragraphs_count = len(paragraphs)
 
     return {
         "source": file.filename,
         "format": ext.lstrip("."),
         "paragraphs": paragraphs_count,
-        "download": f"/download/{filename}",
+        "download": f"/download/{safe_filename}",
         "preview": content[:2000],
     }
 
@@ -273,17 +297,29 @@ async def list_styles():
     }
 
 
+def _sanitize_filename(name: str) -> str:
+    """Remove path traversal characters, allow only safe filenames."""
+    name = Path(name).name  # strip directory components
+    name = re.sub(r"[^a-zA-Z0-9가-힣._-]", "_", name)
+    return name or "untitled"
+
+
 @app.post("/api/styles/upload")
 async def upload_style(
     file: UploadFile = File(...),
 ):
     """Upload a custom CSS file as a new style preset."""
     from web.css_parser import css_to_hwpx_style
-    content = (await file.read()).decode("utf-8")
-    name = Path(file.filename or "custom").stem
+    try:
+        content = (await file.read()).decode("utf-8")
+    except UnicodeDecodeError:
+        return JSONResponse(
+            content={"error": "UTF-8 텍스트 파일만 지원합니다."},
+            status_code=400,
+        )
+    name = _sanitize_filename(Path(file.filename or "custom").stem)
     style_dict = css_to_hwpx_style(content, name=name.title())
     MD_STYLES[name] = style_dict
-    # Also save to styles dir
     styles_dir = Path(__file__).parent / "styles"
     styles_dir.mkdir(exist_ok=True)
     (styles_dir / f"{name}.css").write_text(content, encoding="utf-8")
@@ -297,11 +333,20 @@ async def upload_style(
 
 @app.get("/download/{filename}")
 async def download(filename: str):
-    path = OUTPUT_DIR / filename
+    safe_name = _sanitize_filename(filename)
+    path = (OUTPUT_DIR / safe_name).resolve()
+    if not path.is_relative_to(OUTPUT_DIR.resolve()):
+        return JSONResponse(
+            content={"error": "잘못된 파일 경로입니다."},
+            status_code=403,
+        )
     if not path.exists():
-        return {"error": "파일을 찾을 수 없습니다"}
+        return JSONResponse(
+            content={"error": "파일을 찾을 수 없습니다."},
+            status_code=404,
+        )
     return FileResponse(
         str(path),
         media_type="application/hwp+zip",
-        filename=filename,
+        filename=safe_name,
     )

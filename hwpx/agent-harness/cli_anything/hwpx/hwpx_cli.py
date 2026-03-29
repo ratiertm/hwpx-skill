@@ -19,12 +19,14 @@ import sys
 import os
 import re
 import json
+import functools
 import click
 from typing import Optional
 
 from cli_anything.hwpx.core.session import Session
 
 _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+_PAGE_WIDTH = 42520  # A4 body width in hwpunit
 from cli_anything.hwpx.core import document as doc_mod
 from cli_anything.hwpx.core import text as text_mod
 from cli_anything.hwpx.core import table as table_mod
@@ -54,7 +56,7 @@ def _auto_save_if_needed():
         sess.save(_auto_save_path)
 
 
-def output(data, message: str = ""):
+def emit(data, message: str = ""):
     if _json_output:
         click.echo(json.dumps(data, indent=2, default=str))
     else:
@@ -92,6 +94,7 @@ def _print_list(items: list, indent: int = 0):
 
 
 def handle_error(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -102,8 +105,6 @@ def handle_error(func):
                 click.echo(f"Error: {e}", err=True)
             if not _repl_mode:
                 sys.exit(1)
-    wrapper.__name__ = func.__name__
-    wrapper.__doc__ = func.__doc__
     return wrapper
 
 
@@ -158,7 +159,7 @@ def document_new(output):
     if output:
         doc_mod.save_document(doc, output)
     info = doc_mod.get_document_info(doc)
-    globals()["output"](info, f"Created new document" + (f": {output}" if output else ""))
+    emit(info, f"Created new document" + (f": {output}" if output else ""))
 
 
 @document.command("open")
@@ -170,7 +171,7 @@ def document_open(path):
     sess = get_session()
     sess.set_doc(doc, path)
     info = doc_mod.get_document_info(doc)
-    globals()["output"](info, f"Opened: {path}")
+    emit(info, f"Opened: {path}")
 
 
 @document.command("save")
@@ -180,7 +181,7 @@ def document_save(path):
     """Save the current document."""
     sess = get_session()
     saved = sess.save(path)
-    globals()["output"]({"saved": saved}, f"Saved to: {saved}")
+    emit({"saved": saved}, f"Saved to: {saved}")
 
 
 @document.command("info")
@@ -191,7 +192,7 @@ def document_info():
     info = doc_mod.get_document_info(sess.get_doc())
     session_info = sess.info()
     info.update(session_info)
-    globals()["output"](info)
+    emit(info)
 
 
 # ── Text Commands ──────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ def text_find(query):
     """Find text occurrences in the document."""
     sess = get_session()
     results = text_mod.find_text(sess.get_doc(), query)
-    globals()["output"](results, f"Found {len(results)} match(es) for '{query}'")
+    emit(results, f"Found {len(results)} match(es) for '{query}'")
 
 
 @text.command("replace")
@@ -252,7 +253,7 @@ def text_replace(old, new_text):
     sess.snapshot()
     count = text_mod.replace_text(sess.get_doc(), old, new_text)
     _auto_save_if_needed()
-    globals()["output"]({"old": old, "new": new_text, "replaced": count},
+    emit({"old": old, "new": new_text, "replaced": count},
                         f"Replaced {count} occurrence(s)")
 
 
@@ -268,7 +269,7 @@ def text_add(content):
     sess.snapshot()
     result = text_mod.add_paragraph(sess.get_doc(), content)
     _auto_save_if_needed()
-    globals()["output"](result, f"Added paragraph: {content[:50]}...")
+    emit(result, f"Added paragraph: {content[:50]}...")
 
 
 # ── Table Commands ─────────────────────────────────────────────────────
@@ -293,7 +294,7 @@ def table_add(rows, cols, header, data):
     sess.snapshot()
     result = table_mod.add_table(sess.get_doc(), rows, cols, header=header, data=data)
     _auto_save_if_needed()
-    globals()["output"](result, f"Added {rows}x{cols} table")
+    emit(result, f"Added {rows}x{cols} table")
 
 
 @table.command("list")
@@ -302,7 +303,7 @@ def table_list():
     """List all tables in the document."""
     sess = get_session()
     tables = table_mod.list_tables(sess.get_doc())
-    globals()["output"](tables, f"Found {len(tables)} table(s)")
+    emit(tables, f"Found {len(tables)} table(s)")
 
 
 # ── Image Commands ─────────────────────────────────────────────────────
@@ -324,7 +325,7 @@ def image_add(path, width, height):
     sess.snapshot()
     result = image_mod.add_image(sess.get_doc(), path, width, height)
     _auto_save_if_needed()
-    globals()["output"](result, f"Added image: {path}")
+    emit(result, f"Added image: {path}")
 
 
 @image.command("list")
@@ -333,7 +334,7 @@ def image_list():
     """List all images in the document."""
     sess = get_session()
     images = image_mod.list_images(sess.get_doc())
-    globals()["output"](images, f"Found {len(images)} image(s)")
+    emit(images, f"Found {len(images)} image(s)")
 
 
 @image.command("remove")
@@ -345,7 +346,7 @@ def image_remove(index):
     sess.snapshot()
     result = image_mod.remove_image(sess.get_doc(), index)
     _auto_save_if_needed()
-    globals()["output"](result, f"Removed image {index}")
+    emit(result, f"Removed image {index}")
 
 
 # ── Export Commands ────────────────────────────────────────────────────
@@ -363,7 +364,7 @@ def export_text(output):
     """Export as plain text."""
     sess = get_session()
     result = export_mod.export_to_file(sess.get_doc(), output, "text")
-    globals()["output"](result, f"Exported text to: {output}")
+    emit(result, f"Exported text to: {output}")
 
 
 @export_group.command("markdown")
@@ -373,7 +374,7 @@ def export_markdown(output):
     """Export as Markdown."""
     sess = get_session()
     result = export_mod.export_to_file(sess.get_doc(), output, "markdown")
-    globals()["output"](result, f"Exported Markdown to: {output}")
+    emit(result, f"Exported Markdown to: {output}")
 
 
 @export_group.command("html")
@@ -383,7 +384,7 @@ def export_html(output):
     """Export as HTML."""
     sess = get_session()
     result = export_mod.export_to_file(sess.get_doc(), output, "html")
-    globals()["output"](result, f"Exported HTML to: {output}")
+    emit(result, f"Exported HTML to: {output}")
 
 
 # ── Validate Commands ──────────────────────────────────────────────────
@@ -403,7 +404,7 @@ def validate_schema(path):
     target = path or sess.get_doc()
     result = validate_mod.validate_document(target)
     status = "VALID" if result["is_valid"] else "INVALID"
-    globals()["output"](result, f"Schema validation: {status}")
+    emit(result, f"Schema validation: {status}")
 
 
 @validate_group.command("package")
@@ -413,7 +414,7 @@ def validate_package(path):
     """Validate ZIP/OPC package structure."""
     result = validate_mod.validate_package(path)
     status = "VALID" if result["is_valid"] else "INVALID"
-    globals()["output"](result, f"Package validation: {status}")
+    emit(result, f"Package validation: {status}")
 
 
 # ── Structure Commands ─────────────────────────────────────────────────
@@ -430,7 +431,7 @@ def structure_sections():
     """List all sections."""
     sess = get_session()
     sections = struct_mod.list_sections(sess.get_doc())
-    globals()["output"](sections, f"Found {len(sections)} section(s)")
+    emit(sections, f"Found {len(sections)} section(s)")
 
 
 @structure_group.command("add-section")
@@ -441,7 +442,7 @@ def structure_add_section():
     sess.snapshot()
     result = struct_mod.add_section(sess.get_doc())
     _auto_save_if_needed()
-    globals()["output"](result, "Added new section")
+    emit(result, "Added new section")
 
 
 @structure_group.command("set-header")
@@ -453,7 +454,7 @@ def structure_set_header(text):
     sess.snapshot()
     result = struct_mod.set_header(sess.get_doc(), text)
     _auto_save_if_needed()
-    globals()["output"](result, f"Header set: {text}")
+    emit(result, f"Header set: {text}")
 
 
 @structure_group.command("set-footer")
@@ -465,7 +466,7 @@ def structure_set_footer(text):
     sess.snapshot()
     result = struct_mod.set_footer(sess.get_doc(), text)
     _auto_save_if_needed()
-    globals()["output"](result, f"Footer set: {text}")
+    emit(result, f"Footer set: {text}")
 
 
 @structure_group.command("bookmark")
@@ -477,7 +478,7 @@ def structure_bookmark(name):
     sess.snapshot()
     result = struct_mod.add_bookmark(sess.get_doc(), name)
     _auto_save_if_needed()
-    globals()["output"](result, f"Bookmark added: {name}")
+    emit(result, f"Bookmark added: {name}")
 
 
 @structure_group.command("hyperlink")
@@ -490,7 +491,7 @@ def structure_hyperlink(url, text):
     sess.snapshot()
     result = struct_mod.add_hyperlink(sess.get_doc(), url, text)
     _auto_save_if_needed()
-    globals()["output"](result, f"Hyperlink added: {url}")
+    emit(result, f"Hyperlink added: {url}")
 
 
 @structure_group.command("page-number")
@@ -503,7 +504,7 @@ def structure_page_number(pos, fmt):
     sess.snapshot()
     result = struct_mod.add_page_number(sess.get_doc(), pos=pos, format_type=fmt)
     _auto_save_if_needed()
-    globals()["output"](result, f"Page number added: {pos}")
+    emit(result, f"Page number added: {pos}")
 
 
 @structure_group.command("footnote")
@@ -516,7 +517,7 @@ def structure_footnote(text, anchor):
     sess.snapshot()
     result = struct_mod.add_footnote(sess.get_doc(), text, anchor=anchor)
     _auto_save_if_needed()
-    globals()["output"](result, f"Footnote added")
+    emit(result, f"Footnote added")
 
 
 @structure_group.command("endnote")
@@ -529,7 +530,7 @@ def structure_endnote(text, anchor):
     sess.snapshot()
     result = struct_mod.add_endnote(sess.get_doc(), text, anchor=anchor)
     _auto_save_if_needed()
-    globals()["output"](result, f"Endnote added")
+    emit(result, f"Endnote added")
 
 
 @structure_group.command("equation")
@@ -541,7 +542,7 @@ def structure_equation(script):
     sess.snapshot()
     result = struct_mod.add_equation(sess.get_doc(), script)
     _auto_save_if_needed()
-    globals()["output"](result, f"Equation added")
+    emit(result, f"Equation added")
 
 
 @structure_group.command("rectangle")
@@ -558,7 +559,7 @@ def structure_rectangle(width, height, color, line_width, fill):
     result = struct_mod.add_rectangle(sess.get_doc(), width, height,
                                       line_color=color, line_width=line_width, fill_color=fill)
     _auto_save_if_needed()
-    globals()["output"](result, "Rectangle added")
+    emit(result, "Rectangle added")
 
 
 @structure_group.command("ellipse")
@@ -575,7 +576,7 @@ def structure_ellipse(width, height, color, line_width, fill):
     result = struct_mod.add_ellipse(sess.get_doc(), width, height,
                                     line_color=color, line_width=line_width, fill_color=fill)
     _auto_save_if_needed()
-    globals()["output"](result, "Ellipse added")
+    emit(result, "Ellipse added")
 
 
 @structure_group.command("line")
@@ -589,7 +590,7 @@ def structure_line(length, color, line_width):
     sess.snapshot()
     result = struct_mod.add_line(sess.get_doc(), length=length, line_color=color, line_width=line_width)
     _auto_save_if_needed()
-    globals()["output"](result, "Line added")
+    emit(result, "Line added")
 
 
 @structure_group.command("bullet-list")
@@ -603,7 +604,7 @@ def structure_bullet_list(items, char):
     item_list = [i.strip() for i in items.split(",")]
     result = struct_mod.add_bullet_list(sess.get_doc(), item_list, bullet_char=char)
     _auto_save_if_needed()
-    globals()["output"](result, f"Bullet list added ({len(item_list)} items)")
+    emit(result, f"Bullet list added ({len(item_list)} items)")
 
 
 @structure_group.command("numbered-list")
@@ -617,7 +618,7 @@ def structure_numbered_list(items, fmt):
     item_list = [i.strip() for i in items.split(",")]
     result = struct_mod.add_numbered_list(sess.get_doc(), item_list, format_string=fmt)
     _auto_save_if_needed()
-    globals()["output"](result, f"Numbered list added ({len(item_list)} items)")
+    emit(result, f"Numbered list added ({len(item_list)} items)")
 
 
 @structure_group.command("code-block")
@@ -633,7 +634,7 @@ def structure_code_block(code, lang, font):
     code_text = code.replace("\\n", "\n")
     result = struct_mod.add_code_block(sess.get_doc(), code_text, language=lang, font=font)
     _auto_save_if_needed()
-    globals()["output"](result, f"Code block added ({result['lines']} lines)")
+    emit(result, f"Code block added ({result['lines']} lines)")
 
 
 @structure_group.command("nested-bullet-list")
@@ -653,7 +654,7 @@ def structure_nested_bullet_list(items):
             parsed.append((0, parts[0].strip()))
     result = struct_mod.add_nested_bullet_list(sess.get_doc(), parsed)
     _auto_save_if_needed()
-    globals()["output"](result, f"Nested bullet list added ({result['items']} items)")
+    emit(result, f"Nested bullet list added ({result['items']} items)")
 
 
 @structure_group.command("nested-numbered-list")
@@ -673,7 +674,7 @@ def structure_nested_numbered_list(items):
             parsed.append((0, parts[0].strip()))
     result = struct_mod.add_nested_numbered_list(sess.get_doc(), parsed)
     _auto_save_if_needed()
-    globals()["output"](result, f"Nested numbered list added ({result['items']} items)")
+    emit(result, f"Nested numbered list added ({result['items']} items)")
 
 
 @structure_group.command("set-columns")
@@ -687,7 +688,7 @@ def structure_set_columns(count, gap, separator):
     sess.snapshot()
     result = struct_mod.set_columns(sess.get_doc(), count, gap=gap, separator=separator)
     _auto_save_if_needed()
-    globals()["output"](result, f"Set {count}-column layout")
+    emit(result, f"Set {count}-column layout")
 
 
 @table.command("set-gradient")
@@ -709,7 +710,7 @@ def table_set_gradient(tbl_idx, row, col, start, end, grad_type, angle):
         gradient_type=grad_type, angle=angle,
     )
     _auto_save_if_needed()
-    globals()["output"](result, f"Cell ({row},{col}) gradient set {start} → {end}")
+    emit(result, f"Cell ({row},{col}) gradient set {start} → {end}")
 
 
 # ── Style Commands ────────────────────────────────────────────────────
@@ -738,7 +739,7 @@ def style_add(content, bold, italic, underline, font_size, color):
         font_size=font_size, text_color=color,
     )
     _auto_save_if_needed()
-    globals()["output"](result, f"Styled text added: {content[:50]}...")
+    emit(result, f"Styled text added: {content[:50]}...")
 
 
 # ── Table Background ──────────────────────────────────────────────────
@@ -755,7 +756,7 @@ def table_set_bgcolor(tbl_idx, row, col, color):
     sess.snapshot()
     result = struct_mod.set_cell_background(sess.get_doc(), tbl_idx, row, col, color)
     _auto_save_if_needed()
-    globals()["output"](result, f"Cell ({row},{col}) background set to {color}")
+    emit(result, f"Cell ({row},{col}) background set to {color}")
 
 
 # ── MD→HWPX Style Presets ─────────────────────────────────────────────
@@ -864,12 +865,10 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
         Spacing: heading margin-top 24px → empty paragraph before H1/H2/H3
     """
     s = MD_STYLES.get(style_name, MD_STYLES[DEFAULT_STYLE])
-    # Strip HTML tags — HWPX has no HTML equivalent
-    content = re.sub(r"<(?:iframe|div|style|script|span|br|img|video|audio|embed|object|form|input|button|select|textarea|label|fieldset|legend|details|summary|dialog|template|slot|canvas|svg|math)[^>]*>", "", content, flags=re.IGNORECASE)
-    content = re.sub(r"</(?:iframe|div|style|script|span|br|img|video|audio|embed|object|form|input|button|select|textarea|label|fieldset|legend|details|summary|dialog|template|slot|canvas|svg|math)>", "", content, flags=re.IGNORECASE)
-    # Remove any remaining style/script block content
+    # Strip HTML — HWPX has no HTML equivalent
     content = re.sub(r"<style[^>]*>.*?</style>", "", content, flags=re.IGNORECASE | re.DOTALL)
     content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<[^>]+>", "", content)
 
     lines = content.split("\n")
     element_count = 0
@@ -940,7 +939,7 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
             if rows:
                 max_cols = max(len(r) for r in rows)
                 # Content-based column widths (MD preview style)
-                page_width = 42520
+                page_width = _PAGE_WIDTH
                 col_max_len = [0] * max_cols
                 for row_data in rows:
                     for c_idx, cell_val in enumerate(row_data[:max_cols]):
@@ -965,34 +964,32 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
                             cell_sz = cell.element.find(f"{{{_HP_NS}}}cellSz")
                             if cell_sz is not None:
                                 cell_sz.set("width", str(cw))
-                    except Exception:
+                    except (IndexError, AttributeError):
                         pass
 
-                # Cell padding from style (CSS padding: top/bottom left/right)
-                pad = s.get("table_cell_padding", (450, 975))  # (v, h) in hwpunit
+                pad = s.get("table_cell_padding", (450, 975))
                 pad_v, pad_h = pad[0], pad[1]
 
                 for r_idx, row_data in enumerate(rows):
                     for c_idx, cell_val in enumerate(row_data[:max_cols]):
                         tbl.set_cell_text(r_idx, c_idx, _strip_inline_md(cell_val))
                         try:
-                            # Header row: center, data rows: left
                             h_align = "CENTER" if r_idx == 0 else "LEFT"
                             tbl.set_cell_align(r_idx, c_idx,
                                                horizontal=h_align, vertical="CENTER")
-                        except Exception:
+                        except (IndexError, AttributeError, RuntimeError):
                             pass
                         try:
                             tbl.cell(r_idx, c_idx).set_margin(
                                 left=pad_h, right=pad_h,
                                 top=pad_v, bottom=pad_v)
-                        except Exception:
+                        except (IndexError, AttributeError, RuntimeError):
                             pass
                 if len(rows) > 1:
                     for c_idx in range(max_cols):
                         try:
                             tbl.set_cell_background(0, c_idx, s["table_header_bg"])
-                        except Exception:
+                        except (IndexError, AttributeError, RuntimeError):
                             pass
                 element_count += 1
                 doc.add_paragraph("")
@@ -1003,7 +1000,7 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
         if stripped and all(c in "-*_ " for c in stripped) and len(stripped.replace(" ", "")) >= 3:
             clean = stripped.replace(" ", "")
             if len(set(clean)) == 1 and clean[0] in "-*_":
-                doc.add_line(42520, 0, 42520, 0,
+                doc.add_line(_PAGE_WIDTH, 0, _PAGE_WIDTH, 0,
                              line_color=s["hr_color"], line_width=s["hr_width"])
                 element_count += 1
                 i += 1
@@ -1033,7 +1030,7 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
             char_id = doc.ensure_run_style(bold=True, height=h_size, **h_kw)
             doc.add_paragraph(heading_text, char_pr_id_ref=char_id)
             if s["h1_h2_border"] and level <= 2:
-                doc.add_line(42520, 0, 42520, 0,
+                doc.add_line(_PAGE_WIDTH, 0, _PAGE_WIDTH, 0,
                              line_color=s["heading_border_color"], line_width="71")
             element_count += 1
             i += 1
@@ -1212,9 +1209,12 @@ def _add_rich_paragraph(doc, md_text: str, style: dict | None = None,
             p5 = _mk(params, f"{_HP}stringParam", {"name": "DocOpenType"})
             p5.text = "HWPHYPERLINK_JUMP_CURRENTTAB"
 
-            # Run: link text (blue + underline)
+            # Run: link text (color + underline from CSS style)
+            _s = style or MD_STYLES[DEFAULT_STYLE]
             link_char_id = doc.ensure_run_style(
-                underline=True, text_color="#0969DA", height=1000,
+                underline=True,
+                text_color=_s.get("link_color", "#0969DA"),
+                height=_s.get("body_height", 1000),
             )
             run2 = _mk(para.element, f"{_HP}run", {"charPrIDRef": str(link_char_id)})
             t = _mk(run2, f"{_HP}t")
@@ -1330,7 +1330,7 @@ def convert_file(source, output):
         "paragraphs": element_count,
         "output": output,
     }
-    globals()["output"](result, f"Converted {element_count} paragraphs from {source} to {output}")
+    emit(result, f"Converted {element_count} paragraphs from {source} to {output}")
 
 
 # ── Session Commands ───────────────────────────────────────────────────
@@ -1341,9 +1341,9 @@ def session_undo():
     """Undo the last operation."""
     sess = get_session()
     if sess.undo():
-        globals()["output"]({"status": "undone"}, "Undone")
+        emit({"status": "undone"}, "Undone")
     else:
-        globals()["output"]({"status": "nothing_to_undo"}, "Nothing to undo")
+        emit({"status": "nothing_to_undo"}, "Nothing to undo")
 
 
 @cli.command("redo")
@@ -1352,9 +1352,9 @@ def session_redo():
     """Redo the last undone operation."""
     sess = get_session()
     if sess.redo():
-        globals()["output"]({"status": "redone"}, "Redone")
+        emit({"status": "redone"}, "Redone")
     else:
-        globals()["output"]({"status": "nothing_to_redo"}, "Nothing to redo")
+        emit({"status": "nothing_to_redo"}, "Nothing to redo")
 
 
 # ── REPL ───────────────────────────────────────────────────────────────
