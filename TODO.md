@@ -77,6 +77,7 @@
 - [ ] 텍스트 방향 (secPr/@textDirection)
 - [ ] 기본 탭 간격 (secPr/@tabStopVal)
 - [ ] 프레젠테이션 설정 (presentation)
+- [ ] merge_cells 수정 — 피병합 셀을 물리적으로 제거해야 함 (현재는 span만 변경, 한컴 실제 파일 분석 결과 피병합 셀이 tr에서 제거됨)
 - [ ] 폰트 임베딩 (isEmbedded=1 + binaryItemIDRef로 .ttf를 BinData/에 포함, add_image 패턴 활용)
 - [ ] lxml/ET 전체 통합 (근본적 리팩토링 — stdlib ET 의존 제거)
 
