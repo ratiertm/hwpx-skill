@@ -92,6 +92,7 @@
 - [ ] 고객 캡처/PDF → 자동 감지 → YAML → 검토 → template.hwpx 파이프라인
 - [ ] template.hwpx에서 입력칸 위치를 메타데이터로 관리 (어느 셀에 데이터를 넣을지)
 - [ ] 기존 HWP/HWPX 파일에서 내용 비우고 template으로 변환
+- [ ] Anthropic API (base64 이미지) 연동으로 셀 텍스트 자동 인식 (API 키 필요, OAuth 불가)
 
 ## Whale 뷰어 한계 (한컴오피스 필요)
 
