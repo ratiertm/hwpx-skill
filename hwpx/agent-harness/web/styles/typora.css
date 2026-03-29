@@ -1,0 +1,72 @@
+/* Typora default theme style (simplified) */
+/* Source: github.com/typora/typora-default-themes */
+
+body {
+    font-family: "Open Sans", "Noto Sans CJK KR", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #333333;
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 300;
+    border-bottom: 1px solid #eeeeee;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+h2 {
+    font-size: 1.75rem;
+    font-weight: 400;
+    border-bottom: 1px solid #eeeeee;
+    margin-top: 0.83em;
+    margin-bottom: 0.83em;
+}
+
+h3 { font-size: 1.5rem; font-weight: 500; }
+h4 { font-size: 1.25rem; font-weight: 600; }
+h5 { font-size: 1rem; font-weight: 600; }
+h6 { font-size: 1rem; font-weight: 600; color: #777777; }
+
+p { margin-bottom: 0.5em; }
+
+a { color: #4183C4; text-decoration: none; }
+
+code {
+    font-family: "Fira Code", "D2Coding", Consolas, monospace;
+    font-size: 0.9em;
+    color: #c7254e;
+    background: #f9f2f4;
+}
+
+pre {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    padding: 0.7em 1em;
+    font-size: 0.9em;
+}
+
+blockquote {
+    border-left: 4px solid #dfe2e5;
+    padding: 0 15px;
+    color: #777;
+}
+
+table th {
+    background: #fafafa;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 2px solid #dfe2e5;
+}
+
+table td {
+    padding: 8px 12px;
+    border-top: 1px solid #dfe2e5;
+}
+
+hr {
+    height: 2px;
+    background: #e7e7e7;
+    border: none;
+}

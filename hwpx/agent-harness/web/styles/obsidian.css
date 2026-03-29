@@ -1,0 +1,77 @@
+/* Obsidian default theme style (simplified) */
+/* Source: obsidian.md default theme */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #2e3338;
+}
+
+h1 {
+    font-size: 2em;
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: #2e3338;
+}
+
+h2 {
+    font-size: 1.6em;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+h3 {
+    font-size: 1.37em;
+    font-weight: 600;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+}
+
+h4 { font-size: 1.12em; font-weight: 600; }
+h5 { font-size: 1em; font-weight: 600; }
+h6 { font-size: 0.87em; font-weight: 600; color: #7f8c8d; }
+
+p { margin-bottom: 1em; }
+
+a { color: #705dcf; text-decoration: none; }
+
+code {
+    font-family: "D2Coding", "Fira Code", monospace;
+    font-size: 0.9em;
+    color: #e96900;
+    background: #f8f8f8;
+}
+
+pre {
+    background: #f8f8f8;
+    border: 1px solid #e1e4e8;
+    padding: 16px;
+    font-size: 0.9em;
+}
+
+blockquote {
+    border-left: 3px solid #705dcf;
+    padding: 0 16px;
+    color: #6b7280;
+    background: #f9f9f9;
+}
+
+table th {
+    background: #f0f0f0;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-bottom: 2px solid #ddd;
+}
+
+table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+hr {
+    border: none;
+    border-bottom: 1px solid #e1e4e8;
+}

@@ -260,6 +260,115 @@ def css_to_hwpx_style(css_text: str, name: str = "Custom") -> dict:
             break
     table_border_color = table_border_color or "#D1D9E0"
 
+    # --- Extended CSS→HWPX mappings (ensure_run_style) ---
+
+    # text-decoration: line-through → strikeout
+    body_text_dec = body.get("text-decoration", "")
+    strikeout = "line-through" in body_text_dec
+
+    # letter-spacing → spacing (per-language)
+    letter_spacing_css = body.get("letter-spacing", "")
+    letter_spacing = None
+    ls_match = re.match(r"^(-?[\d.]+)\s*(px|pt|em)", letter_spacing_css)
+    if ls_match:
+        ls_val = float(ls_match.group(1))
+        unit = ls_match.group(2)
+        if unit == "px":
+            letter_spacing = int(ls_val * 75)
+        elif unit == "pt":
+            letter_spacing = int(ls_val * 100)
+        elif unit == "em":
+            letter_spacing = int(ls_val * base_pt * 100)
+
+    # word-spacing (map to spacing as well, additive)
+    word_spacing_css = body.get("word-spacing", "")
+    # Not directly mappable, skip
+
+    # text-shadow → shadow
+    text_shadow_css = body.get("text-shadow", "")
+    text_shadow = bool(text_shadow_css) and "none" not in text_shadow_css
+    text_shadow_color = _parse_css_color(text_shadow_css) if text_shadow else None
+
+    # font-weight for strong/b → check if numeric weight available
+    strong_rules = rules.get("strong", rules.get("b", {}))
+    strong_weight = strong_rules.get("font-weight", "600")
+
+    # --- Extended CSS→HWPX mappings (ensure_para_style) ---
+
+    # p margin-bottom → paragraph spacing after
+    p_rules = rules.get("p", {})
+    p_margin_bottom_css = p_rules.get("margin-bottom", body.get("margin-bottom", ""))
+    para_spacing_after = None
+    pm_match = re.match(r"^([\d.]+)\s*(px|pt|em)", p_margin_bottom_css)
+    if pm_match:
+        para_spacing_after = _parse_css_value_to_hwpunit(pm_match.group(0), base_pt)
+
+    # p margin-top → paragraph spacing before
+    p_margin_top_css = p_rules.get("margin-top", "")
+    para_spacing_before = None
+    pm_match = re.match(r"^([\d.]+)\s*(px|pt|em)", p_margin_top_css)
+    if pm_match:
+        para_spacing_before = _parse_css_value_to_hwpunit(pm_match.group(0), base_pt)
+
+    # p text-indent → paragraph indent
+    text_indent_css = p_rules.get("text-indent", body.get("text-indent", ""))
+    para_indent = None
+    ti_match = re.match(r"^([\d.]+)\s*(px|pt|em)", text_indent_css)
+    if ti_match:
+        para_indent = _parse_css_value_to_hwpunit(ti_match.group(0), base_pt)
+
+    # text-align → paragraph align
+    text_align = p_rules.get("text-align", body.get("text-align", ""))
+    para_align = None
+    align_map = {"left": "LEFT", "center": "CENTER", "right": "RIGHT",
+                 "justify": "JUSTIFY"}
+    if text_align.lower() in align_map:
+        para_align = align_map[text_align.lower()]
+
+    # h1-h6 margin-top/bottom → heading spacing values
+    heading_margin_top = None
+    heading_margin_bottom = None
+    for sel in ("h1", "h2"):
+        r = rules.get(sel, {})
+        mt_css = r.get("margin-top", "")
+        mb_css = r.get("margin-bottom", "")
+        mt_m = re.match(r"^([\d.]+)\s*(px|pt|em)", mt_css)
+        mb_m = re.match(r"^([\d.]+)\s*(px|pt|em)", mb_css)
+        if mt_m and heading_margin_top is None:
+            heading_margin_top = _parse_css_value_to_hwpunit(mt_m.group(0), base_pt)
+        if mb_m and heading_margin_bottom is None:
+            heading_margin_bottom = _parse_css_value_to_hwpunit(mb_m.group(0), base_pt)
+
+    # --- Extended CSS→HWPX mappings (page setup) ---
+
+    # @page margin or body padding → page margins
+    page_rules = rules.get("@page", {})
+    body_padding = body.get("padding", "")
+    page_margin_css = page_rules.get("margin", body_padding)
+    page_margins = None
+    if page_margin_css:
+        pm_parts = re.findall(r"[\d.]+", page_margin_css)
+        if len(pm_parts) >= 4:
+            page_margins = tuple(int(float(v) * 75) for v in pm_parts[:4])  # top right bottom left
+        elif len(pm_parts) == 2:
+            v, h = int(float(pm_parts[0]) * 75), int(float(pm_parts[1]) * 75)
+            page_margins = (v, h, v, h)
+        elif len(pm_parts) == 1:
+            m = int(float(pm_parts[0]) * 75)
+            page_margins = (m, m, m, m)
+
+    # --- Extended: code block padding ---
+    code_padding_css = pre_rules.get("padding", "16px")
+    cp_match = re.match(r"^([\d.]+)", code_padding_css)
+    code_padding = int(float(cp_match.group(1)) * 75) if cp_match else 1200
+
+    # --- Extended: blockquote background ---
+    bq_bg = _parse_css_color(bq_rules.get("background", bq_rules.get("background-color", "")))
+
+    # --- Extended: link underline ---
+    link_underline = "underline" in a_rules.get("text-decoration", "none")
+    link_hover_underline = True  # most renderers underline on hover
+
     # Table cell padding: CSS "padding: Vpx Hpx" → (V_hwpunit, H_hwpunit)
     td_rules = rules.get("table td", rules.get("td", {}))
     th_padding = th_rules.get("padding", td_rules.get("padding", "6px 13px"))
@@ -305,6 +414,27 @@ def css_to_hwpx_style(css_text: str, name: str = "Custom") -> dict:
         "table_border_color": table_border_color,
         "table_cell_padding": (pad_v, pad_h),
         "bullet_chars": ["•", "◦", "▪", "‣", "⁃"],
+        # Extended: ensure_run_style
+        "strikeout": strikeout,
+        "letter_spacing": letter_spacing,
+        "text_shadow": text_shadow,
+        "text_shadow_color": text_shadow_color,
+        # Extended: ensure_para_style
+        "para_align": para_align,
+        "para_indent": para_indent,
+        "para_spacing_before": para_spacing_before,
+        "para_spacing_after": para_spacing_after,
+        # Extended: heading spacing
+        "heading_margin_top": heading_margin_top,
+        "heading_margin_bottom": heading_margin_bottom,
+        # Extended: page setup
+        "page_margins": page_margins,
+        # Extended: code block
+        "code_padding": code_padding,
+        # Extended: blockquote
+        "quote_bg": bq_bg,
+        # Extended: link
+        "link_underline": link_underline,
     }
 
 

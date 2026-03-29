@@ -1,11 +1,17 @@
-/* VS Code Markdown Preview style (simplified) */
+/* VS Code Markdown Preview style */
 /* Source: github.com/microsoft/vscode extensions/markdown-language-features/media/markdown.css */
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, sans-serif;
     font-size: 14px;
-    line-height: 22px;
+    line-height: 1.57;
     color: #333333;
+    text-align: left;
+}
+
+p {
+    margin-top: 0;
+    margin-bottom: 16px;
 }
 
 h1 {
@@ -35,17 +41,20 @@ h3 {
 
 h4 { font-size: 1em; font-weight: 600; }
 h5 { font-size: 0.875em; font-weight: 600; }
-h6 { font-size: 0.85em; font-weight: 600; }
+h6 { font-size: 0.85em; font-weight: 600; color: #6a737d; }
 
 a {
     color: #4080D0;
     text-decoration: none;
 }
 
+strong { font-weight: 600; }
+
 code {
-    font-family: "SF Mono", Monaco, Menlo, Consolas, monospace;
+    font-family: "SF Mono", Monaco, Menlo, Consolas, "D2Coding", monospace;
     font-size: 1em;
     color: #333333;
+    background: rgba(0,0,0,0.04);
 }
 
 pre {
@@ -53,6 +62,7 @@ pre {
     border: 1px solid #c8c8c8;
     padding: 16px;
     border-radius: 3px;
+    font-size: 1em;
 }
 
 blockquote {
@@ -64,6 +74,7 @@ blockquote {
 
 table th {
     background: #e8e8e8;
+    font-weight: 600;
     border-bottom: 1px solid rgba(0,0,0,0.69);
     padding: 5px 10px;
     text-align: left;

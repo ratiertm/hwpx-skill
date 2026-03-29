@@ -868,6 +868,34 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
     element_count = 0
     i = 0
 
+    # Create body paragraph style from CSS (line-spacing, align, indent, spacing)
+    body_para_kw: dict = {}
+    if s.get("line_spacing"):
+        body_para_kw["line_spacing"] = s["line_spacing"]
+    if s.get("para_align"):
+        body_para_kw["align"] = s["para_align"]
+    if s.get("para_indent"):
+        body_para_kw["indent"] = s["para_indent"]
+    if s.get("para_spacing_after"):
+        body_para_kw["spacing_after"] = s["para_spacing_after"]
+    if s.get("para_spacing_before"):
+        body_para_kw["spacing_before"] = s["para_spacing_before"]
+    body_para_id = None
+    if body_para_kw:
+        body_para_id = doc.ensure_para_style(**body_para_kw)
+
+    # Create body char style from CSS (letter-spacing, shadow)
+    body_char_kw: dict = {"height": s["body_height"]}
+    if s.get("body_color"):
+        body_char_kw["text_color"] = s["body_color"]
+    if s.get("letter_spacing") is not None:
+        body_char_kw["spacing_hangul"] = s["letter_spacing"]
+        body_char_kw["spacing_latin"] = s["letter_spacing"]
+    if s.get("text_shadow"):
+        body_char_kw["shadow"] = True
+        if s.get("text_shadow_color"):
+            body_char_kw["shadow_color"] = s["text_shadow_color"]
+
     while i < len(lines):
         line = lines[i]
 
@@ -1058,7 +1086,7 @@ def _convert_markdown_to_hwpx(doc, content: str, style_name: str = DEFAULT_STYLE
             continue
 
         # ── Regular paragraph (inline formatting) ──
-        _add_rich_paragraph(doc, stripped, style=s)
+        _add_rich_paragraph(doc, stripped, style=s, para_pr_id=body_para_id)
         element_count += 1
         i += 1
 
@@ -1107,7 +1135,8 @@ def _parse_inline_segments(text: str) -> list[tuple[str, str]]:
     return segments
 
 
-def _add_rich_paragraph(doc, md_text: str, style: dict | None = None) -> None:
+def _add_rich_paragraph(doc, md_text: str, style: dict | None = None,
+                        para_pr_id: str | int | None = None) -> None:
     """Add a single paragraph with inline bold/italic/code/hyperlink formatting.
 
     All segments (including hyperlinks) are placed in one paragraph
@@ -1120,19 +1149,22 @@ def _add_rich_paragraph(doc, md_text: str, style: dict | None = None) -> None:
 
     segments = _parse_inline_segments(md_text)
 
+    para_kw: dict = {}
+    if para_pr_id is not None:
+        para_kw["para_pr_id_ref"] = int(para_pr_id)
+
     # Fast path: no formatting at all
     if len(segments) == 1 and segments[0][0] == "normal":
-        doc.add_paragraph(segments[0][1])
+        doc.add_paragraph(segments[0][1], **para_kw)
         return
 
     # Create one paragraph, append all segments as runs
     first_style, first_text = segments[0]
     if first_style.startswith("link:"):
-        # First segment is a link — create empty paragraph first
-        para = doc.add_paragraph("", include_run=False)
+        para = doc.add_paragraph("", include_run=False, **para_kw)
     else:
         char_id = _style_for_segment(doc, first_style, style=style)
-        para = doc.add_paragraph(first_text, char_pr_id_ref=char_id)
+        para = doc.add_paragraph(first_text, char_pr_id_ref=char_id, **para_kw)
 
     def _mk(parent, tag, attrib=None):
         child = parent.makeelement(tag, attrib or {})
