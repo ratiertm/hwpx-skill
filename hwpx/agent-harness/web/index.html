@@ -112,7 +112,7 @@
     <div class="tab active" onclick="switchTab('direct')">Direct Input</div>
     <div class="tab" onclick="switchTab('llm')">LLM Instruction</div>
     <div class="tab" onclick="switchTab('upload')">File Upload</div>
-    <div class="tab" onclick="switchTab('image')">Image → HWPX</div>
+    <div class="tab" onclick="switchTab('image')" style="color:#bbb; cursor:not-allowed;">Image → HWPX (준비중)</div>
   </div>
 
   <!-- Tab 1: Direct Input -->
@@ -192,8 +192,8 @@ CLI-Anything과 python-hwpx를 결합하여 AI 에이전트가 한글 문서를 
         <label>Output Filename</label>
         <input type="text" name="filename" value="form-output.hwpx" required>
       </div>
-      <p class="info">OpenCV로 표 그리드를 감지하고, EasyOCR로 셀 텍스트를 추출합니다. 처리에 1~2분 소요될 수 있습니다.</p>
-      <button type="submit" class="btn btn-primary">Detect & Generate HWPX</button>
+      <p class="info">준비중: OpenCV 그리드 감지 + Anthropic API 텍스트 인식 + 셀 편집 UI가 필요합니다.</p>
+      <button type="submit" class="btn btn-primary" disabled>Detect & Generate HWPX (준비중)</button>
     </form>
     <div id="loading-image" class="loading"><div class="spinner"></div><p>이미지 분석 중... (OpenCV + OCR)</p></div>
     <div id="result-image" class="result"></div>
