@@ -1,0 +1,544 @@
+"""Section XML enum types - ported from Java enumtype/ package."""
+from __future__ import annotations
+
+from enum import Enum
+
+
+class AlignStyleType(Enum):
+    TOP_LEFT = "TOP_LEFT"
+    TOP = "TOP"
+    TOP_RIGHT = "TOP_RIGHT"
+    LEFT = "LEFT"
+    CENTER = "CENTER"
+    RIGHT = "RIGHT"
+    BOTTOM_LEFT = "BOTTOM_LEFT"
+    BOTTOM = "BOTTOM"
+    BOTTOM_RIGHT = "BOTTOM_RIGHT"
+
+
+class ApplyPageType(Enum):
+    """Page type to apply to (both, even, odd)."""
+    BOTH = "BOTH"
+    EVEN = "EVEN"
+    ODD = "ODD"
+
+
+class ArcType(Enum):
+    """Arc shape type."""
+    NORMAL = "NORMAL"
+    PIE = "PIE"
+    CHORD = "CHORD"
+
+
+class ArrowSize(Enum):
+    SMALL_SMALL = "SMALL_SMALL"
+    SMALL_MEDIUM = "SMALL_MEDIUM"
+    SMALL_LARGE = "SMALL_LARGE"
+    MEDIUM_SMALL = "MEDIUM_SMALL"
+    MEDIUM_MEDIUM = "MEDIUM_MEDIUM"
+    MEDIUM_LARGE = "MEDIUM_LARGE"
+    LARGE_SMALL = "LARGE_SMALL"
+    LARGE_MEDIUM = "LARGE_MEDIUM"
+    LARGE_LARGE = "LARGE_LARGE"
+
+
+class ArrowType(Enum):
+    NORMAL = "NORMAL"
+    ARROW = "ARROW"
+    SPEAR = "SPEAR"
+    CONCAVE_ARROW = "CONCAVE_ARROW"
+    EMPTY_DIAMOND = "EMPTY_DIAMOND"
+    EMPTY_CIRCLE = "EMPTY_CIRCLE"
+    EMPTY_BOX = "EMPTY_BOX"
+
+
+class BackStyle(Enum):
+    TRANSPARENT = "TRANSPARENT"
+    OPAQUE = "OPAQUE"
+
+
+class ButtonCheckValue(Enum):
+    UNCHECKED = "UNCHECKED"
+    CHECKED = "CHECKED"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class CaptionSide(Enum):
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    TOP = "TOP"
+    BOTTOM = "BOTTOM"
+
+
+class ColorEffectType(Enum):
+    ALPHA = "ALPHA"
+    ALPHA_MOD = "ALPHA_MOD"
+    ALPHA_OFF = "ALPHA_OFF"
+    RED = "RED"
+    RED_MOD = "RED_MOD"
+    RED_OFF = "RED_OFF"
+    GREEN = "GREEN"
+    GREEN_MOD = "GREEN_MOD"
+    GREEN_OFF = "GREEN_OFF"
+    BLUE = "BLUE"
+    BLUE_MOD = "BLUE_MOD"
+    BLUE_OFF = "BLUE_OFF"
+    HUE = "HUE"
+    HUE_MOD = "HUE_MOD"
+    HUE_OFF = "HUE_OFF"
+    SAT = "SAT"
+    SAT_MOD = "SAT_MOD"
+    SAT_OFF = "SAT_OFF"
+    LUM = "LUM"
+    LUM_MOD = "LUM_MOD"
+    LUM_OFF = "LUM_OFF"
+    SHADE = "SHADE"
+    TINT = "TINT"
+    GRAY = "GRAY"
+    COMP = "COMP"
+    GAMMA = "GAMMA"
+    INV_GAMMA = "INV_GAMMA"
+    INV = "INV"
+
+
+class ColorType(Enum):
+    RGB = "RGB"
+    CMYK = "CMYK"
+    SCHEMA = "SCHEMA"
+    SYSTEM = "SYSTEM"
+
+
+class ColumnDirection(Enum):
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    MIRROR = "MIRROR"
+
+
+class ComposeCircleType(Enum):
+    CHAR = "CHAR"
+    SHAPE_CIRCLE = "SHAPE_CIRCLE"
+    SHAPE_REVERSAL_CIRCLE = "SHAPE_REVERSAL_CIRCLE"
+    SHAPE_RECTANGLE = "SHAPE_RECTANGLE"
+    SHAPE_REVERSAL_RECTANGLE = "SHAPE_REVERSAL_RECTANGLE"
+    SHAPE_TRIANGLE = "SHAPE_TRIANGLE"
+    SHAPE_REVERSAL_TIRANGLE = "SHAPE_REVERSAL_TIRANGLE"
+    SHAPE_LIGHT = "SHAPE_LIGHT"
+    SHAPE_RHOMBUS = "SHAPE_RHOMBUS"
+    SHAPE_REVERSAL_RHOMBUS = "SHAPE_REVERSAL_RHOMBUS"
+    SHAPE_ROUNDED_RECTANGLE = "SHAPE_ROUNDED_RECTANGLE"
+    SHAPE_EMPTY_CIRCULATE_TRIANGLE = "SHAPE_EMPTY_CIRCULATE_TRIANGLE"
+    SHAPE_THIN_CIRCULATE_TRIANGLE = "SHAPE_THIN_CIRCULATE_TRIANGLE"
+    SHAPE_THICK_CIRCULATE_TRIANGLE = "SHAPE_THICK_CIRCULATE_TRIANGLE"
+
+
+class ComposeType(Enum):
+    SPREAD = "SPREAD"
+    OVERLAP = "OVERLAP"
+
+
+class ConnectLineType(Enum):
+    STRAIGHT_NOARROW = "STRAIGHT_NOARROW"
+    STRAIGHT_ONEWAY = "STRAIGHT_ONEWAY"
+    STRAIGHT_BOTH = "STRAIGHT_BOTH"
+    STROKE_NOARROW = "STROKE_NOARROW"
+    STROKE_ONEWAY = "STROKE_ONEWAY"
+    STROKE_BOTH = "STROKE_BOTH"
+    ARC_NOARROW = "ARC_NOARROW"
+    ARC_ONEWAY = "ARC_ONEWAY"
+    ARC_BOTH = "ARC_BOTH"
+
+
+class CurveSegmentType(Enum):
+    LINE = "LINE"
+    CURVE = "CURVE"
+
+
+class DisplayScrollBar(Enum):
+    NONE = "NONE"
+    VERTICAL = "VERTICAL"
+    HORIZONTAL = "HORIZONTAL"
+    BOTH = "BOTH"
+
+
+class DrawingShadowType(Enum):
+    NONE = "NONE"
+    SCALE_NARROW = "SCALE_NARROW"
+    SCALE_ENLARGE = "SCALE_ENLARGE"
+    PARELLEL_LEFTTOP = "PARELLEL_LEFTTOP"
+    PARELLEL_RIGHTTOP = "PARELLEL_RIGHTTOP"
+    PARELLEL_LEFTBOTTOM = "PARELLEL_LEFTBOTTOM"
+    PARELLEL_RIGHTBOTTOM = "PARELLEL_RIGHTBOTTOM"
+    SHEAR_LEFTTOP = "SHEAR_LEFTTOP"
+    SHEAR_RIGHTTOP = "SHEAR_RIGHTTOP"
+    SHEAR_LEFTBOTTOM = "SHEAR_LEFTBOTTOM"
+    SHEAR_RIGHTBOTTOM = "SHEAR_RIGHTBOTTOM"
+
+
+class DropCapStyle(Enum):
+    NONE = "None"
+    DOUBLE_LINE = "DoubleLine"
+    TRIPLE_LINE = "TripleLine"
+    MARGIN = "Margin"
+
+
+class DutmalPosType(Enum):
+    TOP = "TOP"
+    BOTTOM = "BOTTOM"
+
+
+class EndNoteNumberingType(Enum):
+    CONTINUOUS = "CONTINUOUS"
+    ON_SECTION = "ON_SECTION"
+
+
+class EndNotePlace(Enum):
+    END_OF_DOCUMENT = "END_OF_DOCUMENT"
+    END_OF_SECTION = "END_OF_SECTION"
+
+
+class EquationLineMode(Enum):
+    LINE = "LINE"
+    CHAR = "CHAR"
+
+
+class FieldType(Enum):
+    CLICK_HERE = "CLICK_HERE"
+    HYPERLINK = "HYPERLINK"
+    BOOKMARK = "BOOKMARK"
+    FORMULA = "FORMULA"
+    SUMMARY = "SUMMARY"
+    USER_INFO = "USER_INFO"
+    DATE = "DATE"
+    DOC_DATE = "DOC_DATE"
+    PATH = "PATH"
+    CROSSREF = "CROSSREF"
+    MAILMERGE = "MAILMERGE"
+    MEMO = "MEMO"
+    PROOFREADING_MARKS = "PROOFREADING_MARKS"
+    PRIVATE_INFO = "PRIVATE_INFO"
+    METADATA = "METADATA"
+    CITATION = "CITATION"
+    BIBLIOGRAPHY = "BIBLIOGRAPHY"
+
+
+class FontType2(Enum):
+    REP = "REP"
+    TTF = "TTF"
+    HFT = "HFT"
+
+
+class FootNoteNumberingType(Enum):
+    CONTINUOUS = "CONTINUOUS"
+    ON_SECTION = "ON_SECTION"
+    ON_PAGE = "ON_PAGE"
+
+
+class FootNotePlace(Enum):
+    EACH_COLUMN = "EACH_COLUMN"
+    MERGE_COLUMN = "MERGE_COLUMN"
+    BOTTOM_OF_PAGE = "BOTTOM_OF_PAGE"
+    BELOW_TEXT = "BELOW_TEXT"
+
+
+class GutterMethod(Enum):
+    LEFT_ONLY = "LEFT_ONLY"
+    LEFT_RIGHT = "LEFT_RIGHT"
+    TOP_BOTTOM = "TOP_BOTTOM"
+
+
+class HeightRelTo(Enum):
+    PAPER = "PAPER"
+    PAGE = "PAGE"
+    ABSOLUTE = "ABSOLUTE"
+
+
+class HorzAlign(Enum):
+    LEFT = "LEFT"
+    CENTER = "CENTER"
+    RIGHT = "RIGHT"
+    INSIDE = "INSIDE"
+    OUTSIDE = "OUTSIDE"
+
+
+class HorzRelTo(Enum):
+    PAPER = "PAPER"
+    PAGE = "PAGE"
+    COLUMN = "COLUMN"
+    PARA = "PARA"
+
+
+class LineCap(Enum):
+    FLAT = "FLAT"
+    ROUND = "ROUND"
+    SQUARE = "SQUARE"
+
+
+class LineNumberRestartType(Enum):
+    NONE = "NONE"
+    PAGE = "PAGE"
+    SECTION = "SECTION"
+
+
+class LineWrapMethod(Enum):
+    BREAK = "BREAK"
+    SQUEEZE = "SQUEEZE"
+    KEEP = "KEEP"
+
+
+class MultiColumnType(Enum):
+    GENERAL = "GENERAL"
+    PARALLEL = "PARALLEL"
+    NEWSPAPER = "NEWSPAPER"
+
+
+class NumType(Enum):
+    PAGE = "PAGE"
+    FOOTNOTE = "FOOTNOTE"
+    ENDNOTE = "ENDNOTE"
+    PICTURE = "PICTURE"
+    TABLE = "TABLE"
+    EQUATION = "EQUATION"
+    TOTAL_PAGE = "TOTAL_PAGE"
+
+
+class NumberType2(Enum):
+    DIGIT = "DIGIT"
+    CIRCLE_DIGIT = "CIRCLE_DIGIT"
+    ROMAN_CAPITAL = "ROMAN_CAPITAL"
+    ROMAN_SMALL = "ROMAN_SMALL"
+    LATIN_CAPITAL = "LATIN_CAPITAL"
+    LATIN_SMALL = "LATIN_SMALL"
+    CIRCLED_LATIN_CAPITAL = "CIRCLED_LATIN_CAPITAL"
+    CIRCLED_LATIN_SMALL = "CIRCLED_LATIN_SMALL"
+    HANGUL_SYLLABLE = "HANGUL_SYLLABLE"
+    CIRCLED_HANGUL_SYLLABLE = "CIRCLED_HANGUL_SYLLABLE"
+    HANGUL_JAMO = "HANGUL_JAMO"
+    CIRCLED_HANGUL_JAMO = "CIRCLED_HANGUL_JAMO"
+    HANGUL_PHONETIC = "HANGUL_PHONETIC"
+    IDEOGRAPH = "IDEOGRAPH"
+    CIRCLED_IDEOGRAPH = "CIRCLED_IDEOGRAPH"
+    DECAGON_CIRCLE = "DECAGON_CIRCLE"
+    DECAGON_CIRCLE_HANJA = "DECAGON_CIRCLE_HANJA"
+    SYMBOL = "SYMBOL"
+    USER_CHAR = "USER_CHAR"
+
+
+class NumberingType(Enum):
+    NONE = "NONE"
+    PICTURE = "PICTURE"
+    TABLE = "TABLE"
+    EQUATION = "EQUATION"
+
+
+class OLEDrawAspect(Enum):
+    CONTENT = "CONTENT"
+    THUMBNAIL = "THUMBNAIL"
+    ICON = "ICON"
+    DOCPRINT = "DOCPRINT"
+
+
+class OLEObjectType(Enum):
+    EMBEDDED = "EMBEDDED"
+    LINK = "LINK"
+    STATIC = "STATIC"
+    EQUATION = "EQUATION"
+
+
+class OutlineStyle(Enum):
+    NORMAL = "NORMAL"
+    BOX = "BOX"
+    CUSTOM = "CUSTOM"
+
+
+class PageBorderPositionCriterion(Enum):
+    BODY = "BODY"
+    PAPER = "PAPER"
+
+
+class PageDirection(Enum):
+    NARROWLY = "NARROWLY"
+    WIDELY = "WIDELY"
+
+
+class PageFillArea(Enum):
+    PAPER = "PAPER"
+    PAGE = "PAGE"
+    BODY = "BODY"
+
+
+class PageNumPosition(Enum):
+    NONE = "NONE"
+    TOP_LEFT = "TOP_LEFT"
+    TOP_CENTER = "TOP_CENTER"
+    TOP_RIGHT = "TOP_RIGHT"
+    BOTTOM_LEFT = "BOTTOM_LEFT"
+    BOTTOM_CENTER = "BOTTOM_CENTER"
+    BOTTOM_RIGHT = "BOTTOM_RIGHT"
+    OUTSIDE_TOP = "OUTSIDE_TOP"
+    OUTSIDE_BOTTOM = "OUTSIDE_BOTTOM"
+    INSIDE_TOP = "INSIDE_TOP"
+    INSIDE_BOTTOM = "INSIDE_BOTTOM"
+
+
+class PageStartON(Enum):
+    BOTH = "BOTH"
+    EVEN = "EVEN"
+    ODD = "ODD"
+
+
+class PresentationEffect(Enum):
+    NONE = "NONE"
+    RANDOM = "RANDOM"
+    BLINDS_HORIZONTAL = "BLINDS_HORIZONTAL"
+    BLINDS_VERTICAL = "BLINDS_VERTICAL"
+    BOX_IN = "BOX_IN"
+    BOX_OUT = "BOX_OUT"
+    CHECKERBOARD_ACROSS = "CHECKERBOARD_ACROSS"
+    CHECKERBOARD_DOWN = "CHECKERBOARD_DOWN"
+    COVER_DOWN = "COVER_DOWN"
+    COVER_LEFT = "COVER_LEFT"
+    COVER_RIGHT = "COVER_RIGHT"
+    COVER_UP = "COVER_UP"
+    COVER_LEFT_DOWN = "COVER_LEFT_DOWN"
+    COVER_LEFT_UP = "COVER_LEFT_UP"
+    COVER_RIGHT_DOWN = "COVER_RIGHT_DOWN"
+    COVER_RIGHT_UP = "COVER_RIGHT_UP"
+    CUT = "CUT"
+    CUT_THROUGH_BLACK = "CUT_THROUGH_BLACK"
+    DISSOLVE = "DISSOLVE"
+    FADE_THROUGH_BLACK = "FADE_THROUGH_BLACK"
+    SPLIT_HORIZONTAL_IN = "SPLIT_HORIZONTAL_IN"
+    SPLIT_HORIZONTAL_OUT = "SPLIT_HORIZONTAL_OUT"
+    SPLIT_VERTICAL_IN = "SPLIT_VERTICAL_IN"
+    SPLIT_VERTICAL_OUT = "SPLIT_VERTICAL_OUT"
+    STRIPS_LEFT_DOWN = "STRIPS_LEFT_DOWN"
+    STRIPS_LEFT_UP = "STRIPS_LEFT_UP"
+    STRIPS_RIGHT_DOWN = "STRIPS_RIGHT_DOWN"
+    STRIPS_RIGHT_UP = "STRIPS_RIGHT_UP"
+    UNCOVER_DOWN = "UNCOVER_DOWN"
+    UNCOVER_LEFT = "UNCOVER_LEFT"
+    UNCOVER_RIGHT = "UNCOVER_RIGHT"
+    UNCOVER_UP = "UNCOVER_UP"
+    UNCOVER_LEFT_DOWN = "UNCOVER_LEFT_DOWN"
+    UNCOVER_LEFT_UP = "UNCOVER_LEFT_UP"
+    UNCOVER_RIGHT_DOWN = "UNCOVER_RIGHT_DOWN"
+    UNCOVER_RIGHT_UP = "UNCOVER_RIGHT_UP"
+    WIPE_DOWN = "WIPE_DOWN"
+    WIPE_LEFT = "WIPE_LEFT"
+    WIPE_RIGHT = "WIPE_RIGHT"
+    WIPE_UP = "WIPE_UP"
+
+
+class ScrollBarType(Enum):
+    FLAT = "FLAT"
+    THREE_D = "THREE_D"
+
+
+class ShadowStyle(Enum):
+    NONE = "NONE"
+    DROP = "DROP"
+    CONTINUOUS = "CONTINUOUS"
+
+
+class TabKeyBehavior(Enum):
+    NEXT_OBJECT = "NEXT_OBJECT"
+    INSERT_TAB = "INSERT_TAB"
+
+
+class TablePageBreak(Enum):
+    NONE = "NONE"
+    CELL = "CELL"
+    TABLE = "TABLE"
+
+
+class TextArtAlign(Enum):
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    CENTER = "CENTER"
+    FULL = "FULL"
+
+
+class TextArtShape(Enum):
+    WAVE_1 = "WAVE_1"
+    WAVE_2 = "WAVE_2"
+    WAVE_3 = "WAVE_3"
+    WAVE_4 = "WAVE_4"
+    ARCH_UP_CURVE = "ARCH_UP_CURVE"
+    ARCH_DOWN_CURVE = "ARCH_DOWN_CURVE"
+    CIRCLE_CURVE = "CIRCLE_CURVE"
+    BUTTON_CURVE = "BUTTON_CURVE"
+    FAT = "FAT"
+    THIN = "THIN"
+    TRIM = "TRIM"
+    DEFLATE_1 = "DEFLATE_1"
+    DEFLATE_2 = "DEFLATE_2"
+    DEFLATE_3 = "DEFLATE_3"
+    INFLATE_1 = "INFLATE_1"
+    INFLATE_2 = "INFLATE_2"
+    INFLATE_3 = "INFLATE_3"
+    SLOPE = "SLOPE"
+    SLANT_UP = "SLANT_UP"
+    SLANT_DOWN = "SLANT_DOWN"
+    CASCADE_UP = "CASCADE_UP"
+    CASCADE_DOWN = "CASCADE_DOWN"
+    PLAIN = "PLAIN"
+
+
+class TextDirection(Enum):
+    HORIZONTAL = "HORIZONTAL"
+    VERTICAL = "VERTICAL"
+
+
+class TextFlowSide(Enum):
+    BOTH = "BOTH"
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    LARGEST = "LARGEST"
+
+
+class TextWrapMethod(Enum):
+    SQUARE = "SQUARE"
+    TIGHT = "TIGHT"
+    THROUGH = "THROUGH"
+    TOP_AND_BOTTOM = "TOP_AND_BOTTOM"
+    IN_FRONT_OF_TEXT = "IN_FRONT_OF_TEXT"
+    BEHIND_TEXT = "BEHIND_TEXT"
+
+
+class VertAlign(Enum):
+    TOP = "TOP"
+    CENTER = "CENTER"
+    BOTTOM = "BOTTOM"
+
+
+class VertRelTo(Enum):
+    PAPER = "PAPER"
+    PAGE = "PAGE"
+    PARA = "PARA"
+
+
+class VerticalAlign2(Enum):
+    TOP = "TOP"
+    CENTER = "CENTER"
+    BOTTOM = "BOTTOM"
+
+
+class VideoType(Enum):
+    LOCAL = "LOCAL"
+    WEB = "WEB"
+
+
+class VisibilityOption(Enum):
+    SHOW = "SHOW"
+    SHOW_ALL = "SHOW_ALL"
+    HIDE = "HIDE"
+    SHOW_ON_FIRST_PAGE_ONLY = "SHOW_ON_FIRST_PAGE_ONLY"
+    HIDE_ON_FIRST_PAGE_ONLY = "HIDE_ON_FIRST_PAGE_ONLY"
+
+
+class WidthRelTo(Enum):
+    PAPER = "PAPER"
+    PAGE = "PAGE"
+    COLUMN = "COLUMN"
+    PARA = "PARA"
+    ABSOLUTE = "ABSOLUTE"

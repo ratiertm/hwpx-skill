@@ -1,0 +1,6 @@
+HWPX = "application/hwp+zip"
+HWPML_Package = "application/hwpml-package+xml"
+OLE = "application/ole"
+Image_PreFix = "image/"
+Script_PreFix = "application/x-javascript"
+XML = "application/xml"
