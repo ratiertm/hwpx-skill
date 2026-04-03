@@ -270,18 +270,21 @@ class _HwpxToHtmlConverter:
 
     def _convert_paragraph(self, p_elem: ET.Element) -> None:
         """Convert a single <hp:p> element."""
-        # Check if this paragraph contains only a table/shape
         runs = p_elem.findall(f"{HP}run")
 
         # Check for table
-        tbl_elems = p_elem.findall(f".//{HP}tbl")
-        for tbl in tbl_elems:
+        for tbl in p_elem.findall(f".//{HP}tbl"):
             self._convert_table(tbl)
 
         # Check for shape elements
-        for tag_suffix in ("rect", "ellipse"):
+        for tag_suffix in ("rect", "ellipse", "arc", "polygon", "curve",
+                           "connectLine", "textart", "container"):
             for shape in p_elem.findall(f".//{HP}{tag_suffix}"):
                 self._convert_shape(shape, tag_suffix)
+
+        # Check for line
+        for line in p_elem.findall(f".//{HP}line"):
+            self._convert_line(line)
 
         # Check for image (pic)
         for pic in p_elem.findall(f".//{HP}pic"):
@@ -291,12 +294,40 @@ class _HwpxToHtmlConverter:
         for eq in p_elem.findall(f".//{HP}equation"):
             self._convert_equation(eq)
 
+        # Check for form controls
+        for tag, html_fn in [
+            ("checkBtn", self._convert_checkbox),
+            ("radioBtn", self._convert_radio),
+            ("btn", self._convert_button),
+            ("comboBox", self._convert_combobox),
+            ("edit", self._convert_edit),
+            ("listBox", self._convert_listbox),
+            ("scrollBar", self._convert_scrollbar),
+        ]:
+            for elem in p_elem.findall(f".//{HP}{tag}"):
+                html_fn(elem)
+
+        # Check for highlight (markpenBegin)
+        has_markpen = p_elem.find(f".//{HP}markpenBegin") is not None
+
+        # Check for dutmal (ruby)
+        for dutmal in p_elem.findall(f".//{HP}dutmal"):
+            self._convert_dutmal(dutmal)
+
         # Collect text runs
         text_fragments = self._collect_run_html(runs)
         if text_fragments:
             combined = "".join(text_fragments)
             if not combined.strip():
                 return
+
+            # Apply highlight if markpen found
+            if has_markpen:
+                color = "#FFFF00"
+                mp = p_elem.find(f".//{HP}markpenBegin")
+                if mp is not None:
+                    color = mp.get("color", "#FFFF00")
+                combined = f'<mark style="background-color: {color}">{combined}</mark>'
 
             # Determine if this should be a heading
             heading_level = self._detect_heading(runs)
@@ -577,6 +608,82 @@ class _HwpxToHtmlConverter:
 
         if script:
             self.parts.append(f'<code>{_escape_html(script)}</code>')
+
+    # -- Form controls -------------------------------------------------------
+
+    def _convert_checkbox(self, elem: ET.Element) -> None:
+        caption = elem.get("caption", "")
+        value = elem.get("value", "UNCHECKED")
+        checked = ' checked' if value == "CHECKED" else ''
+        self.parts.append(
+            f'<p><label><input type="checkbox"{checked}> '
+            f'{_escape_html(caption)}</label></p>'
+        )
+
+    def _convert_radio(self, elem: ET.Element) -> None:
+        caption = elem.get("caption", "")
+        group = elem.get("radioGroupName", "")
+        value = elem.get("value", "UNCHECKED")
+        checked = ' checked' if value == "CHECKED" else ''
+        self.parts.append(
+            f'<p><label><input type="radio" name="{_escape_html(group)}"{checked}> '
+            f'{_escape_html(caption)}</label></p>'
+        )
+
+    def _convert_button(self, elem: ET.Element) -> None:
+        caption = elem.get("caption", "Button")
+        self.parts.append(f'<p><button>{_escape_html(caption)}</button></p>')
+
+    def _convert_combobox(self, elem: ET.Element) -> None:
+        name = elem.get("name", "")
+        self.parts.append(f'<p><select>')
+        for item in elem.findall(f"{HP}listItem"):
+            display = item.get("displayText", "")
+            val = item.get("value", "")
+            self.parts.append(f'  <option value="{_escape_html(val)}">{_escape_html(display or val)}</option>')
+        if not elem.findall(f"{HP}listItem"):
+            self.parts.append(f'  <option>{_escape_html(name)}</option>')
+        self.parts.append('</select></p>')
+
+    def _convert_edit(self, elem: ET.Element) -> None:
+        text_elem = elem.find(f"{HP}text")
+        text = text_elem.text if text_elem is not None and text_elem.text else ""
+        multi = elem.get("multiLine", "0") == "1"
+        if multi:
+            self.parts.append(f'<p><textarea rows="3" style="width:200px">{_escape_html(text)}</textarea></p>')
+        else:
+            self.parts.append(f'<p><input type="text" value="{_escape_html(text)}" style="width:200px"></p>')
+
+    def _convert_listbox(self, elem: ET.Element) -> None:
+        self.parts.append('<p><select multiple size="4">')
+        for item in elem.findall(f"{HP}listItem"):
+            display = item.get("displayText", "")
+            self.parts.append(f'  <option>{_escape_html(display)}</option>')
+        self.parts.append('</select></p>')
+
+    def _convert_scrollbar(self, elem: ET.Element) -> None:
+        min_v = elem.get("min", "0")
+        max_v = elem.get("max", "100")
+        val = elem.get("value", "0")
+        self.parts.append(f'<p><input type="range" min="{min_v}" max="{max_v}" value="{val}"></p>')
+
+    # -- Line ----------------------------------------------------------------
+
+    def _convert_line(self, line: ET.Element) -> None:
+        ls = line.find(f"{HP}lineShape")
+        color = ls.get("color", "#000000") if ls is not None else "#000000"
+        width = int(ls.get("width", "283")) if ls is not None else 283
+        px = max(1, width // 71)
+        self.parts.append(f'<hr style="border: none; border-top: {px}px solid {color}; margin: 10px 0;">')
+
+    # -- Dutmal (ruby) -------------------------------------------------------
+
+    def _convert_dutmal(self, elem: ET.Element) -> None:
+        main_el = elem.find(f"{HP}mainText")
+        sub_el = elem.find(f"{HP}subText")
+        main = main_el.text if main_el is not None and main_el.text else ""
+        sub = sub_el.text if sub_el is not None and sub_el.text else ""
+        self.parts.append(f'<p><ruby>{_escape_html(main)}<rp>(</rp><rt>{_escape_html(sub)}</rt><rp>)</rp></ruby></p>')
 
 
 # ---------------------------------------------------------------------------
