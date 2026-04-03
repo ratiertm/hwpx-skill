@@ -1716,6 +1716,31 @@ def convert_md_file_to_hwpx(md_path: str, hwpx_path: str, style: str = "github")
 
 
 # ======================================================================
+# HTML conversion
+# ======================================================================
+
+def convert_html_to_hwpx(hwpx_file: HWPXFile, html_content: str) -> int:
+    """Convert HTML content to HWPX elements in the document.
+
+    Uses only Python standard library (``html.parser``) for parsing.
+    Supports headings, paragraphs, bold/italic/underline, tables, lists,
+    images (base64 and local files), hyperlinks, code blocks, form
+    controls, ruby text, and inline CSS styles.
+    """
+    from .html_to_hwpx import convert_html_to_hwpx as _convert
+    return _convert(hwpx_file, html_content)
+
+
+def convert_html_file_to_hwpx(html_path: str, hwpx_path: str) -> None:
+    """Convert an HTML file to a HWPX file."""
+    with open(html_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    doc = create_document()
+    convert_html_to_hwpx(doc, content)
+    save(doc, hwpx_path)
+
+
+# ======================================================================
 # Reading & text extraction
 # ======================================================================
 
