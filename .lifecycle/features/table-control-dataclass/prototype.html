@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Table/Control Dataclass - Prototype</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #f5f5f5; color: #333; padding: 20px; max-width: 900px; margin: 0 auto; }
+h1 { font-size: 18px; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
+h2 { font-size: 14px; margin: 16px 0 8px; color: #555; }
+.code { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-size: 13px; line-height: 1.6; margin: 8px 0; white-space: pre; overflow-x: auto; }
+.kw { color: #569cd6; } .cls { color: #4ec9b0; } .str { color: #ce9178; } .cmt { color: #6a9955; } .fld { color: #9cdcfe; } .num { color: #b5cea8; }
+.section { border: 1px solid #ddd; padding: 16px; margin: 12px 0; background: #fff; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+th { background: #eee; }
+.comparison { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 0; margin: 12px 0; }
+.comparison-label { font-size: 12px; color: #777; text-align: center; margin-bottom: 4px; }
+.arrow { display: flex; align-items: center; justify-content: center; color: #999; font-size: 20px; }
+nav { display: flex; gap: 8px; margin-bottom: 16px; }
+nav button { padding: 6px 12px; border: 1px solid #999; background: #fff; cursor: pointer; font-family: monospace; font-size: 12px; }
+nav button.active { background: #333; color: #fff; }
+.screen { display: none; } .screen.active { display: block; }
+</style>
+<script type="application/json" id="prototype-manifest">
+{
+  "feature": "table-control-dataclass",
+  "specFile": ".lifecycle/features/table-control-dataclass/spec.md",
+  "version": "1.0.0",
+  "screens": ["overview", "table", "control"],
+  "specMapping": [
+    {"specId": "e2e-table-control-dataclass-001", "element": "[data-spec-id='001']", "screen": "table"},
+    {"specId": "e2e-table-control-dataclass-006", "element": "[data-spec-id='006']", "screen": "control"}
+  ],
+  "interactions": [{"action": "nav-overview", "target": "overview"}, {"action": "nav-table", "target": "table"}, {"action": "nav-control", "target": "control"}]
+}
+</script>
+</head>
+<body>
+<h1>Table/Control Dataclass Prototype</h1>
+<nav>
+  <button data-action="nav-overview" class="active">Overview</button>
+  <button data-action="nav-table">Table</button>
+  <button data-action="nav-control">Control</button>
+</nav>
+
+<div data-screen="overview" class="screen active">
+<h2>Before vs After</h2>
+<div class="comparison">
+<div>
+  <div class="comparison-label">BEFORE</div>
+  <div class="code"><span class="cmt"># Table: 100% generic</span>
+tbl.<span class="fld">attributes</span>[<span class="str">"rowCnt"</span>]  <span class="cmt"># str</span>
+tbl.<span class="fld">children</span>[<span class="num">0</span>]              <span class="cmt"># GenericElement (row?)</span>
+tbl.<span class="fld">children</span>[<span class="num">0</span>].<span class="fld">children</span>[<span class="num">0</span>] <span class="cmt"># GenericElement (cell??)</span>
+
+<span class="cmt"># Control: 1 typed field</span>
+ctrl.<span class="fld">control_type</span>            <span class="cmt"># str</span>
+ctrl.<span class="fld">attributes</span>[<span class="str">"id"</span>]       <span class="cmt"># str</span></div>
+</div>
+<div class="arrow">→</div>
+<div>
+  <div class="comparison-label">AFTER</div>
+  <div class="code"><span class="cmt"># Table: typed structure</span>
+tbl.<span class="fld">row_cnt</span>                    <span class="cmt"># int</span>
+tbl.<span class="fld">rows</span>[<span class="num">0</span>]                     <span class="cmt"># TableRow</span>
+tbl.<span class="fld">rows</span>[<span class="num">0</span>].<span class="fld">cells</span>[<span class="num">0</span>].<span class="fld">col_addr</span>  <span class="cmt"># int</span>
+tbl.<span class="fld">rows</span>[<span class="num">0</span>].<span class="fld">cells</span>[<span class="num">0</span>].<span class="fld">width</span>     <span class="cmt"># int</span>
+
+<span class="cmt"># Control: typed fields</span>
+ctrl.<span class="fld">control_type</span>               <span class="cmt"># str</span>
+ctrl.<span class="fld">id</span>                          <span class="cmt"># Optional[str]</span>
+ctrl.<span class="fld">name</span>                        <span class="cmt"># Optional[str]</span></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Scope</h2>
+<table>
+<tr><th>Target</th><th>New Classes</th><th>New Parsers</th></tr>
+<tr><td>Table</td><td>TableRow, TableCell, TableCellMargin, TableInMargin</td><td>4 parse_*</td></tr>
+<tr><td>Control</td><td>(확장만, 신규 클래스 없음)</td><td>1 parse_* 확장</td></tr>
+</table>
+</div>
+</div>
+
+<div data-screen="table" class="screen">
+<h2 data-spec-id="001">Table Dataclass Hierarchy</h2>
+<div class="code"><span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">TableCellMargin</span>:
+    <span class="fld">left</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">right</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">top</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">bottom</span>: Optional[int] = <span class="kw">None</span>
+
+<span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">TableInMargin</span>:
+    <span class="fld">left</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">right</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">top</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">bottom</span>: Optional[int] = <span class="kw">None</span>
+
+<span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">TableCell</span>:
+    <span class="fld">col_addr</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">row_addr</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">col_span</span>: int = <span class="num">1</span>
+    <span class="fld">row_span</span>: int = <span class="num">1</span>
+    <span class="fld">width</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">height</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">margin</span>: Optional[TableCellMargin] = <span class="kw">None</span>
+    <span class="fld">border_fill_id_ref</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">paragraphs</span>: List[GenericElement] = field(...)
+    <span class="fld">other_children</span>: Dict = field(...)
+
+<span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">TableRow</span>:
+    <span class="fld">cells</span>: List[TableCell] = field(...)
+    <span class="fld">other_children</span>: Dict = field(...)
+
+<span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">Table</span>:
+    <span class="fld">tag</span>: str
+    <span class="fld">row_cnt</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">col_cnt</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">page_break</span>: Optional[str] = <span class="kw">None</span>  <span class="cmt"># TABLE|CELL|NONE</span>
+    <span class="fld">repeat_header</span>: Optional[bool] = <span class="kw">None</span>
+    <span class="fld">cell_spacing</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">border_fill_id_ref</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">in_margin</span>: Optional[TableInMargin] = <span class="kw">None</span>
+    <span class="fld">rows</span>: List[TableRow] = field(...)
+    <span class="fld">other_attributes</span>: Dict = field(...)
+    <span class="fld">other_children</span>: Dict = field(...)</div>
+
+<h2>XML → Dataclass Mapping</h2>
+<div class="code"><span class="cmt">&lt;hp:tbl rowCnt="3" colCnt="2" repeatHeader="false"&gt;</span>
+  <span class="cmt">&lt;hp:inMargin left="50" right="50" top="0" bottom="0"/&gt;</span>
+  <span class="cmt">&lt;hp:tr&gt;</span>
+    <span class="cmt">&lt;hp:tc&gt;</span>
+      <span class="cmt">&lt;hp:cellAddr colAddr="0" rowAddr="0"/&gt;</span>
+      <span class="cmt">&lt;hp:cellSpan colSpan="1" rowSpan="1"/&gt;</span>
+      <span class="cmt">&lt;hp:cellSz width="4252" height="1000"/&gt;</span>
+      <span class="cmt">&lt;hp:subList&gt;...paragraphs...&lt;/hp:subList&gt;</span>
+    <span class="cmt">&lt;/hp:tc&gt;</span>
+  <span class="cmt">&lt;/hp:tr&gt;</span>
+<span class="cmt">&lt;/hp:tbl&gt;</span>
+
+          ↓ parse_table_element()
+
+<span class="cls">Table</span>(
+  row_cnt=<span class="num">3</span>, col_cnt=<span class="num">2</span>, repeat_header=<span class="kw">False</span>,
+  in_margin=<span class="cls">TableInMargin</span>(left=<span class="num">50</span>, right=<span class="num">50</span>),
+  rows=[
+    <span class="cls">TableRow</span>(cells=[
+      <span class="cls">TableCell</span>(col_addr=<span class="num">0</span>, row_addr=<span class="num">0</span>,
+               col_span=<span class="num">1</span>, row_span=<span class="num">1</span>,
+               width=<span class="num">4252</span>, height=<span class="num">1000</span>,
+               paragraphs=[...])
+    ])
+  ]
+)</div>
+</div>
+
+<div data-screen="control" class="screen">
+<h2 data-spec-id="006">Control Expansion (Minimal)</h2>
+<div class="code"><span class="kw">@dataclass</span>(slots=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="cls">Control</span>:
+    <span class="fld">tag</span>: str
+    <span class="fld">control_type</span>: Optional[str] = <span class="kw">None</span>
+    <span class="cmt"># NEW: explicit fields from OWPML schema</span>
+    <span class="fld">id</span>: Optional[str] = <span class="kw">None</span>
+    <span class="fld">name</span>: Optional[str] = <span class="kw">None</span>
+    <span class="fld">editable</span>: Optional[bool] = <span class="kw">None</span>
+    <span class="fld">dirty</span>: Optional[bool] = <span class="kw">None</span>
+    <span class="fld">zorder</span>: Optional[int] = <span class="kw">None</span>
+    <span class="fld">field_id</span>: Optional[str] = <span class="kw">None</span>
+    <span class="cmt"># Fallback</span>
+    <span class="fld">other_attributes</span>: Dict = field(...)
+    <span class="fld">children</span>: List[GenericElement] = field(...)</div>
+
+<div class="section">
+<h2>Scope Decision</h2>
+<p><strong>이번:</strong> Control의 공통 속성만 typed. children은 GenericElement 유지.</p>
+<p><strong>향후:</strong> FieldBegin, Bookmark, PageNum 등 20+ 하위 타입 분류는 별도 피처.</p>
+</div>
+</div>
+
+<script>
+(function() {
+  var screens = document.querySelectorAll('.screen');
+  var buttons = document.querySelectorAll('nav button');
+  function show(name) {
+    screens.forEach(function(s) { s.classList.remove('active'); });
+    buttons.forEach(function(b) { b.classList.remove('active'); });
+    var t = document.querySelector('[data-screen="' + name + '"]');
+    if (t) t.classList.add('active');
+    var btn = document.querySelector('[data-action="nav-' + name + '"]');
+    if (btn) btn.classList.add('active');
+  }
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    show(btn.getAttribute('data-action').replace('nav-', ''));
+  });
+})();
+</script>
+</body>
+</html>

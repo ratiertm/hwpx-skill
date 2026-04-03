@@ -1,39 +1,46 @@
 {
   "version": "1.0",
-  "feature": "hwpx-skill-v1",
+  "feature": "char-property-dataclass",
   "artifacts": {
     "1_plan": {
       "required_inputs": [],
       "outputs": [
-        {"type": "spec", "path": ".lifecycle/features/hwpx-skill-v1/spec.md", "created_at": "2026-03-27T00:20:00Z", "status": "complete"},
-        {"type": "prototype", "path": ".lifecycle/features/hwpx-skill-v1/prototype.html", "created_at": "2026-03-27T00:25:00Z", "status": "complete"}
+        {"type": "spec", "path": ".lifecycle/features/char-property-dataclass/spec.md", "created_at": "2026-03-28T12:00:00Z", "status": "complete"},
+        {"type": "prototype", "path": ".lifecycle/features/char-property-dataclass/prototype.html", "created_at": "2026-03-28T12:00:00Z", "status": "complete"}
       ],
-      "completed_at": "2026-03-27T00:30:00Z"
+      "completed_at": "2026-03-28T12:10:00Z"
     },
     "2_do": {
       "required_inputs": ["1_plan"],
       "outputs": [
-        {"type": "code", "path": "hwpx/agent-harness/cli_anything/hwpx/hwpx_cli.py", "created_at": "2026-03-27T00:45:00Z", "status": "complete"},
-        {"type": "spec-updated", "path": ".lifecycle/features/hwpx-skill-v1/spec.md", "created_at": "2026-03-27T00:45:00Z", "status": "complete"}
+        {"type": "code", "path": "ratiertm-hwpx/src/hwpx/oxml/header.py", "created_at": "2026-03-28T12:30:00Z", "status": "complete"},
+        {"type": "code", "path": "ratiertm-hwpx/src/hwpx/oxml/document.py", "created_at": "2026-03-28T12:30:00Z", "status": "complete"},
+        {"type": "test", "path": "ratiertm-hwpx/tests/test_char_property.py", "created_at": "2026-03-28T12:30:00Z", "status": "complete"},
+        {"type": "spec-updated", "path": ".lifecycle/features/char-property-dataclass/spec.md", "created_at": "2026-03-28T12:30:00Z", "status": "complete"}
       ],
-      "completed_at": "2026-03-27T00:45:00Z"
+      "completed_at": "2026-03-28T12:30:00Z"
     },
     "3_test": {
       "required_inputs": ["2_do"],
       "outputs": [
-        {"type": "verification", "path": ".lifecycle/features/hwpx-skill-v1/verification.md", "created_at": "2026-03-27T00:55:00Z", "status": "complete"}
+        {"type": "verification", "path": ".lifecycle/features/char-property-dataclass/verification.json", "created_at": "2026-03-28T12:35:00Z", "status": "complete"},
+        {"type": "test-report", "path": ".lifecycle/features/char-property-dataclass/verification.md", "created_at": "2026-03-28T12:35:00Z", "status": "complete"}
       ],
-      "completed_at": "2026-03-27T00:55:00Z"
+      "completed_at": "2026-03-28T12:35:00Z"
     },
     "4_commit": {
       "required_inputs": ["3_test"],
-      "outputs": [],
-      "completed_at": null
+      "outputs": [
+        {"type": "commit", "path": "0bcd72e", "created_at": "2026-03-28T12:40:00Z", "status": "complete"}
+      ],
+      "completed_at": "2026-03-28T12:40:00Z"
     },
     "8_retrospect": {
       "required_inputs": ["4_commit"],
-      "outputs": [],
-      "completed_at": null
+      "outputs": [
+        {"type": "retrospective", "path": ".lifecycle/features/char-property-dataclass/retrospective.md", "created_at": "2026-03-28T12:45:00Z", "status": "complete"}
+      ],
+      "completed_at": "2026-03-28T12:45:00Z"
     }
   },
   "gate_rules": {

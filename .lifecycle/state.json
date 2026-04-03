@@ -10,16 +10,16 @@
     "stage": 1,
     "stage_name": "PLAN",
     "status": "in_progress",
-    "feature": "api-style-align",
-    "mode": "feature"
+    "feature": "owpml-model-python",
+    "mode": "release"
   },
   "progress": {
     "stages_completed": [],
-    "current_stage_started_at": "2026-03-28T07:00:00Z",
-    "last_transition_at": "2026-03-28T07:00:00Z"
+    "current_stage_started_at": "2026-03-28T14:00:00Z",
+    "last_transition_at": "2026-03-28T14:00:00Z"
   },
   "session": {
-    "last_active": "2026-03-28T07:00:00Z",
-    "resume_hint": "Stage 1 PLAN — API 스타일을 공식 python-hwpx 패턴에 맞춰 개선"
+    "last_active": "2026-03-28T14:00:00Z",
+    "resume_hint": "Stage 1 PLAN — hancom-io/hwpx-owpml-model C++ → Python 전환 설계"
   }
 }

@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CharProperty Dataclass - API Prototype</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #f5f5f5; color: #333; padding: 20px; }
+h1 { font-size: 18px; margin-bottom: 16px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+h2 { font-size: 14px; margin: 16px 0 8px; color: #555; }
+.screen { display: none; max-width: 900px; margin: 0 auto; }
+.screen.active { display: block; }
+nav { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+nav button { padding: 6px 12px; border: 1px solid #999; background: #fff; cursor: pointer; font-family: monospace; font-size: 12px; }
+nav button.active { background: #333; color: #fff; }
+.code-block { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 8px 0; white-space: pre; }
+.keyword { color: #569cd6; }
+.class-name { color: #4ec9b0; }
+.string { color: #ce9178; }
+.comment { color: #6a9955; }
+.field { color: #9cdcfe; }
+.decorator { color: #dcdcaa; }
+.number { color: #b5cea8; }
+.arrow { display: flex; align-items: center; justify-content: center; padding: 8px; color: #999; font-size: 20px; }
+.comparison { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 0; margin: 12px 0; }
+.comparison-label { font-size: 12px; color: #777; text-align: center; margin-bottom: 4px; }
+.spec-badge { display: inline-block; background: #e0e0e0; padding: 2px 6px; font-size: 10px; border-radius: 2px; margin-left: 8px; color: #666; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+th { background: #eee; }
+.status { display: inline-block; padding: 2px 6px; border-radius: 2px; font-size: 11px; }
+.status-new { background: #d4edda; color: #155724; }
+.status-changed { background: #fff3cd; color: #856404; }
+.status-kept { background: #e2e3e5; color: #383d41; }
+.checklist { list-style: none; padding: 0; }
+.checklist li { padding: 4px 0; font-size: 13px; }
+.checklist li::before { content: "[ ] "; color: #999; }
+.section { border: 1px solid #ddd; padding: 16px; margin: 12px 0; background: #fff; border-radius: 4px; }
+</style>
+
+<script type="application/json" id="prototype-manifest">
+{
+  "feature": "char-property-dataclass",
+  "specFile": ".lifecycle/features/char-property-dataclass/spec.md",
+  "version": "1.0.0",
+  "generatedFrom": "spec.md",
+  "screens": ["overview", "dataclass", "parser", "serializer", "ensure-run-style", "roundtrip", "checklist"],
+  "specMapping": [
+    {"specId": "e2e-char-property-dataclass-001", "element": "[data-spec-id='e2e-char-property-dataclass-001']", "screen": "dataclass"},
+    {"specId": "e2e-char-property-dataclass-002", "element": "[data-spec-id='e2e-char-property-dataclass-002']", "screen": "parser"},
+    {"specId": "e2e-char-property-dataclass-003", "element": "[data-spec-id='e2e-char-property-dataclass-003']", "screen": "parser"},
+    {"specId": "e2e-char-property-dataclass-004", "element": "[data-spec-id='e2e-char-property-dataclass-004']", "screen": "dataclass"},
+    {"specId": "e2e-char-property-dataclass-005", "element": "[data-spec-id='e2e-char-property-dataclass-005']", "screen": "parser"},
+    {"specId": "e2e-char-property-dataclass-006", "element": "[data-spec-id='e2e-char-property-dataclass-006']", "screen": "serializer"},
+    {"specId": "e2e-char-property-dataclass-007", "element": "[data-spec-id='e2e-char-property-dataclass-007']", "screen": "ensure-run-style"},
+    {"specId": "e2e-char-property-dataclass-008", "element": "[data-spec-id='e2e-char-property-dataclass-008']", "screen": "ensure-run-style"},
+    {"specId": "e2e-char-property-dataclass-009", "element": "[data-spec-id='e2e-char-property-dataclass-009']", "screen": "ensure-run-style"},
+    {"specId": "e2e-char-property-dataclass-010", "element": "[data-spec-id='e2e-char-property-dataclass-010']", "screen": "ensure-run-style"},
+    {"specId": "e2e-char-property-dataclass-011", "element": "[data-spec-id='e2e-char-property-dataclass-011']", "screen": "roundtrip"},
+    {"specId": "e2e-char-property-dataclass-012", "element": "[data-spec-id='e2e-char-property-dataclass-012']", "screen": "serializer"},
+    {"specId": "e2e-char-property-dataclass-013", "element": "[data-spec-id='e2e-char-property-dataclass-013']", "screen": "checklist"},
+    {"specId": "e2e-char-property-dataclass-014", "element": "[data-spec-id='e2e-char-property-dataclass-014']", "screen": "checklist"},
+    {"specId": "e2e-char-property-dataclass-015", "element": "[data-spec-id='e2e-char-property-dataclass-015']", "screen": "checklist"}
+  ],
+  "interactions": [
+    {"action": "nav-overview", "target": "overview"},
+    {"action": "nav-dataclass", "target": "dataclass"},
+    {"action": "nav-parser", "target": "parser"},
+    {"action": "nav-serializer", "target": "serializer"},
+    {"action": "nav-ensure-run-style", "target": "ensure-run-style"},
+    {"action": "nav-roundtrip", "target": "roundtrip"},
+    {"action": "nav-checklist", "target": "checklist"}
+  ]
+}
+</script>
+</head>
+<body>
+<div id="app">
+
+<h1>CharProperty Dataclass Expansion Prototype</h1>
+
+<nav>
+  <button data-action="nav-overview" class="active">Overview</button>
+  <button data-action="nav-dataclass">Dataclass</button>
+  <button data-action="nav-parser">Parser</button>
+  <button data-action="nav-serializer">Serializer</button>
+  <button data-action="nav-ensure-run-style">ensure_run_style</button>
+  <button data-action="nav-roundtrip">Round-trip</button>
+  <button data-action="nav-checklist">Checklist</button>
+</nav>
+
+<!-- Screen: Overview -->
+<div data-screen="overview" class="screen active">
+<h2>Architecture: Before vs After</h2>
+
+<div class="comparison">
+  <div>
+    <div class="comparison-label">BEFORE (현재)</div>
+    <div class="code-block"><span class="decorator">@dataclass</span>
+<span class="keyword">class</span> <span class="class-name">CharProperty</span>:
+    <span class="field">id</span>: Optional[int]
+    <span class="field">attributes</span>: Dict[str, str]         <span class="comment"># generic</span>
+    <span class="field">child_attributes</span>: Dict[...]  <span class="comment"># generic</span>
+    <span class="field">child_elements</span>: Dict[...]    <span class="comment"># generic</span>
+
+<span class="comment"># Access pattern:</span>
+height = prop.<span class="field">attributes</span>.get(<span class="string">"height"</span>)
+font = prop.<span class="field">child_attributes</span>.get(<span class="string">"fontRef"</span>, {})
+ul_type = font.get(<span class="string">"hangul"</span>)</div>
+  </div>
+  <div class="arrow">→</div>
+  <div>
+    <div class="comparison-label">AFTER (목표)</div>
+    <div class="code-block"><span class="decorator">@dataclass</span>
+<span class="keyword">class</span> <span class="class-name">CharProperty</span>:
+    <span class="field">id</span>: Optional[int]
+    <span class="field">height</span>: Optional[int]            <span class="comment"># typed</span>
+    <span class="field">text_color</span>: Optional[str]       <span class="comment"># typed</span>
+    <span class="field">font_ref</span>: Optional[CharFontRef] <span class="comment"># typed</span>
+    <span class="field">underline</span>: Optional[CharUnderline]
+    <span class="field">bold</span>: Optional[bool]
+    ...
+
+<span class="comment"># Access pattern:</span>
+height = prop.<span class="field">height</span>
+font = prop.<span class="field">font_ref</span>.<span class="field">hangul</span>
+ul_type = prop.<span class="field">underline</span>.<span class="field">type</span></div>
+  </div>
+</div>
+
+<h2>Data Flow</h2>
+<div class="code-block"><span class="comment">HWPX ZIP</span>
+  └─ header.xml
+       └─ &lt;hh:charPr id="0" height="1000" textColor="#000000"&gt;
+            ├─ &lt;hh:fontRef hangul="0" latin="0" .../&gt;
+            ├─ &lt;hh:bold/&gt;
+            └─ &lt;hh:underline type="BOTTOM" shape="SOLID" color="#000000"/&gt;
+
+            ↓ <span class="keyword">parse_char_property()</span>
+
+<span class="class-name">CharProperty</span>(
+    id=<span class="number">0</span>,
+    height=<span class="number">1000</span>,
+    text_color=<span class="string">"#000000"</span>,
+    font_ref=<span class="class-name">CharFontRef</span>(hangul=<span class="number">0</span>, latin=<span class="number">0</span>, ...),
+    bold=<span class="keyword">True</span>,
+    underline=<span class="class-name">CharUnderline</span>(type=<span class="string">"BOTTOM"</span>, shape=<span class="string">"SOLID"</span>, color=<span class="string">"#000000"</span>),
+)
+
+            ↓ <span class="keyword">serialize_char_property()</span>
+
+&lt;hh:charPr id="0" height="1000" textColor="#000000"&gt;
+  &lt;hh:fontRef hangul="0" latin="0" .../&gt;
+  &lt;hh:bold/&gt;
+  &lt;hh:underline type="BOTTOM" shape="SOLID" color="#000000"/&gt;
+&lt;/hh:charPr&gt;</div>
+
+<h2>Target Pattern: ParagraphProperty</h2>
+<div class="section">
+<p>ParagraphProperty (header.py lines 359-377) has <strong>7 dedicated sub-dataclasses</strong> and <strong>7 parse_*() functions</strong>.</p>
+<p>CharProperty will follow the same pattern with <strong>9 sub-dataclasses</strong> and <strong>9 parse_*() + 10 serialize_*()</strong> functions.</p>
+</div>
+</div>
+
+<!-- Screen: Dataclass -->
+<div data-screen="dataclass" data-spec-id="e2e-char-property-dataclass-001" class="screen">
+<h2>New Dataclass Definitions <span class="spec-badge">e2e-001</span></h2>
+
+<div class="code-block"><span class="comment"># --- 9 Sub-dataclasses (NEW) ---</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharFontRef</span>:
+    <span class="field">hangul</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">latin</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">hanja</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">japanese</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">other</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">symbol</span>: Optional[int] = <span class="keyword">None</span>
+    <span class="field">user</span>: Optional[int] = <span class="keyword">None</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharSpacing</span>:    <span class="comment"># same 7 lang fields (int, -50~50)</span>
+<span class="keyword">class</span> <span class="class-name">CharRatio</span>:      <span class="comment"># same 7 lang fields (int, 50~200)</span>
+<span class="keyword">class</span> <span class="class-name">CharRelSize</span>:    <span class="comment"># same 7 lang fields (int, 10~250)</span>
+<span class="keyword">class</span> <span class="class-name">CharOffset</span>:     <span class="comment"># same 7 lang fields (int, -100~100)</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharUnderline</span>:
+    <span class="field">type</span>: Optional[str] = <span class="keyword">None</span>   <span class="comment"># NONE|BOTTOM|CENTER|TOP</span>
+    <span class="field">shape</span>: Optional[str] = <span class="keyword">None</span>  <span class="comment"># LineType2</span>
+    <span class="field">color</span>: Optional[str] = <span class="keyword">None</span>  <span class="comment"># #RRGGBB</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharStrikeout</span>:
+    <span class="field">shape</span>: Optional[str] = <span class="keyword">None</span>
+    <span class="field">color</span>: Optional[str] = <span class="keyword">None</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharOutline</span>:
+    <span class="field">type</span>: Optional[str] = <span class="keyword">None</span>   <span class="comment"># LineType1</span>
+
+<span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharShadow</span>:
+    <span class="field">type</span>: Optional[str] = <span class="keyword">None</span>       <span class="comment"># NONE|DROP|CONTINUOUS</span>
+    <span class="field">color</span>: Optional[str] = <span class="keyword">None</span>      <span class="comment"># #RRGGBB</span>
+    <span class="field">offset_x</span>: Optional[int] = <span class="keyword">None</span>  <span class="comment"># -100~100</span>
+    <span class="field">offset_y</span>: Optional[int] = <span class="keyword">None</span>  <span class="comment"># -100~100</span></div>
+
+<h2>Expanded CharProperty <span class="spec-badge">e2e-004</span></h2>
+<div class="code-block" data-spec-id="e2e-char-property-dataclass-004"><span class="decorator">@dataclass</span>(slots=<span class="keyword">True</span>)
+<span class="keyword">class</span> <span class="class-name">CharProperty</span>:
+    <span class="comment"># Identity</span>
+    <span class="field">id</span>: Optional[int] = <span class="keyword">None</span>
+
+    <span class="comment"># Direct attributes (from charPr element)</span>
+    <span class="field">height</span>: Optional[int] = <span class="keyword">None</span>              <span class="comment"># hwpunit (1000 = 10pt)</span>
+    <span class="field">text_color</span>: Optional[str] = <span class="keyword">None</span>         <span class="comment"># #RRGGBB</span>
+    <span class="field">shade_color</span>: Optional[str] = <span class="keyword">None</span>        <span class="comment"># #RRGGBB</span>
+    <span class="field">use_font_space</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">use_kerning</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">sym_mark</span>: Optional[str] = <span class="keyword">None</span>           <span class="comment"># NONE|DOT_ABOVE|...</span>
+    <span class="field">border_fill_id_ref</span>: Optional[int] = <span class="keyword">None</span>
+
+    <span class="comment"># Sub-dataclass fields (from child elements)</span>
+    <span class="field">font_ref</span>: Optional[CharFontRef] = <span class="keyword">None</span>
+    <span class="field">ratio</span>: Optional[CharRatio] = <span class="keyword">None</span>
+    <span class="field">spacing</span>: Optional[CharSpacing] = <span class="keyword">None</span>
+    <span class="field">rel_size</span>: Optional[CharRelSize] = <span class="keyword">None</span>
+    <span class="field">offset</span>: Optional[CharOffset] = <span class="keyword">None</span>
+    <span class="field">underline</span>: Optional[CharUnderline] = <span class="keyword">None</span>
+    <span class="field">strikeout</span>: Optional[CharStrikeout] = <span class="keyword">None</span>
+    <span class="field">outline</span>: Optional[CharOutline] = <span class="keyword">None</span>
+    <span class="field">shadow</span>: Optional[CharShadow] = <span class="keyword">None</span>
+
+    <span class="comment"># Boolean flags (presence = True)</span>
+    <span class="field">bold</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">italic</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">emboss</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">engrave</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">supscript</span>: Optional[bool] = <span class="keyword">None</span>
+    <span class="field">subscript</span>: Optional[bool] = <span class="keyword">None</span>
+
+    <span class="comment"># Fallback for unknown elements</span>
+    <span class="field">other_attributes</span>: Dict[str, str] = field(default_factory=dict)
+    <span class="field">other_children</span>: Dict[str, List[GenericElement]] = field(default_factory=dict)</div>
+</div>
+
+<!-- Screen: Parser -->
+<div data-screen="parser" data-spec-id="e2e-char-property-dataclass-002" class="screen">
+<h2>Parser Functions <span class="spec-badge">e2e-002, 003, 005</span></h2>
+
+<div class="code-block"><span class="comment"># Pattern: same as parse_paragraph_alignment, parse_paragraph_margin, etc.</span>
+
+<span class="keyword">def</span> <span class="decorator">parse_char_font_ref</span>(node) -> <span class="class-name">CharFontRef</span>:
+    <span class="keyword">return</span> CharFontRef(
+        hangul=parse_int(node.get(<span class="string">"hangul"</span>)),
+        latin=parse_int(node.get(<span class="string">"latin"</span>)),
+        hanja=parse_int(node.get(<span class="string">"hanja"</span>)),
+        japanese=parse_int(node.get(<span class="string">"japanese"</span>)),
+        other=parse_int(node.get(<span class="string">"other"</span>)),
+        symbol=parse_int(node.get(<span class="string">"symbol"</span>)),
+        user=parse_int(node.get(<span class="string">"user"</span>)),
+    )
+
+<span class="comment"># parse_char_spacing, parse_char_ratio, parse_char_rel_size,</span>
+<span class="comment"># parse_char_offset — same pattern, 7 language fields</span>
+
+<span class="keyword">def</span> <span class="decorator">parse_char_underline</span>(node) -> <span class="class-name">CharUnderline</span>:
+    <span class="keyword">return</span> CharUnderline(
+        type=node.get(<span class="string">"type"</span>),
+        shape=node.get(<span class="string">"shape"</span>),
+        color=node.get(<span class="string">"color"</span>),
+    )
+
+<span class="comment"># parse_char_strikeout, parse_char_outline, parse_char_shadow</span></div>
+
+<h2>Expanded parse_char_property <span class="spec-badge">e2e-003</span></h2>
+<div class="code-block" data-spec-id="e2e-char-property-dataclass-003"><span class="keyword">def</span> <span class="decorator">parse_char_property</span>(node) -> <span class="class-name">CharProperty</span>:
+    font_ref = <span class="keyword">None</span>; spacing = <span class="keyword">None</span>; ratio = <span class="keyword">None</span>
+    rel_size = <span class="keyword">None</span>; offset = <span class="keyword">None</span>
+    underline = <span class="keyword">None</span>; strikeout = <span class="keyword">None</span>
+    outline_dc = <span class="keyword">None</span>; shadow = <span class="keyword">None</span>
+    bold = <span class="keyword">None</span>; italic = <span class="keyword">None</span>; emboss = <span class="keyword">None</span>
+    engrave = <span class="keyword">None</span>; supscript = <span class="keyword">None</span>; subscript = <span class="keyword">None</span>
+    other_children = {}
+
+    <span class="keyword">for</span> child <span class="keyword">in</span> node:
+        name = local_name(child)
+        <span class="keyword">if</span> name == <span class="string">"fontRef"</span>:
+            font_ref = parse_char_font_ref(child)
+        <span class="keyword">elif</span> name == <span class="string">"spacing"</span>:
+            spacing = parse_char_spacing(child)
+        <span class="keyword">elif</span> name == <span class="string">"ratio"</span>:
+            ratio = parse_char_ratio(child)
+        <span class="comment"># ... relSz, offset, underline, strikeout, outline, shadow</span>
+        <span class="keyword">elif</span> name == <span class="string">"bold"</span>:
+            bold = <span class="keyword">True</span>
+        <span class="keyword">elif</span> name == <span class="string">"italic"</span>:
+            italic = <span class="keyword">True</span>
+        <span class="comment"># ... emboss, engrave, supscript, subscript</span>
+        <span class="keyword">else</span>:
+            other_children.setdefault(name, []).append(
+                parse_generic_element(child))
+
+    <span class="keyword">return</span> CharProperty(
+        id=parse_int(node.get(<span class="string">"id"</span>)),
+        height=parse_int(node.get(<span class="string">"height"</span>)),
+        text_color=node.get(<span class="string">"textColor"</span>),
+        shade_color=node.get(<span class="string">"shadeColor"</span>),
+        <span class="comment"># ... other attributes</span>
+        font_ref=font_ref, spacing=spacing, ratio=ratio,
+        bold=bold, italic=italic,
+        <span class="comment"># ... rest</span>
+        other_children=other_children,
+    )</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-005">
+<h2>Error Handling <span class="spec-badge">e2e-005</span></h2>
+<table>
+<tr><th>Condition</th><th>Behavior</th></tr>
+<tr><td>fontRef missing</td><td>font_ref = None (no error)</td></tr>
+<tr><td>Unknown child element</td><td>Stored in other_children</td></tr>
+<tr><td>Invalid attribute value</td><td>parse_int returns None</td></tr>
+</table>
+</div>
+</div>
+
+<!-- Screen: Serializer -->
+<div data-screen="serializer" data-spec-id="e2e-char-property-dataclass-006" class="screen">
+<h2>Serialization Functions <span class="spec-badge">e2e-006, 012</span></h2>
+
+<div class="code-block"><span class="keyword">def</span> <span class="decorator">serialize_char_property</span>(
+    prop: <span class="class-name">CharProperty</span>,
+    parent: etree._Element,
+    nsmap: dict,
+) -> etree._Element:
+    <span class="comment">"""CharProperty -> &lt;hh:charPr&gt; XML element.
+    Uses _append_child pattern (never LET.SubElement).
+    """</span>
+    attrib = {<span class="string">"id"</span>: str(prop.id)}
+    <span class="keyword">if</span> prop.height <span class="keyword">is not None</span>:
+        attrib[<span class="string">"height"</span>] = str(prop.height)
+    <span class="keyword">if</span> prop.text_color <span class="keyword">is not None</span>:
+        attrib[<span class="string">"textColor"</span>] = prop.text_color
+    <span class="comment"># ... shade_color, useFontSpace, useKerning, symMark</span>
+
+    char_pr = _append_child(parent, <span class="string">"hh:charPr"</span>, attrib)
+
+    <span class="comment"># Child elements in OWPML schema order:</span>
+    <span class="keyword">if</span> prop.font_ref:
+        serialize_char_font_ref(prop.font_ref, char_pr)
+    <span class="keyword">if</span> prop.ratio:
+        serialize_char_ratio(prop.ratio, char_pr)
+    <span class="keyword">if</span> prop.spacing:
+        serialize_char_spacing(prop.spacing, char_pr)
+    <span class="keyword">if</span> prop.rel_size:
+        serialize_char_rel_size(prop.rel_size, char_pr)
+    <span class="keyword">if</span> prop.offset:
+        serialize_char_offset(prop.offset, char_pr)
+    <span class="keyword">if</span> prop.italic:
+        _append_child(char_pr, <span class="string">"hh:italic"</span>, {})
+    <span class="keyword">if</span> prop.bold:
+        _append_child(char_pr, <span class="string">"hh:bold"</span>, {})
+    <span class="comment"># ... underline, strikeout, outline, shadow, emboss, ...</span>
+
+    <span class="keyword">return</span> char_pr</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-012">
+<h2>XML Element Order (OWPML Schema) <span class="spec-badge">e2e-012</span></h2>
+<table>
+<tr><th>#</th><th>Element</th><th>Dataclass</th></tr>
+<tr><td>1</td><td>fontRef</td><td>CharFontRef</td></tr>
+<tr><td>2</td><td>ratio</td><td>CharRatio</td></tr>
+<tr><td>3</td><td>spacing</td><td>CharSpacing</td></tr>
+<tr><td>4</td><td>relSz</td><td>CharRelSize</td></tr>
+<tr><td>5</td><td>offset</td><td>CharOffset</td></tr>
+<tr><td>6</td><td>italic</td><td>bool flag</td></tr>
+<tr><td>7</td><td>bold</td><td>bool flag</td></tr>
+<tr><td>8</td><td>underline</td><td>CharUnderline</td></tr>
+<tr><td>9</td><td>strikeout</td><td>CharStrikeout</td></tr>
+<tr><td>10</td><td>outline</td><td>CharOutline</td></tr>
+<tr><td>11</td><td>shadow</td><td>CharShadow</td></tr>
+<tr><td>12</td><td>emboss</td><td>bool flag</td></tr>
+<tr><td>13</td><td>engrave</td><td>bool flag</td></tr>
+<tr><td>14</td><td>supscript</td><td>bool flag</td></tr>
+<tr><td>15</td><td>subscript</td><td>bool flag</td></tr>
+</table>
+</div>
+</div>
+
+<!-- Screen: ensure_run_style -->
+<div data-screen="ensure-run-style" data-spec-id="e2e-char-property-dataclass-007" class="screen">
+<h2>ensure_run_style Refactor <span class="spec-badge">e2e-007, 008, 009, 010</span></h2>
+
+<div class="comparison">
+<div>
+  <div class="comparison-label">BEFORE: XML Direct</div>
+  <div class="code-block"><span class="comment"># document.py ensure_char_property()</span>
+<span class="keyword">def</span> modifier(charPr_elem):
+    <span class="comment"># XML 직접 조작</span>
+    charPr_elem.set(<span class="string">"height"</span>, <span class="string">"2000"</span>)
+    bold = _append_child(
+        charPr_elem, <span class="string">"hh:bold"</span>, {})
+    <span class="comment"># 40+ if/elif blocks...</span></div>
+</div>
+<div class="arrow">→</div>
+<div>
+  <div class="comparison-label">AFTER: Dataclass-based</div>
+  <div class="code-block"><span class="comment"># document.py ensure_char_property()</span>
+<span class="keyword">def</span> modifier(charPr_elem):
+    <span class="comment"># Parse → Modify → Serialize</span>
+    prop = parse_char_property(charPr_elem)
+    prop.height = <span class="number">2000</span>
+    prop.bold = <span class="keyword">True</span>
+    <span class="comment"># Clear and rebuild</span>
+    charPr_elem.clear()
+    serialize_into(prop, charPr_elem)</div>
+</div>
+</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-008">
+<h2>Verification Cases <span class="spec-badge">e2e-008</span></h2>
+<table>
+<tr><th>API Call</th><th>Expected XML</th></tr>
+<tr><td>ensure_run_style(bold=True)</td><td>&lt;hh:bold/&gt;</td></tr>
+<tr><td>ensure_run_style(height=2000)</td><td>height="2000"</td></tr>
+<tr><td>ensure_run_style(text_color="#FF0000")</td><td>textColor="#FF0000"</td></tr>
+<tr><td>ensure_run_style(font_hangul=1)</td><td>&lt;hh:fontRef hangul="1" .../&gt;</td></tr>
+<tr><td>ensure_run_style(underline_type="BOTTOM")</td><td>&lt;hh:underline type="BOTTOM" .../&gt;</td></tr>
+</table>
+</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-009">
+<h2>Backward Compatibility <span class="spec-badge">e2e-009</span></h2>
+<ul class="checklist">
+  <li>Official test 238/238 pass</li>
+  <li>hwpx-skill test 64/64 pass</li>
+  <li>ensure_run_style(bold=True, italic=True, underline=True) works</li>
+  <li>60+ parameter signature preserved</li>
+</ul>
+</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-010">
+<h2>Error Handling <span class="spec-badge">e2e-010</span></h2>
+<table>
+<tr><th>Condition</th><th>Behavior</th></tr>
+<tr><td>height=0 (out of range)</td><td>ValueError or default 1000</td></tr>
+<tr><td>underline_type="INVALID"</td><td>ValueError</td></tr>
+<tr><td>No charPr in document</td><td>Create new CharProperty</td></tr>
+</table>
+</div>
+</div>
+
+<!-- Screen: Roundtrip -->
+<div data-screen="roundtrip" data-spec-id="e2e-char-property-dataclass-011" class="screen">
+<h2>Round-trip Test <span class="spec-badge">e2e-011</span></h2>
+
+<div class="code-block"><span class="comment"># Test: open -> save -> reopen -> verify identical</span>
+
+doc = HwpxDocument.open(<span class="string">"test.hwpx"</span>)
+original = doc.header.char_properties.properties[<span class="number">0</span>]
+
+<span class="comment"># Save</span>
+doc.save(<span class="string">"test_copy.hwpx"</span>)
+
+<span class="comment"># Reopen</span>
+doc2 = HwpxDocument.open(<span class="string">"test_copy.hwpx"</span>)
+reloaded = doc2.header.char_properties.properties[<span class="number">0</span>]
+
+<span class="comment"># Verify</span>
+<span class="keyword">assert</span> original.height == reloaded.height
+<span class="keyword">assert</span> original.text_color == reloaded.text_color
+<span class="keyword">assert</span> original.font_ref.hangul == reloaded.font_ref.hangul
+<span class="keyword">assert</span> original.bold == reloaded.bold
+<span class="keyword">assert</span> original.underline.type == reloaded.underline.type</div>
+
+<div class="section">
+<h2>What Must Be Preserved</h2>
+<table>
+<tr><th>Field</th><th>Type</th><th>Round-trip</th></tr>
+<tr><td>height</td><td>int</td><td>Exact value</td></tr>
+<tr><td>text_color</td><td>str</td><td>#RRGGBB format</td></tr>
+<tr><td>font_ref (7 fields)</td><td>CharFontRef</td><td>All language IDs</td></tr>
+<tr><td>bold/italic</td><td>bool</td><td>True/None</td></tr>
+<tr><td>underline (3 fields)</td><td>CharUnderline</td><td>type + shape + color</td></tr>
+<tr><td>other_children</td><td>Dict</td><td>Unknown elements preserved</td></tr>
+</table>
+</div>
+</div>
+
+<!-- Screen: Checklist -->
+<div data-screen="checklist" data-spec-id="e2e-char-property-dataclass-013" class="screen">
+<h2>Implementation Checklist <span class="spec-badge">e2e-013, 014, 015</span></h2>
+
+<div class="section">
+<h2>Phase 1: Dataclass + Parser (header.py)</h2>
+<ul class="checklist">
+  <li>Define 9 sub-dataclasses (CharFontRef ~ CharShadow)</li>
+  <li>Expand CharProperty with typed fields</li>
+  <li>Write 9 parse_* functions</li>
+  <li>Expand parse_char_property()</li>
+  <li>Add to __all__</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Phase 2: Serializer (header.py)</h2>
+<ul class="checklist">
+  <li>Write serialize_char_property()</li>
+  <li>Write 9 serialize_* sub-functions</li>
+  <li>OWPML element order enforced</li>
+  <li>_append_child pattern only</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Phase 3: ensure_run_style Integration (document.py)</h2>
+<ul class="checklist">
+  <li>Refactor modifier to use parse -> modify -> serialize</li>
+  <li>Keep 40+ parameter signature</li>
+  <li>Backward compatible</li>
+</ul>
+</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-014">
+<h2>Phase 4: Tests</h2>
+<ul class="checklist">
+  <li>Official tests 238/238</li>
+  <li>hwpx-skill tests 64/64</li>
+  <li>New test_char_property.py (10+ tests)</li>
+  <li>Round-trip test</li>
+</ul>
+</div>
+
+<div class="section" data-spec-id="e2e-char-property-dataclass-015">
+<h2>Compatibility Notes <span class="spec-badge">e2e-015</span></h2>
+<table>
+<tr><th>Old Access</th><th>New Access</th><th>Migration</th></tr>
+<tr><td>prop.attributes["height"]</td><td>prop.height</td><td>other_attributes fallback</td></tr>
+<tr><td>prop.child_attributes["fontRef"]["hangul"]</td><td>prop.font_ref.hangul</td><td>Direct field</td></tr>
+<tr><td>prop.child_elements["underline"]</td><td>prop.underline</td><td>Typed object</td></tr>
+</table>
+</div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+(function() {
+  var screens = document.querySelectorAll('.screen');
+  var buttons = document.querySelectorAll('nav button');
+
+  function showScreen(name) {
+    screens.forEach(function(s) { s.classList.remove('active'); });
+    buttons.forEach(function(b) { b.classList.remove('active'); });
+    var target = document.querySelector('[data-screen="' + name + '"]');
+    if (target) target.classList.add('active');
+    var btn = document.querySelector('[data-action="nav-' + name + '"]');
+    if (btn) btn.classList.add('active');
+    window.location.hash = name;
+  }
+
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    if (action.startsWith('nav-')) {
+      showScreen(action.replace('nav-', ''));
+    }
+  });
+
+  // Hash routing
+  var hash = window.location.hash.slice(1);
+  if (hash) showScreen(hash);
+})();
+</script>
+</body>
+</html>

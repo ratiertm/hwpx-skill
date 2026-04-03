@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Namespace 2024 Compat - Prototype</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #f5f5f5; color: #333; padding: 20px; max-width: 900px; margin: 0 auto; }
+h1 { font-size: 18px; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
+h2 { font-size: 14px; margin: 16px 0 8px; color: #555; }
+.code { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-size: 13px; line-height: 1.6; margin: 8px 0; white-space: pre; overflow-x: auto; }
+.kw { color: #569cd6; } .str { color: #ce9178; } .cmt { color: #6a9955; }
+.section { border: 1px solid #ddd; padding: 16px; margin: 12px 0; background: #fff; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+th { background: #eee; }
+.arrow { text-align: center; font-size: 24px; color: #999; padding: 8px; }
+nav { display: flex; gap: 8px; margin-bottom: 16px; }
+nav button { padding: 6px 12px; border: 1px solid #999; background: #fff; cursor: pointer; font-family: monospace; font-size: 12px; }
+nav button.active { background: #333; color: #fff; }
+.screen { display: none; } .screen.active { display: block; }
+</style>
+<script type="application/json" id="prototype-manifest">
+{
+  "feature": "namespace-2024-compat",
+  "specFile": ".lifecycle/features/namespace-2024-compat/spec.md",
+  "version": "1.0.0",
+  "screens": ["overview", "implementation", "tests"],
+  "specMapping": [
+    {"specId": "e2e-namespace-2024-compat-001", "element": "[data-spec-id='001']", "screen": "implementation"},
+    {"specId": "e2e-namespace-2024-compat-002", "element": "[data-spec-id='002']", "screen": "implementation"},
+    {"specId": "e2e-namespace-2024-compat-007", "element": "[data-spec-id='007']", "screen": "tests"}
+  ],
+  "interactions": [{"action": "nav-overview", "target": "overview"}, {"action": "nav-implementation", "target": "implementation"}, {"action": "nav-tests", "target": "tests"}]
+}
+</script>
+</head>
+<body>
+<h1>Namespace 2024 Compatibility Prototype</h1>
+<nav>
+  <button data-action="nav-overview" class="active">Overview</button>
+  <button data-action="nav-implementation">Implementation</button>
+  <button data-action="nav-tests">Tests</button>
+</nav>
+
+<div data-screen="overview" class="screen active">
+<h2>Normalization Flow</h2>
+<div class="code"><span class="cmt"># HWPX 파일 열기 흐름</span>
+
+HWPX ZIP → header.xml (bytes)
+    ↓
+<span class="kw">normalize_hwpml_namespaces(data)</span>  <span class="cmt"># byte-level replace</span>
+    │
+    ├─ 2016 URI → 2011 URI  <span class="cmt">(기존, 7개 매핑)</span>
+    ├─ <span class="str">2024 URI → 2011 URI  (신규, 7개 매핑)</span>
+    │
+    ↓
+parse_xml(normalized_data)
+    ↓
+기존 코드 (2011 URI 기준) → 정상 동작</div>
+
+<h2>Namespace URI 비교</h2>
+<table>
+<tr><th>Version</th><th>Domain</th><th>Example URI</th></tr>
+<tr><td>2011</td><td>hancom.co.kr</td><td>http://www.hancom.co.kr/hwpml/2011/head</td></tr>
+<tr><td>2016</td><td>hancom.co.kr</td><td>http://www.hancom.co.kr/hwpml/2016/head</td></tr>
+<tr><td><strong>2024</strong></td><td><strong>owpml.org</strong></td><td><strong>http://www.owpml.org/owpml/2024/head</strong></td></tr>
+</table>
+
+<div class="section">
+<h2>변경 범위</h2>
+<p><strong>핵심:</strong> xml_utils.py에 7개 매핑 추가 (byte-level replace)</p>
+<p><strong>부가:</strong> namespaces.py 상수 추가, document.py 방어 등록, 테스트</p>
+<p><strong>영향:</strong> 없음 — 기존 코드는 변경 불필요 (투명한 정규화)</p>
+</div>
+</div>
+
+<div data-screen="implementation" class="screen">
+<h2 data-spec-id="001">xml_utils.py 변경</h2>
+<div class="code"><span class="cmt"># 기존: 2016→2011 (7개)</span>
+<span class="kw">_HWPML_NS_TO_2011</span> = (
+    <span class="cmt"># 2016 → 2011</span>
+    (b<span class="str">"hancom.co.kr/hwpml/2016/paragraph"</span>, b<span class="str">"hancom.co.kr/hwpml/2011/paragraph"</span>),
+    ...  <span class="cmt"># 7개</span>
+    <span class="cmt"># 2024 → 2011 (신규)</span>
+    (b<span class="str">"www.owpml.org/owpml/2024/core"</span>,        b<span class="str">"hancom.co.kr/hwpml/2011/core"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/head"</span>,        b<span class="str">"hancom.co.kr/hwpml/2011/head"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/paragraph"</span>,   b<span class="str">"hancom.co.kr/hwpml/2011/paragraph"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/section"</span>,     b<span class="str">"hancom.co.kr/hwpml/2011/section"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/master-page"</span>, b<span class="str">"hancom.co.kr/hwpml/2011/master-page"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/history"</span>,     b<span class="str">"hancom.co.kr/hwpml/2011/history"</span>),
+    (b<span class="str">"www.owpml.org/owpml/2024/version"</span>,     b<span class="str">"hancom.co.kr/hwpml/2011/app"</span>),
+)</div>
+
+<h2 data-spec-id="002">document.py 방어 등록</h2>
+<div class="code"><span class="cmt"># 기존 2016 방어 등록과 동일 패턴</span>
+ET.register_namespace(<span class="str">"hp24"</span>, <span class="str">"http://www.owpml.org/owpml/2024/paragraph"</span>)
+ET.register_namespace(<span class="str">"hs24"</span>, <span class="str">"http://www.owpml.org/owpml/2024/section"</span>)
+ET.register_namespace(<span class="str">"hc24"</span>, <span class="str">"http://www.owpml.org/owpml/2024/core"</span>)
+ET.register_namespace(<span class="str">"hh24"</span>, <span class="str">"http://www.owpml.org/owpml/2024/head"</span>)</div>
+</div>
+
+<div data-screen="tests" class="screen">
+<h2 data-spec-id="007">Test Cases</h2>
+<div class="code"><span class="kw">def</span> test_namespace_2024_normalization():
+    xml = b<span class="str">'&lt;hh:charPr xmlns:hh="http://www.owpml.org/owpml/2024/head" id="0"/&gt;'</span>
+    result = normalize_hwpml_namespaces(xml)
+    <span class="kw">assert</span> b<span class="str">"hancom.co.kr/hwpml/2011/head"</span> <span class="kw">in</span> result
+    <span class="kw">assert</span> b<span class="str">"owpml.org"</span> <span class="kw">not in</span> result
+
+<span class="kw">def</span> test_namespace_mixed_2011_2024():
+    <span class="cmt"># 2011과 2024 혼합 → 2024만 정규화</span>
+    xml = b<span class="str">'...xmlns:hh="2011/head" xmlns:hp="2024/paragraph"...'</span>
+    result = normalize_hwpml_namespaces(xml)
+    <span class="kw">assert</span> b<span class="str">"2011/head"</span> <span class="kw">in</span> result
+    <span class="kw">assert</span> b<span class="str">"2011/paragraph"</span> <span class="kw">in</span> result</div>
+</div>
+
+<script>
+(function() {
+  var screens = document.querySelectorAll('.screen');
+  var buttons = document.querySelectorAll('nav button');
+  function show(name) {
+    screens.forEach(function(s) { s.classList.remove('active'); });
+    buttons.forEach(function(b) { b.classList.remove('active'); });
+    var t = document.querySelector('[data-screen="' + name + '"]');
+    if (t) t.classList.add('active');
+    var btn = document.querySelector('[data-action="nav-' + name + '"]');
+    if (btn) btn.classList.add('active');
+  }
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    show(btn.getAttribute('data-action').replace('nav-', ''));
+  });
+})();
+</script>
+</body>
+</html>

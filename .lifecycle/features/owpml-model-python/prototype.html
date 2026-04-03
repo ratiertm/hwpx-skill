@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>OWPML Model C++ → Python</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:monospace;background:#f5f5f5;color:#333;padding:20px;max-width:1000px;margin:0 auto}
+h1{font-size:18px;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:16px}
+h2{font-size:14px;margin:16px 0 8px;color:#555}
+.code{background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:4px;font-size:12px;line-height:1.5;margin:8px 0;white-space:pre;overflow-x:auto}
+.kw{color:#569cd6}.cls{color:#4ec9b0}.str{color:#ce9178}.cmt{color:#6a9955}.fld{color:#9cdcfe}.num{color:#b5cea8}
+.section{border:1px solid #ddd;padding:16px;margin:12px 0;background:#fff;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+th,td{border:1px solid #ccc;padding:5px 8px;text-align:left}
+th{background:#eee}
+.done{color:#155724;background:#d4edda}.todo{color:#856404;background:#fff3cd}
+nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+nav button{padding:5px 10px;border:1px solid #999;background:#fff;cursor:pointer;font-family:monospace;font-size:11px}
+nav button.active{background:#333;color:#fff}
+.screen{display:none}.screen.active{display:block}
+.progress{background:#e9ecef;border-radius:4px;overflow:hidden;height:24px;margin:8px 0}
+.progress-bar{height:100%;background:#28a745;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:bold}
+</style>
+<script type="application/json" id="prototype-manifest">
+{"feature":"owpml-model-python","specFile":".lifecycle/features/owpml-model-python/spec.md","version":"1.0.0",
+"screens":["overview","core","head","para","etc","mapping"],
+"specMapping":[
+{"specId":"e2e-owpml-model-python-001","screen":"core"},
+{"specId":"e2e-owpml-model-python-006","screen":"head"},
+{"specId":"e2e-owpml-model-python-012","screen":"para"},
+{"specId":"e2e-owpml-model-python-018","screen":"etc"}
+]}
+</script>
+</head>
+<body>
+<h1>OWPML Model: C++ → Python (292 classes)</h1>
+<nav>
+<button data-action="nav-overview" class="active">Overview</button>
+<button data-action="nav-core">Phase 1: Core</button>
+<button data-action="nav-head">Phase 2: Head</button>
+<button data-action="nav-para">Phase 3: Para</button>
+<button data-action="nav-etc">Phase 4: Etc</button>
+<button data-action="nav-mapping">Full Mapping</button>
+</nav>
+
+<div data-screen="overview" class="screen active">
+<h2>Progress: 59/292 (20%)</h2>
+<div class="progress"><div class="progress-bar" style="width:20%">59/292</div></div>
+
+<table>
+<tr><th>Phase</th><th>Category</th><th>C++</th><th>Python</th><th>Gap</th><th>신규 파일</th></tr>
+<tr><td>1</td><td>Core</td><td>10</td><td>0</td><td class="todo">10</td><td>oxml/core.py</td></tr>
+<tr><td>2</td><td>Head</td><td>107</td><td>~45</td><td class="todo">~62</td><td>header.py 확장</td></tr>
+<tr><td>3</td><td>Para</td><td>134</td><td>~12</td><td class="todo">~122</td><td>body.py + para_types.py</td></tr>
+<tr><td>4</td><td>Etc+RDF+Root</td><td>41</td><td>~2</td><td class="todo">~39</td><td>etc.py + enums.py</td></tr>
+<tr><td>5</td><td>통합 검증</td><td colspan="4">292/292 확인 + 라운드트립 + 라이선스</td></tr>
+</table>
+
+<h2>Architecture</h2>
+<div class="code"><span class="cmt"># C++ 원본 (hancom-io/hwpx-owpml-model)</span>
+OWPML/Class/
+  Core/   → <span class="cls">oxml/core.py</span>        (MarginAttribute, Color, FillBrush...)
+  Head/   → <span class="cls">oxml/header.py</span>      (CharProperty, ParaProperty, BorderFill, Style...)
+  Para/   → <span class="cls">oxml/body.py</span>        (Table, Ctrl, Run, Section...)
+           <span class="cls">oxml/para_types.py</span>  (Abstract계층, 도형, 폼컨트롤...)
+  Etc/    → <span class="cls">oxml/etc.py</span>         (History, Version, Manifest...)
+  Root/   → <span class="cls">oxml/enums.py</span>       (OWPML enum 정의)
+
+<span class="cmt"># 의존성 방향 (단방향)</span>
+core.py ← header.py ← body.py ← para_types.py
+                                ← etc.py</div>
+
+<h2>C++ → Python 변환 규칙</h2>
+<div class="section">
+<table>
+<tr><th>C++ 패턴</th><th>Python 패턴</th></tr>
+<tr><td><code>class CTableType : public CAbstractShapeObjectType</code></td><td><code>@dataclass class TableType:</code> (상속 대신 필드 포함)</td></tr>
+<tr><td><code>UINT GetRowCnt()</code> / <code>void SetRowCnt(UINT)</code></td><td><code>row_cnt: Optional[int]</code></td></tr>
+<tr><td><code>BOOL GetRepeatHeader()</code></td><td><code>repeat_header: Optional[bool]</code></td></tr>
+<tr><td><code>CTr* Settr(CTr*)</code> / <code>CTr* Gettr(int)</code></td><td><code>rows: List[Tr]</code></td></tr>
+<tr><td><code>InitMap(bRead)</code></td><td><code>parse_table_type(node) → TableType</code></td></tr>
+<tr><td><code>WriteElement()</code></td><td><code>serialize_table_type_into(prop, element)</code></td></tr>
+<tr><td><code>CMarginAttrubute</code> (base class)</td><td><code>MarginAttribute</code> (composition/mixin)</td></tr>
+</table>
+</div>
+</div>
+
+<div data-screen="core" class="screen">
+<h2>Phase 1: Core (10 classes)</h2>
+<div class="code"><span class="cmt"># oxml/core.py — 기반 타입</span>
+
+<span class="kw">@dataclass</span>(slots=True)
+<span class="kw">class</span> <span class="cls">MarginAttribute</span>:           <span class="cmt"># C++: CMarginAttrubute</span>
+    <span class="fld">left</span>: Optional[int] = None
+    <span class="fld">right</span>: Optional[int] = None
+    <span class="fld">top</span>: Optional[int] = None
+    <span class="fld">bottom</span>: Optional[int] = None
+
+<span class="kw">@dataclass</span>(slots=True)
+<span class="kw">class</span> <span class="cls">Color</span>:                      <span class="cmt"># C++: Ccolor</span>
+    <span class="fld">red</span>: Optional[int] = None
+    <span class="fld">green</span>: Optional[int] = None
+    <span class="fld">blue</span>: Optional[int] = None
+    <span class="fld">alpha</span>: Optional[int] = None
+
+<span class="kw">@dataclass</span>(slots=True)
+<span class="kw">class</span> <span class="cls">PointType</span>:                  <span class="cmt"># C++: CPointType</span>
+    <span class="fld">x</span>: Optional[int] = None
+    <span class="fld">y</span>: Optional[int] = None
+
+<span class="kw">@dataclass</span>(slots=True)
+<span class="kw">class</span> <span class="cls">Gradation</span>:                  <span class="cmt"># C++: CGradation</span>
+<span class="kw">class</span> <span class="cls">ImageBrush</span>:                 <span class="cmt"># C++: CImgBrush</span>
+<span class="kw">class</span> <span class="cls">WindowBrush</span>:                <span class="cmt"># C++: CWinBrush</span>
+<span class="kw">class</span> <span class="cls">FillBrushType</span>:              <span class="cmt"># C++: CFillBrushType</span>
+<span class="kw">class</span> <span class="cls">ImageType</span>:                  <span class="cmt"># C++: CImageType</span>
+<span class="kw">class</span> <span class="cls">MatrixType</span>:                 <span class="cmt"># C++: CMatrixType</span>
+<span class="kw">class</span> <span class="cls">HWPValue</span>:                   <span class="cmt"># C++: CHWPValue</span></div>
+</div>
+
+<div data-screen="head" class="screen">
+<h2>Phase 2: Head (107 → ~62 추가)</h2>
+<div class="section">
+<h2>이미 완료 (~45개)</h2>
+<table>
+<tr><th>Python</th><th>C++</th><th>상태</th></tr>
+<tr><td>CharProperty + 9 sub</td><td>CCharShapeType</td><td class="done">완료</td></tr>
+<tr><td>ParagraphProperty + 7 sub</td><td>CParaShapeType</td><td class="done">완료</td></tr>
+<tr><td>Font, FontFace, FontFaceList</td><td>CFontfaceType</td><td class="done">부분</td></tr>
+<tr><td>Style, StyleList</td><td>CStyleType</td><td class="done">부분</td></tr>
+<tr><td>Bullet, BulletList</td><td>CBulletType</td><td class="done">부분</td></tr>
+<tr><td>BeginNum, TrackChange 등</td><td>각종</td><td class="done">완료</td></tr>
+</table>
+</div>
+<div class="section">
+<h2>추가 필요 (~62개)</h2>
+<table>
+<tr><th>C++ 클래스</th><th>Python 목표</th><th>주요 필드</th></tr>
+<tr><td>CBorderFillType</td><td>BorderFillType</td><td>borderType children, fillBrush</td></tr>
+<tr><td>CBorderType</td><td>BorderType</td><td>type, width, color</td></tr>
+<tr><td>CTabDefType</td><td>TabDefType</td><td>tabItem children</td></tr>
+<tr><td>CNumberingType</td><td>NumberingType</td><td>start, paraHead children</td></tr>
+<tr><td>layoutCompatibility (40+)</td><td>LayoutCompatibility</td><td>40+ bool fields</td></tr>
+<tr><td>CMappingTableType</td><td>MappingTableType</td><td>fontfaces, borderFills 등 집합</td></tr>
+<tr><td>CHWPMLHeadType</td><td>HWPMLHeadType</td><td>beginNum, mappingTable, layout 등</td></tr>
+</table>
+</div>
+</div>
+
+<div data-screen="para" class="screen">
+<h2>Phase 3: Para (134 → ~122 추가)</h2>
+<div class="code"><span class="cmt"># 계층 구조</span>
+
+<span class="cls">AbstractShapeObjectType</span>           <span class="cmt"># 모든 도형/개체의 부모</span>
+  ├─ <span class="cls">TableType</span>                       <span class="cmt"># 표</span>
+  │   ├─ InsideMarginType, Tr, Tc, CellAddr...
+  ├─ <span class="cls">PictureType</span>                     <span class="cmt"># 그림</span>
+  ├─ <span class="cls">AbstractDrawingObjectType</span>       <span class="cmt"># 그리기 개체</span>
+  │   ├─ <span class="cls">LineType</span>, <span class="cls">RectangleType</span>, <span class="cls">EllipseType</span>
+  │   ├─ <span class="cls">ArcType</span>, <span class="cls">PolygonType</span>, <span class="cls">CurveType</span>
+  │   └─ <span class="cls">AbstractFormObjectType</span>     <span class="cmt"># 폼 컨트롤</span>
+  │       ├─ <span class="cls">EditType</span>, <span class="cls">ComboBoxType</span>, <span class="cls">ListBoxType</span>
+  │       └─ <span class="cls">AbstractButtonObjectType</span>
+  ├─ <span class="cls">EquationType</span>, <span class="cls">OLEType</span>, <span class="cls">VideoType</span>
+  └─ <span class="cls">ContainerType</span>
+
+<span class="cls">Ctrl</span>                                <span class="cmt"># 컨트롤 컨테이너</span>
+  ├─ FieldBegin, FieldEnd, Bookmark
+  ├─ HeaderFooterType (header, footer)
+  ├─ NoteType (footNote, endNote)
+  ├─ AutoNumNewNumType, PageNumCtrl, PageNum
+  └─ Indexmark, HiddenComment
+
+<span class="cls">PType</span> (문단), <span class="cls">RunType</span> (런), <span class="cls">ParaListType</span>
+<span class="cls">SectionDefinitionType</span> (구역 속성)</div>
+</div>
+
+<div data-screen="etc" class="screen">
+<h2>Phase 4: Etc (36) + RDF (1) + Root (4)</h2>
+<div class="code"><span class="cmt"># oxml/etc.py</span>
+<span class="cls">HWPMLHistoryType</span>    <span class="cmt"># 변경 이력</span>
+<span class="cls">HistoryEntryType</span>    <span class="cmt"># 이력 항목</span>
+<span class="cls">DiffEntryType</span>       <span class="cmt"># diff 정보</span>
+<span class="cls">VersionType</span>         <span class="cmt"># 버전 메타데이터</span>
+<span class="cls">ManifestType</span>        <span class="cmt"># OPC 매니페스트</span>
+<span class="cls">SectionType</span>         <span class="cmt"># 구역 루트</span>
+<span class="cls">MasterPageType</span>      <span class="cmt"># 바탕쪽</span>
+
+<span class="cmt"># oxml/enums.py</span>
+<span class="cls">TablePageBreakType</span>  <span class="cmt"># TABLE | CELL | NONE</span>
+<span class="cls">TextWrapType</span>        <span class="cmt"># TOP_AND_BOTTOM | SQUARE | ...</span>
+<span class="cls">FieldType</span>           <span class="cmt"># DATE | FORMULA | CROSSREF | ...</span>
+<span class="cmt"># ... 모든 OWPML enum</span></div>
+</div>
+
+<div data-screen="mapping" class="screen">
+<h2>C++ → Python Full Mapping (292)</h2>
+<div class="section" style="max-height:400px;overflow-y:auto">
+<table>
+<tr><th>C++ Class</th><th>Category</th><th>Python Target</th><th>Status</th></tr>
+<tr><td>CMarginAttrubute</td><td>Core</td><td>MarginAttribute</td><td class="todo">TODO</td></tr>
+<tr><td>Ccolor</td><td>Core</td><td>Color</td><td class="todo">TODO</td></tr>
+<tr><td>CFillBrushType</td><td>Core</td><td>FillBrushType</td><td class="todo">TODO</td></tr>
+<tr><td>CCharShapeType</td><td>Head</td><td>CharProperty</td><td class="done">DONE</td></tr>
+<tr><td>CParaShapeType</td><td>Head</td><td>ParagraphProperty</td><td class="done">DONE</td></tr>
+<tr><td>CBorderFillType</td><td>Head</td><td>BorderFillType</td><td class="todo">TODO</td></tr>
+<tr><td>CTableType</td><td>Para</td><td>TableType</td><td class="todo">TODO</td></tr>
+<tr><td>CTr</td><td>Para</td><td>Tr</td><td class="todo">TODO</td></tr>
+<tr><td>CTc</td><td>Para</td><td>Tc</td><td class="todo">TODO</td></tr>
+<tr><td>CCtrl</td><td>Para</td><td>Ctrl</td><td class="todo">TODO</td></tr>
+<tr><td>CFieldBegin</td><td>Para</td><td>FieldBegin</td><td class="todo">TODO</td></tr>
+<tr><td colspan="4"><em>... 281 more classes ...</em></td></tr>
+</table>
+</div>
+</div>
+
+<script>
+(function(){
+var ss=document.querySelectorAll('.screen'),bs=document.querySelectorAll('nav button');
+function show(n){ss.forEach(function(s){s.classList.remove('active')});bs.forEach(function(b){b.classList.remove('active')});
+var t=document.querySelector('[data-screen="'+n+'"]');if(t)t.classList.add('active');
+var btn=document.querySelector('[data-action="nav-'+n+'"]');if(btn)btn.classList.add('active')}
+document.addEventListener('click',function(e){var b=e.target.closest('[data-action]');if(!b)return;show(b.getAttribute('data-action').replace('nav-',''))})
+})();
+</script>
+</body>
+</html>

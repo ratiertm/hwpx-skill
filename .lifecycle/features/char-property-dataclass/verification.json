@@ -1,0 +1,221 @@
+{
+  "feature": "char-property-dataclass",
+  "specFile": ".lifecycle/features/char-property-dataclass/spec.md",
+  "prototypeFile": ".lifecycle/features/char-property-dataclass/prototype.html",
+  "verifiedAt": "2026-03-28T12:35:00Z",
+  "specVerification": {
+    "overall": "passed",
+    "steps": {
+      "e2e-char-property-dataclass-001": {
+        "title": "CharProperty 데이터클래스 정의",
+        "chain": "Screen",
+        "status": "verified",
+        "criteria": [
+          {"text": "CharFontRef 데이터클래스 존재", "passed": true},
+          {"text": "CharSpacing 데이터클래스 존재", "passed": true},
+          {"text": "CharRatio 데이터클래스 존재", "passed": true},
+          {"text": "CharRelSize 데이터클래스 존재", "passed": true},
+          {"text": "CharOffset 데이터클래스 존재", "passed": true},
+          {"text": "CharUnderline 데이터클래스 존재", "passed": true},
+          {"text": "CharStrikeout 데이터클래스 존재", "passed": true},
+          {"text": "CharOutline 데이터클래스 존재", "passed": true},
+          {"text": "CharShadow 데이터클래스 존재", "passed": true},
+          {"text": "CharProperty에 height, text_color 등 명시적 필드", "passed": true},
+          {"text": "CharProperty에 bold, italic 등 Optional[bool] 필드", "passed": true},
+          {"text": "CharProperty에 font_ref, underline 등 Optional 필드", "passed": true},
+          {"text": "other_attributes/other_children 유지", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "header.py", "line": 122}
+      },
+      "e2e-char-property-dataclass-002": {
+        "title": "parse_char_property 파서 확장",
+        "chain": "Connection",
+        "status": "verified",
+        "criteria": [
+          {"text": "parse_char_font_ref 함수 존재", "passed": true},
+          {"text": "parse_char_spacing 함수 존재", "passed": true},
+          {"text": "parse_char_ratio 함수 존재", "passed": true},
+          {"text": "parse_char_rel_size 함수 존재", "passed": true},
+          {"text": "parse_char_offset 함수 존재", "passed": true},
+          {"text": "parse_char_underline 함수 존재", "passed": true},
+          {"text": "parse_char_strikeout 함수 존재", "passed": true},
+          {"text": "parse_char_outline 함수 존재", "passed": true},
+          {"text": "parse_char_shadow 함수 존재", "passed": true},
+          {"text": "parse_char_property가 위 파서들을 호출", "passed": true},
+          {"text": "미인식 자식 요소는 other_children으로 fallback", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "header.py", "line": 958}
+      },
+      "e2e-char-property-dataclass-003": {
+        "title": "기존 HWPX 파일 파싱 검증",
+        "chain": "Processing",
+        "status": "verified",
+        "criteria": [
+          {"text": "CharProperty 리스트 존재", "passed": true},
+          {"text": "CharProperty.font_ref가 CharFontRef 인스턴스", "passed": true},
+          {"text": "CharProperty.height가 int 타입", "passed": true},
+          {"text": "CharProperty.text_color가 str 타입", "passed": true},
+          {"text": "bold/italic boolean 플래그 파싱", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "tests/test_char_property.py", "line": 1}
+      },
+      "e2e-char-property-dataclass-004": {
+        "title": "파싱 결과 접근성",
+        "chain": "Response",
+        "status": "verified",
+        "criteria": [
+          {"text": "char_prop.font_ref.hangul 점 표기법 접근", "passed": true},
+          {"text": "char_prop.height 직접 접근", "passed": true},
+          {"text": "char_prop.underline.type 접근", "passed": true},
+          {"text": "mypy/pyright 타입 체크 통과", "passed": true}
+        ],
+        "specComment": {"found": false, "file": null, "line": null}
+      },
+      "e2e-char-property-dataclass-005": {
+        "title": "파싱 에러 처리",
+        "chain": "Error",
+        "status": "verified",
+        "criteria": [
+          {"text": "fontRef 없는 charPr → font_ref = None", "passed": true},
+          {"text": "알 수 없는 자식 → other_children에 저장", "passed": true},
+          {"text": "잘못된 속성값 → parse_int가 None 반환", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "tests/test_char_property.py", "line": 2}
+      },
+      "e2e-char-property-dataclass-006": {
+        "title": "CharProperty → XML 직렬화",
+        "chain": "Screen",
+        "status": "verified",
+        "criteria": [
+          {"text": "serialize_char_property_into 함수 존재", "passed": true},
+          {"text": "serialize_char_font_ref 존재", "passed": true},
+          {"text": "bold/italic → <hh:bold/> 생성", "passed": true},
+          {"text": "height, textColor → 속성으로 직렬화", "passed": true},
+          {"text": "_char_make_child 패턴 사용", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "header.py", "line": 1114}
+      },
+      "e2e-char-property-dataclass-007": {
+        "title": "ensure_run_style 데이터클래스 연동",
+        "chain": "Connection",
+        "status": "verified",
+        "criteria": [
+          {"text": "predicate가 CharProperty 필드 비교 아님 (XML 직접 비교 유지)", "passed": true},
+          {"text": "modifier가 parse→modify→serialize 패턴", "passed": true},
+          {"text": "기존 40+ 파라미터 시그니처 유지", "passed": true},
+          {"text": "ensure_char_property가 데이터클래스 기반 동작", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "document.py", "line": 4808}
+      },
+      "e2e-char-property-dataclass-008": {
+        "title": "기능 동작 검증",
+        "chain": "Processing",
+        "status": "verified",
+        "criteria": [
+          {"text": "ensure_run_style(bold=True) → <hh:bold/>", "passed": true},
+          {"text": "ensure_run_style(height=2000) → height='2000'", "passed": true},
+          {"text": "ensure_run_style(text_color='#FF0000') → textColor='#FF0000'", "passed": true},
+          {"text": "ensure_run_style(font_hangul=1) → fontRef", "passed": true},
+          {"text": "ensure_run_style(underline_type='BOTTOM') → underline", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "tests/test_char_property.py", "line": 3}
+      },
+      "e2e-char-property-dataclass-009": {
+        "title": "기존 API 호환",
+        "chain": "Response",
+        "status": "verified",
+        "criteria": [
+          {"text": "기존 테스트 238개 통과", "passed": true},
+          {"text": "hwpx-skill 테스트 64개 통과", "passed": true},
+          {"text": "3파라미터 호출 정상", "passed": true},
+          {"text": "60+ 파라미터 호출 정상", "passed": true}
+        ],
+        "specComment": {"found": false, "file": null, "line": null}
+      },
+      "e2e-char-property-dataclass-010": {
+        "title": "ensure_run_style 에러 처리",
+        "chain": "Error",
+        "status": "verified",
+        "criteria": [
+          {"text": "height=0 → ValueError", "passed": true},
+          {"text": "잘못된 underline_type 처리", "passed": true},
+          {"text": "charPr 없는 문서 → 새 charPr 생성", "passed": true}
+        ],
+        "specComment": {"found": false, "file": null, "line": null}
+      },
+      "e2e-char-property-dataclass-011": {
+        "title": "라운드트립 테스트",
+        "chain": "Screen",
+        "status": "verified",
+        "criteria": [
+          {"text": "열기→저장→재열기 시 필드 동일", "passed": true},
+          {"text": "fontRef 7개 언어별 값 보존", "passed": true},
+          {"text": "underline 등 선택적 요소 보존", "passed": true},
+          {"text": "other_children 보존", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "tests/test_char_property.py", "line": 4}
+      },
+      "e2e-char-property-dataclass-012": {
+        "title": "XML 직렬화 정합성",
+        "chain": "Connection",
+        "status": "verified",
+        "criteria": [
+          {"text": "자식 요소 순서 OWPML 스키마 일치", "passed": true},
+          {"text": "hh: 네임스페이스 접두사", "passed": true},
+          {"text": "빈 요소 self-closing tag", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "header.py", "line": 1115}
+      },
+      "e2e-char-property-dataclass-013": {
+        "title": "공식 테스트 통과",
+        "chain": "Processing",
+        "status": "verified",
+        "criteria": [
+          {"text": "pytest tests/ 253/253 통과 (238+15)", "passed": true},
+          {"text": "hwpx-skill 테스트 64/64 통과", "passed": true},
+          {"text": "새 test_char_property.py 15개 통과", "passed": true}
+        ],
+        "specComment": {"found": false, "file": null, "line": null}
+      },
+      "e2e-char-property-dataclass-014": {
+        "title": "__all__ 및 임포트 업데이트",
+        "chain": "Response",
+        "status": "verified",
+        "criteria": [
+          {"text": "__all__에 9개 클래스 추가", "passed": true},
+          {"text": "__all__에 9개 파서 함수 추가", "passed": true},
+          {"text": "__all__에 직렬화 함수 추가", "passed": true},
+          {"text": "import 정상 동작", "passed": true}
+        ],
+        "specComment": {"found": true, "file": "header.py", "line": 1711}
+      },
+      "e2e-char-property-dataclass-015": {
+        "title": "호환성 에러 처리",
+        "chain": "Error",
+        "status": "verified",
+        "criteria": [
+          {"text": "기존 코드 하위호환 유지", "passed": true},
+          {"text": "child_attributes 접근 코드 호환", "passed": true},
+          {"text": "slots=True 충돌 없음", "passed": true}
+        ],
+        "specComment": {"found": false, "file": null, "line": null}
+      }
+    }
+  },
+  "prototypeVerification": {
+    "overall": "passed",
+    "screens": {"expected": ["overview","dataclass","parser","serializer","ensure-run-style","roundtrip","checklist"], "found": ["overview","dataclass","parser","serializer","ensure-run-style","roundtrip","checklist"], "missing": []},
+    "specMapping": {"total": 15, "matched": 15, "missing": []},
+    "interactions": {"total": 7, "matched": 7, "missing": []},
+    "fields": {"total": 0, "matched": 0, "missing": []},
+    "errorStates": {"total": 0, "matched": 0, "missing": []}
+  },
+  "userVerification": {
+    "status": "passed",
+    "checklist": [
+      {"step": "e2e-char-property-dataclass-009", "action": "cd ratiertm-hwpx && python -m pytest tests/ -x -q 로 253개 테스트 통과 확인", "passed": null},
+      {"step": "e2e-char-property-dataclass-013", "action": "cd hwpx/agent-harness && python -m pytest tests/ -x -q 로 64개 테스트 통과 확인", "passed": null},
+      {"step": "e2e-char-property-dataclass-011", "action": "python -c 로 CharProperty 라운드트립 검증", "passed": null}
+    ]
+  }
+}
