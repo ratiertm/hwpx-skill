@@ -1337,6 +1337,369 @@ def add_rectangle_with_image_fill(
     return para
 
 
+# ======================================================================
+# Form Controls  (Phase 4)
+# ======================================================================
+
+def add_checkbox(
+    hwpx_file: HWPXFile,
+    caption: str = "체크박스",
+    checked: bool = False,
+    name: str = "CheckBox1",
+    width: int = 9921,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add a checkbox form control to the document."""
+    from .writer.shape_writer import build_checkbox_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_checkbox_xml(
+        caption=caption, name=name, checked=checked,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_radio_button(
+    hwpx_file: HWPXFile,
+    caption: str = "라디오",
+    group: str = "",
+    checked: bool = False,
+    name: str = "Radio1",
+    width: int = 8504,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add a radio button form control to the document.
+
+    Use *group* to link multiple radio buttons so only one can be selected.
+    """
+    from .writer.shape_writer import build_radio_button_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_radio_button_xml(
+        caption=caption, name=name, group=group, checked=checked,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_button(
+    hwpx_file: HWPXFile,
+    caption: str = "버튼",
+    name: str = "Button1",
+    width: int = 7087,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add a push-button form control to the document."""
+    from .writer.shape_writer import build_button_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_button_xml(
+        caption=caption, name=name,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_combobox(
+    hwpx_file: HWPXFile,
+    items: list[tuple[str, str]] | None = None,
+    name: str = "ComboBox1",
+    width: int = 9921,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add a combo box form control to the document.
+
+    *items* is a list of ``(display_text, value)`` tuples.
+    """
+    from .writer.shape_writer import build_combobox_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_combobox_xml(
+        name=name, items=items,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_listbox(
+    hwpx_file: HWPXFile,
+    items: list[tuple[str, str]] | None = None,
+    name: str = "ListBox1",
+    width: int = 9921,
+    height: int = 3968,
+    section_index: int = 0,
+) -> Para:
+    """Add a list box form control to the document.
+
+    *items* is a list of ``(display_text, value)`` tuples.
+    """
+    from .writer.shape_writer import build_listbox_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_listbox_xml(
+        name=name, items=items,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_edit_field(
+    hwpx_file: HWPXFile,
+    text: str = "",
+    name: str = "Edit1",
+    multi_line: bool = False,
+    width: int = 7087,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add an edit (text input) form control to the document."""
+    from .writer.shape_writer import build_edit_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_edit_xml(
+        name=name, text=text, multi_line=multi_line,
+        width=width, height=height,
+    )
+    return para
+
+
+def add_scrollbar(
+    hwpx_file: HWPXFile,
+    name: str = "ScrollBar1",
+    orientation: str = "HORIZONTAL",
+    width: int = 14400,
+    height: int = 1984,
+    section_index: int = 0,
+) -> Para:
+    """Add a scroll bar form control to the document.
+
+    *orientation*: ``"HORIZONTAL"`` or ``"VERTICAL"``.
+    """
+    from .writer.shape_writer import build_scrollbar_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_scrollbar_xml(
+        name=name, orientation=orientation,
+        width=width, height=height,
+    )
+    return para
+
+
+# ======================================================================
+# Inline / Special Characters  (Phase 4)
+# ======================================================================
+
+def add_highlight(
+    hwpx_file: HWPXFile,
+    text: str,
+    color: str = "#FFFF00",
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add highlighted (markpen) text to the document.
+
+    Creates a new paragraph containing the highlighted text.
+    """
+    from .writer.shape_writer import build_highlight_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_highlight_xml(
+        _sanitize_text(text), color=color,
+        char_pr_id_ref=char_pr_id_ref,
+    )
+    return para
+
+
+def add_dutmal(
+    hwpx_file: HWPXFile,
+    main_text: str,
+    sub_text: str,
+    pos: str = "TOP",
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add ruby text (dutmal) to the document.
+
+    *main_text* is the base text, *sub_text* is the ruby annotation.
+    *pos*: ``"TOP"`` or ``"BOTTOM"``.
+    """
+    from .writer.shape_writer import build_dutmal_xml
+
+    para = _new_raw_para(hwpx_file, section_index)
+    para.raw_xml_content = build_dutmal_xml(
+        _sanitize_text(main_text), _sanitize_text(sub_text),
+        pos=pos, char_pr_id_ref=char_pr_id_ref,
+    )
+    return para
+
+
+def add_hidden_comment(
+    hwpx_file: HWPXFile,
+    text: str,
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add a hidden comment annotation to the document.
+
+    The comment is appended to the last content paragraph as an inline
+    control, matching the Hancom Office structure.
+    """
+    from .writer.shape_writer import build_hidden_comment_xml
+
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    paras = section.paras()
+
+    # Find the last content paragraph
+    anchor_para = None
+    for p in reversed(paras):
+        if p.count_of_run() > 0 or (
+            p.raw_xml_content
+            and '<hp:header' not in p.raw_xml_content
+            and '<hp:footer' not in p.raw_xml_content
+        ):
+            anchor_para = p
+            break
+
+    if anchor_para is None or anchor_para.raw_xml_content is None:
+        anchor_para = _new_raw_para(hwpx_file, section_index)
+        anchor_para.raw_xml_content = ""
+
+    comment_xml = build_hidden_comment_xml(
+        _sanitize_text(text), char_pr_id_ref=char_pr_id_ref,
+    )
+    if anchor_para.raw_xml_content:
+        anchor_para.raw_xml_content += comment_xml
+    else:
+        anchor_para.raw_xml_content = comment_xml
+    return anchor_para
+
+
+def add_indexmark(
+    hwpx_file: HWPXFile,
+    key: str,
+    second_key: str | None = None,
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add an index mark to the document.
+
+    The index mark is appended to the last content paragraph as an inline
+    control.
+    """
+    from .writer.shape_writer import build_indexmark_xml
+
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    paras = section.paras()
+
+    anchor_para = None
+    for p in reversed(paras):
+        if p.count_of_run() > 0 or (
+            p.raw_xml_content
+            and '<hp:header' not in p.raw_xml_content
+            and '<hp:footer' not in p.raw_xml_content
+        ):
+            anchor_para = p
+            break
+
+    if anchor_para is None or anchor_para.raw_xml_content is None:
+        anchor_para = _new_raw_para(hwpx_file, section_index)
+        anchor_para.raw_xml_content = ""
+
+    mark_xml = build_indexmark_xml(
+        _sanitize_text(key),
+        second_key=_sanitize_text(second_key) if second_key else None,
+        char_pr_id_ref=char_pr_id_ref,
+    )
+    if anchor_para.raw_xml_content:
+        anchor_para.raw_xml_content += mark_xml
+    else:
+        anchor_para.raw_xml_content = mark_xml
+    return anchor_para
+
+
+def add_tab(
+    hwpx_file: HWPXFile,
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add a tab character to the document.
+
+    Appended to the last content paragraph.
+    """
+    from .writer.shape_writer import build_tab_xml
+
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    paras = section.paras()
+
+    anchor_para = None
+    for p in reversed(paras):
+        if p.count_of_run() > 0 or (
+            p.raw_xml_content
+            and '<hp:header' not in p.raw_xml_content
+            and '<hp:footer' not in p.raw_xml_content
+        ):
+            anchor_para = p
+            break
+
+    if anchor_para is None or anchor_para.raw_xml_content is None:
+        anchor_para = _new_raw_para(hwpx_file, section_index)
+        anchor_para.raw_xml_content = ""
+
+    tab_xml = build_tab_xml(char_pr_id_ref=char_pr_id_ref)
+    if anchor_para.raw_xml_content:
+        anchor_para.raw_xml_content += tab_xml
+    else:
+        anchor_para.raw_xml_content = tab_xml
+    return anchor_para
+
+
+def add_special_char(
+    hwpx_file: HWPXFile,
+    char_type: str = "nbspace",
+    char_pr_id_ref: str = "0",
+    section_index: int = 0,
+) -> Para:
+    """Add a special character to the document.
+
+    *char_type*: ``"nbspace"`` (non-breaking space), ``"fwspace"``
+    (full-width space), or ``"hyphen"`` (non-breaking hyphen).
+
+    Appended to the last content paragraph.
+    """
+    from .writer.shape_writer import build_special_char_xml
+
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    paras = section.paras()
+
+    anchor_para = None
+    for p in reversed(paras):
+        if p.count_of_run() > 0 or (
+            p.raw_xml_content
+            and '<hp:header' not in p.raw_xml_content
+            and '<hp:footer' not in p.raw_xml_content
+        ):
+            anchor_para = p
+            break
+
+    if anchor_para is None or anchor_para.raw_xml_content is None:
+        anchor_para = _new_raw_para(hwpx_file, section_index)
+        anchor_para.raw_xml_content = ""
+
+    char_xml = build_special_char_xml(
+        char_type=char_type, char_pr_id_ref=char_pr_id_ref,
+    )
+    if anchor_para.raw_xml_content:
+        anchor_para.raw_xml_content += char_xml
+    else:
+        anchor_para.raw_xml_content = char_xml
+    return anchor_para
+
+
 def convert_md_to_hwpx(hwpx_file: HWPXFile, md_content: str, style: str = "github") -> int:
     """Convert Markdown content to HWPX elements in the document."""
     from .converter import convert_markdown_to_hwpx
@@ -1350,3 +1713,374 @@ def convert_md_file_to_hwpx(md_path: str, hwpx_path: str, style: str = "github")
     doc = create_document()
     convert_md_to_hwpx(doc, content, style)
     save(doc, hwpx_path)
+
+
+# ======================================================================
+# Reading & text extraction
+# ======================================================================
+
+def open_document(filepath: str):
+    """Open an existing HWPX file for reading.
+
+    Returns an :class:`~pyhwpxlib.reader.HwpxDocument` with parsed
+    sections, paragraphs, tables, and image references.
+    """
+    from .reader import HwpxDocument
+    return HwpxDocument.open(filepath)
+
+
+def extract_text(filepath: str, separator: str = "\n") -> str:
+    """Extract plain text from HWPX file."""
+    from .reader import extract_text as _extract_text
+    return _extract_text(filepath, separator=separator)
+
+
+def extract_markdown(filepath: str) -> str:
+    """Extract content from HWPX file as Markdown."""
+    from .reader import extract_markdown as _extract_md
+    return _extract_md(filepath)
+
+
+def extract_html(filepath: str) -> str:
+    """Extract content from HWPX file as HTML."""
+    from .reader import extract_html as _extract_html
+    return _extract_html(filepath)
+
+
+# ======================================================================
+# Page setup
+# ======================================================================
+
+_PAPER_SIZES: dict[str, tuple[int, int]] = {
+    "A4": (59528, 84186),
+    "A3": (84186, 119056),
+    "B5": (51024, 72284),
+    "LETTER": (61200, 79200),
+    "LEGAL": (61200, 100800),
+}
+
+
+def set_page_setup(
+    hwpx_file: HWPXFile,
+    *,
+    paper: Optional[str] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    landscape: Optional[bool] = None,
+    margin_left: Optional[int] = None,
+    margin_right: Optional[int] = None,
+    margin_top: Optional[int] = None,
+    margin_bottom: Optional[int] = None,
+    margin_header: Optional[int] = None,
+    margin_footer: Optional[int] = None,
+    section_index: int = 0,
+) -> None:
+    """Modify page setup (size, orientation, margins) for a section.
+
+    The section properties live in the SecPr of the first paragraph's
+    first run, which is created by BlankFileMaker.
+
+    Parameters
+    ----------
+    paper : str, optional
+        Paper size name: ``"A4"``, ``"A3"``, ``"B5"``, ``"LETTER"``, ``"LEGAL"``.
+        Sets both width and height (overridden by explicit width/height).
+    width, height : int, optional
+        Page dimensions in HWPX units (1/7200 inch).
+    landscape : bool, optional
+        If True, swap width/height and set landscape orientation.
+    margin_left, margin_right, margin_top, margin_bottom : int, optional
+        Page margins in HWPX units.
+    margin_header, margin_footer : int, optional
+        Header/footer margins in HWPX units.
+    section_index : int
+        Index of the section to modify (default 0).
+    """
+    from .objects.section.enum_types import PageDirection
+
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    paras = section.paras()
+    if not paras:
+        raise ValueError("Section has no paragraphs; cannot find SecPr.")
+
+    # SecPr is in the first paragraph's first run
+    first_para = paras[0]
+    sec_pr = None
+    for run_idx in range(first_para.count_of_run()):
+        run = first_para.get_run(run_idx)
+        if run.sec_pr is not None:
+            sec_pr = run.sec_pr
+            break
+
+    if sec_pr is None:
+        raise ValueError(
+            "No SecPr found in the first paragraph. "
+            "Ensure the document was created with create_document()."
+        )
+
+    page_pr = sec_pr.page_pr
+    if page_pr is None:
+        raise ValueError("SecPr has no PagePr; document structure is unexpected.")
+
+    # Apply paper size
+    if paper is not None:
+        key = paper.upper()
+        if key not in _PAPER_SIZES:
+            raise ValueError(
+                f"Unknown paper size '{paper}'. "
+                f"Choices: {', '.join(_PAPER_SIZES.keys())}"
+            )
+        pw, ph = _PAPER_SIZES[key]
+        if width is None:
+            width = pw
+        if height is None:
+            height = ph
+
+    # Apply landscape: swap dimensions if needed
+    if landscape is not None:
+        if landscape:
+            page_pr.landscape = PageDirection.NARROWLY
+            # In landscape mode, width > height
+            if width is not None and height is not None and width < height:
+                width, height = height, width
+            elif width is None and height is None:
+                # Swap existing
+                cur_w = page_pr.width
+                cur_h = page_pr.height
+                if cur_w is not None and cur_h is not None and cur_w < cur_h:
+                    page_pr.width = cur_h
+                    page_pr.height = cur_w
+        else:
+            page_pr.landscape = PageDirection.WIDELY
+            # In portrait mode, height > width
+            if width is not None and height is not None and width > height:
+                width, height = height, width
+
+    if width is not None:
+        page_pr.width = width
+    if height is not None:
+        page_pr.height = height
+
+    # Apply margins
+    margin = page_pr.margin
+    if margin is None:
+        margin = page_pr.create_margin()
+
+    if margin_left is not None:
+        margin.left = margin_left
+    if margin_right is not None:
+        margin.right = margin_right
+    if margin_top is not None:
+        margin.top = margin_top
+    if margin_bottom is not None:
+        margin.bottom = margin_bottom
+    if margin_header is not None:
+        margin.header = margin_header
+    if margin_footer is not None:
+        margin.footer = margin_footer
+
+
+# ======================================================================
+# HWPX → HTML conversion
+# ======================================================================
+
+def convert_hwpx_to_html(
+    hwpx_path: str,
+    output_path: str | None = None,
+    embed_images: bool = True,
+    title: str = "HWPX Document",
+) -> str:
+    """Convert HWPX file to standalone HTML for browser viewing.
+
+    Produces a self-contained HTML document with inline CSS and
+    base64-encoded images.  Handles paragraphs, styled text runs,
+    tables, shapes, images, equations, and hyperlinks.
+
+    Parameters
+    ----------
+    hwpx_path : str
+        Path to the input .hwpx file.
+    output_path : str or None
+        Path to write the output .html file.  If None, the HTML is
+        returned as a string without writing to disk.
+    embed_images : bool
+        Whether to embed images as base64 data URIs (default True).
+    title : str
+        Title for the HTML ``<title>`` element.
+
+    Returns
+    -------
+    str
+        The generated HTML content.
+    """
+    from .html_converter import convert_hwpx_to_html as _convert
+    return _convert(
+        hwpx_path,
+        output_path=output_path,
+        embed_images=embed_images,
+        title=title,
+    )
+
+
+# ======================================================================
+# Document merge
+# ======================================================================
+
+def merge_documents(hwpx_paths: list[str], output_path: str) -> None:
+    """Merge multiple HWPX files into one.
+
+    Opens each input file, extracts text paragraphs and tables,
+    and recreates them in a single new HWPX document.  A page break
+    is inserted between documents.
+
+    Parameters
+    ----------
+    hwpx_paths : list of str
+        Paths to the input .hwpx files (in order).
+    output_path : str
+        Path for the merged output .hwpx file.
+    """
+    from .reader import HwpxDocument
+
+    if not hwpx_paths:
+        raise ValueError("hwpx_paths must contain at least one file path.")
+
+    doc = create_document()
+    first_file = True
+
+    for path in hwpx_paths:
+        src = HwpxDocument.open(path)
+
+        for section in src.sections:
+            if not first_file:
+                # Insert a page-break paragraph between documents
+                _add_page_break(doc)
+
+            for para in section.paragraphs:
+                text = para.text
+                if text:
+                    add_paragraph(doc, text)
+
+            for table in section.tables:
+                grid = table.to_2d()
+                if grid:
+                    rows = len(grid)
+                    cols = max(len(r) for r in grid) if grid else 0
+                    # Pad rows to uniform width
+                    padded = [
+                        r + [""] * (cols - len(r)) for r in grid
+                    ]
+                    add_table(doc, rows, cols, data=padded)
+
+            first_file = False
+
+    save(doc, output_path)
+
+
+def _add_page_break(hwpx_file: HWPXFile, section_index: int = 0) -> Para:
+    """Insert a paragraph that forces a page break."""
+    section = hwpx_file.section_xml_file_list.get(section_index)
+    para = section.add_new_para()
+    para.id = str(_random.randint(1000000000, 4294967295))
+    para.para_pr_id_ref = "0"
+    para.style_id_ref = "0"
+    para.page_break = True
+    para.column_break = False
+    para.merged = False
+    run = para.add_new_run()
+    run.char_pr_id_ref = "0"
+    t = run.add_new_t()
+    t.add_text("")
+    return para
+
+
+# ======================================================================
+# Template fill
+# ======================================================================
+
+def fill_template(
+    template_path: str,
+    data: dict[str, str],
+    output_path: str,
+) -> None:
+    """Fill a template HWPX with data by replacing placeholder text.
+
+    Placeholders are ``{{key}}`` patterns **or** literal text strings
+    in the template.  All occurrences in every ``<hp:t>`` element
+    across all section files are replaced.
+
+    The original formatting is preserved — only the text content of
+    matching ``<hp:t>`` nodes is changed.
+
+    Parameters
+    ----------
+    template_path : str
+        Path to the template .hwpx file.
+    data : dict of str to str
+        Mapping of placeholder text to replacement values.
+        Both ``{{key}}`` style and literal-match replacements
+        are supported.
+    output_path : str
+        Path for the filled output .hwpx file.
+    """
+    import shutil
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    # Namespace normalization
+    from .reader import _normalize_ns, _SECTION_RE
+
+    if not data:
+        # Nothing to replace — just copy the file
+        shutil.copy2(template_path, output_path)
+        return
+
+    # Work on a copy
+    shutil.copy2(template_path, output_path)
+
+    with zipfile.ZipFile(template_path, "r") as zf_in:
+        names = zf_in.namelist()
+        section_names = sorted(n for n in names if _SECTION_RE.match(n))
+
+        if not section_names:
+            return
+
+        # Read all files into memory
+        file_data: dict[str, bytes] = {}
+        for name in names:
+            file_data[name] = zf_in.read(name)
+
+    # Process each section file
+    for sec_name in section_names:
+        raw = file_data[sec_name]
+        text = raw.decode("utf-8")
+
+        # Perform text replacements in the raw XML
+        for placeholder, value in data.items():
+            # Escape the replacement value for XML
+            xml_safe_value = (
+                value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&apos;")
+            )
+            # Also escape the placeholder for matching in XML context
+            # (the placeholder itself might contain special chars)
+            xml_safe_placeholder = (
+                placeholder.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&apos;")
+            )
+            text = text.replace(xml_safe_placeholder, xml_safe_value)
+            # Also try the raw placeholder (in case it's not escaped)
+            text = text.replace(placeholder, value)
+
+        file_data[sec_name] = text.encode("utf-8")
+
+    # Write the modified ZIP
+    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf_out:
+        for name in names:
+            zf_out.writestr(name, file_data[name])

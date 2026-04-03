@@ -449,7 +449,7 @@ def _make_char_pr(
     offset.set(ov[0], ov[1], ov[2], ov[3], ov[4], ov[5], ov[6])
 
     so = cp.create_strikeout()
-    so.shape = "3D"
+    so.shape = "NONE"
     so.color = "#000000"
 
 

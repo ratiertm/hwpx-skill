@@ -1450,3 +1450,321 @@ def build_rectangle_with_image_fill_xml(
     parts.append('</hp:run>')
 
     return "".join(parts)
+
+
+# ======================================================================
+# FORM CONTROLS  (Phase 4)
+# ======================================================================
+
+def _form_common_attrs(
+    name: str,
+    foreColor: str = "#000000",
+    backColor: str = "#FFFFFF",
+    groupName: str = "",
+    tabStop: str = "1",
+    editable: str = "1",
+    tabOrder: str = "1",
+    enabled: str = "1",
+    borderTypeIDRef: str = "0",
+    drawFrame: str = "1",
+    printable: str = "1",
+    command: str = "",
+) -> str:
+    return (
+        f' name="{_escape(name)}" foreColor="{foreColor}" backColor="{backColor}"'
+        f' groupName="{_escape(groupName)}" tabStop="{tabStop}" editable="{editable}"'
+        f' tabOrder="{tabOrder}" enabled="{enabled}" borderTypeIDRef="{borderTypeIDRef}"'
+        f' drawFrame="{drawFrame}" printable="{printable}" command="{_escape(command)}"'
+    )
+
+
+def _form_char_pr_xml() -> str:
+    return '<hp:formCharPr charPrIDRef="0" followContext="0" autoSz="0" wordWrap="0"/>'
+
+
+def _form_control_xml(
+    tag: str,
+    attrs: str,
+    width: int,
+    height: int,
+    extra_children: str = "",
+) -> str:
+    """Wrap a form control element inside ``<hp:run>``."""
+    return (
+        '<hp:run charPrIDRef="0">'
+        f'<hp:{tag}{attrs}>'
+        f'{_form_char_pr_xml()}'
+        f'{extra_children}'
+        f'{_sz_xml(width, height)}'
+        f'{_pos_xml()}'
+        f'{_out_margin_xml()}'
+        f'</hp:{tag}>'
+        '</hp:run>'
+    )
+
+
+def build_checkbox_xml(
+    caption: str = "체크박스",
+    name: str = "CheckBox1",
+    checked: bool = False,
+    width: int = 9921,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:checkBtn>`` element."""
+    value = "CHECKED" if checked else "UNCHECKED"
+    attrs = (
+        f' caption="{_escape(caption)}" value="{value}"'
+        f' radioGroupName="" triState="0" backStyle="OPAQUE"'
+        f'{_form_common_attrs(name)}'
+    )
+    return _form_control_xml("checkBtn", attrs, width, height)
+
+
+def build_radio_button_xml(
+    caption: str = "라디오",
+    name: str = "Radio1",
+    group: str = "",
+    checked: bool = False,
+    width: int = 8504,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:radioBtn>`` element."""
+    value = "CHECKED" if checked else "UNCHECKED"
+    attrs = (
+        f' caption="{_escape(caption)}" value="{value}"'
+        f' radioGroupName="{_escape(group)}" triState="0" backStyle="OPAQUE"'
+        f'{_form_common_attrs(name, groupName=group)}'
+    )
+    return _form_control_xml("radioBtn", attrs, width, height)
+
+
+def build_button_xml(
+    caption: str = "버튼",
+    name: str = "Button1",
+    value: str = "",
+    width: int = 7087,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:btn>`` element."""
+    attrs = (
+        f' caption="{_escape(caption)}" value="{_escape(value)}"'
+        f'{_form_common_attrs(name)}'
+    )
+    return _form_control_xml("btn", attrs, width, height)
+
+
+def build_combobox_xml(
+    name: str = "ComboBox1",
+    items: list[tuple[str, str]] | None = None,
+    list_box_rows: int = 10,
+    list_box_width: int = 0,
+    edit_enable: bool = True,
+    width: int = 9921,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:comboBox>`` element.
+
+    *items* is a list of ``(display_text, value)`` tuples.
+    """
+    items = items or []
+    attrs = (
+        f' listBoxRows="{list_box_rows}" listBoxWidth="{list_box_width}"'
+        f' editEnable="{1 if edit_enable else 0}" selectedValue=""'
+        f'{_form_common_attrs(name, backColor="#F0F0F0")}'
+    )
+    children = "".join(
+        f'<hp:listItem displayText="{_escape(dt)}" value="{_escape(v)}"/>'
+        for dt, v in items
+    )
+    return _form_control_xml("comboBox", attrs, width, height, extra_children=children)
+
+
+def build_listbox_xml(
+    name: str = "ListBox1",
+    items: list[tuple[str, str]] | None = None,
+    width: int = 9921,
+    height: int = 3968,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:listBox>`` element.
+
+    *items* is a list of ``(display_text, value)`` tuples.
+    """
+    items = items or []
+    attrs = (
+        f' selectedValue=""'
+        f'{_form_common_attrs(name)}'
+    )
+    children = "".join(
+        f'<hp:listItem displayText="{_escape(dt)}" value="{_escape(v)}"/>'
+        for dt, v in items
+    )
+    return _form_control_xml("listBox", attrs, width, height, extra_children=children)
+
+
+def build_edit_xml(
+    name: str = "Edit1",
+    text: str = "",
+    multi_line: bool = False,
+    max_length: int = 2147483647,
+    read_only: bool = False,
+    align_text: str = "LEFT",
+    width: int = 7087,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:edit>`` element."""
+    attrs = (
+        f' multiLine="{1 if multi_line else 0}" passwordChar=""'
+        f' maxLength="{max_length}" scrollBars="NONE"'
+        f' tabKeyBehavior="NEXT_OBJECT" numOnly="0"'
+        f' readOnly="{1 if read_only else 0}" alignText="{align_text}"'
+        f'{_form_common_attrs(name)}'
+    )
+    children = f'<hp:text>{_escape(text)}</hp:text>' if text else '<hp:text/>'
+    return _form_control_xml("edit", attrs, width, height, extra_children=children)
+
+
+def build_scrollbar_xml(
+    name: str = "ScrollBar1",
+    orientation: str = "HORIZONTAL",
+    min_val: int = 0,
+    max_val: int = 32767,
+    value: int = 0,
+    small_change: int = 1,
+    large_change: int = 3,
+    width: int = 14400,
+    height: int = 1984,
+) -> str:
+    """Build a complete ``<hp:run>`` containing an ``<hp:scrollBar>`` element."""
+    attrs = (
+        f' delay="50" smallChange="{small_change}" largeChange="{large_change}"'
+        f' min="{min_val}" max="{max_val}" page="3" value="{value}"'
+        f' type="{orientation}"'
+        f'{_form_common_attrs(name)}'
+    )
+    return _form_control_xml("scrollBar", attrs, width, height)
+
+
+# ======================================================================
+# INLINE / SPECIAL CHARACTERS  (Phase 4)
+# ======================================================================
+
+def build_highlight_xml(
+    text: str,
+    color: str = "#FFFF00",
+    char_pr_id_ref: str = "0",
+) -> str:
+    """Build multi-run XML for highlighted (markpen) text.
+
+    Returns three ``<hp:run>`` elements: markpenBegin, text, markpenEnd.
+    """
+    escaped = _escape(text)
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        f'<hp:markpenBegin color="{color}"/>'
+        '</hp:run>'
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        f'<hp:t>{escaped}</hp:t>'
+        '</hp:run>'
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        '<hp:markpenEnd/>'
+        '</hp:run>'
+    )
+
+
+def build_dutmal_xml(
+    main_text: str,
+    sub_text: str,
+    pos: str = "TOP",
+    sz_ratio: int = 50,
+    align: str = "CENTER",
+    char_pr_id_ref: str = "0",
+) -> str:
+    """Build a ``<hp:run>`` containing a ``<hp:dutmal>`` (ruby text) element."""
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        f'<hp:dutmal posType="{pos}" szRatio="{sz_ratio}"'
+        f' option="0" styleIDRef="0" align="{align}">'
+        f'<hp:mainText>{_escape(main_text)}</hp:mainText>'
+        f'<hp:subText>{_escape(sub_text)}</hp:subText>'
+        '</hp:dutmal>'
+        '</hp:run>'
+    )
+
+
+def build_hidden_comment_xml(
+    text: str,
+    char_pr_id_ref: str = "0",
+) -> str:
+    """Build a ``<hp:run>`` containing an ``<hp:ctrl><hp:hiddenComment>``."""
+    p_id = _id()
+    escaped = _escape(text)
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        '<hp:ctrl>'
+        '<hp:hiddenComment>'
+        '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK"'
+        ' vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0"'
+        ' textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+        f'<hp:p id="{p_id}" paraPrIDRef="0" styleIDRef="0" pageBreak="0"'
+        ' columnBreak="0" merged="0">'
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        f'<hp:t>{escaped}</hp:t>'
+        '</hp:run>'
+        '</hp:p>'
+        '</hp:subList>'
+        '</hp:hiddenComment>'
+        '</hp:ctrl>'
+        '</hp:run>'
+    )
+
+
+def build_indexmark_xml(
+    key: str,
+    second_key: str | None = None,
+    char_pr_id_ref: str = "0",
+) -> str:
+    """Build a ``<hp:run>`` containing an ``<hp:ctrl><hp:indexmark>``."""
+    second = (
+        f'<hp:secondKey>{_escape(second_key)}</hp:secondKey>'
+        if second_key else ''
+    )
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        '<hp:ctrl>'
+        '<hp:indexmark>'
+        f'<hp:firstKey>{_escape(key)}</hp:firstKey>'
+        f'{second}'
+        '</hp:indexmark>'
+        '</hp:ctrl>'
+        '</hp:run>'
+    )
+
+
+def build_tab_xml(char_pr_id_ref: str = "0") -> str:
+    """Build a ``<hp:run>`` containing a tab character."""
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        '<hp:t><hp:tab/></hp:t>'
+        '</hp:run>'
+    )
+
+
+def build_special_char_xml(
+    char_type: str = "nbspace",
+    char_pr_id_ref: str = "0",
+) -> str:
+    """Build a ``<hp:run>`` containing a special character.
+
+    *char_type*: ``"nbspace"`` | ``"fwspace"`` | ``"hyphen"``.
+    """
+    tag_map = {
+        "nbspace": "nbSpace",
+        "fwspace": "fwSpace",
+        "hyphen": "hyphen",
+    }
+    tag = tag_map.get(char_type.lower(), "nbSpace")
+    return (
+        f'<hp:run charPrIDRef="{char_pr_id_ref}">'
+        f'<hp:t><hp:{tag}/></hp:t>'
+        '</hp:run>'
+    )
