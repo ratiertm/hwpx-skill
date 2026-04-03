@@ -180,6 +180,9 @@ class HwpxHtmlParser(HTMLParser):
         self._current_row: list[str] = []
         self._in_td: bool = False
 
+        # Skip content inside <head>, <style>, <script>, <title>
+        self._skip_depth: int = 0
+
         # Link context
         self._in_a: bool = False
         self._a_href: str = ""
@@ -271,8 +274,15 @@ class HwpxHtmlParser(HTMLParser):
 
     # -- tag dispatch ---------------------------------------------------------
 
+    _SKIP_TAGS = frozenset({"head", "style", "script", "title"})
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]):
         tag = tag.lower()
+        if tag in self._SKIP_TAGS:
+            self._skip_depth += 1
+            return
+        if self._skip_depth > 0:
+            return
         attr_dict = dict(attrs)
 
         try:
@@ -489,6 +499,11 @@ class HwpxHtmlParser(HTMLParser):
 
     def handle_endtag(self, tag: str):
         tag = tag.lower()
+        if tag in self._SKIP_TAGS:
+            self._skip_depth = max(0, self._skip_depth - 1)
+            return
+        if self._skip_depth > 0:
+            return
         try:
             self._handle_endtag_inner(tag)
         except Exception:
@@ -689,6 +704,8 @@ class HwpxHtmlParser(HTMLParser):
             return
 
     def handle_data(self, data: str):
+        if self._skip_depth > 0:
+            return
         try:
             self._handle_data_inner(data)
         except Exception:
