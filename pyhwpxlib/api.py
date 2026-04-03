@@ -749,6 +749,7 @@ def _register_manifest_item(
     item.id = item_id
     item.href = href
     item.media_type = media_type
+    item.is_embedded = "1"
 
 
 # ======================================================================
