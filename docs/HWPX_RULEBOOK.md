@@ -273,37 +273,54 @@ HWPX (ZIP)
 
 ## 14. section0.xml 문단 구조 규칙 (2026-04-04 검증)
 
+### 14-1. p 수 최소화 — 1페이지 배치 핵심
+
+서식 문서는 **p(문단) 수가 적을수록** 한 페이지에 들어갈 확률이 높다.
+불필요한 p가 추가되면 표가 다음 페이지로 밀린다.
+
 ```xml
-<!-- ✅ 올바른 구조 (pyhwpxlib 검증 완료) -->
-<hs:sec>
-  <!-- p[0]: secPr만 포함, 텍스트 없음, linesegarray 1개 -->
-  <hp:p>
-    <hp:run charPrIDRef="0">
-      <hp:secPr ...>페이지설정</hp:secPr>
-    </hp:run>
-    <hp:linesegarray><hp:lineseg .../></hp:linesegarray>
-  </hp:p>
+<!-- ❌ p가 3개 → 표가 2페이지로 밀림 -->
+<hp:p>secPr</hp:p>
+<hp:p>제목 텍스트</hp:p>      ← 불필요한 p
+<hp:p>표</hp:p>
 
-  <!-- p[1~N]: 본문 텍스트, linesegarray 없음 -->
-  <hp:p><hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run></hp:p>
-
-  <!-- 표: 별도 p 안에 -->
-  <hp:p>
-    <hp:run charPrIDRef="0">
-      <hp:tbl ...>표 XML</hp:tbl>
-      <hp:t/>
-    </hp:run>
-  </hp:p>
-
-  <!-- 표 뒤 텍스트 -->
-  <hp:p><hp:run charPrIDRef="0"><hp:t>표 뒤 텍스트</hp:t></hp:run></hp:p>
-</hs:sec>
+<!-- ✅ p가 2개 → 한 페이지에 들어감 (원본 패턴) -->
+<hp:p>secPr + 제목 텍스트 + linesegarray</hp:p>
+<hp:p>표</hp:p>
 ```
 
-**핵심 3원칙**:
-1. **secPr 문단 분리**: secPr은 빈 문단에 단독 배치, 텍스트와 합치면 겹침 발생
-2. **linesegarray 최소화**: secPr 문단에만 1개, 나머지는 한컴이 자동 계산
-3. **셀 내 줄바꿈**: `<hp:subList>` 안에 별도 `<hp:p>`로 분리, linesegarray 불필요
+### 14-2. secPr 문단 + 표 앞 텍스트 배치
+
+**상황별 규칙:**
+
+| 상황 | 올바른 방식 |
+|------|-----------|
+| 표 앞 텍스트 있음 (서식) | secPr p에 텍스트 run 합침 |
+| 표 앞 텍스트 없음 | secPr p 단독 |
+| 표 없이 본문만 | secPr p 단독 + 텍스트 별도 p |
+
+```xml
+<!-- ✅ 서식: secPr p에 제목 텍스트 포함 -->
+<hp:p paraPrIDRef="8">
+  <hp:run charPrIDRef="4"><hp:secPr ...>페이지설정</hp:secPr></hp:run>
+  <hp:run charPrIDRef="4"><hp:t>[별지 제11호 서식](97. 12. 31. 개정)</hp:t></hp:run>
+  <hp:linesegarray><hp:lineseg .../></hp:linesegarray>
+</hp:p>
+<hp:p paraPrIDRef="1">
+  <hp:run charPrIDRef="4"><hp:tbl ...>표</hp:tbl></hp:run>
+</hp:p>
+```
+
+### 14-3. linesegarray 규칙
+
+- secPr 포함 첫 문단에만 1개
+- 나머지 모든 `<hp:p>` (본문, 셀 내부)에는 넣지 않음
+- 한컴오피스가 열 때 자동으로 레이아웃 재계산
+
+### 14-4. 셀 내 줄바꿈
+
+- `<hp:subList>` 안에 별도 `<hp:p>`로 분리
+- linesegarray 불필요 (한컴 자동 계산)
 
 ## 15. 서식 표 사이즈 규칙 (별지 리버스)
 
@@ -327,3 +344,174 @@ height = sum(row_heights[row : row + rowSpan])
 | charPr.height | 글자 크기 (100=1pt), 제목 1500~1800, 본문 1000~1100 |
 | charPr.textColor | `#RRGGBB`, bold는 `<hh:bold/>` 태그 유무 |
 | spacing (자간) | charPr 하위 `<hh:spacing hangul="30"/>` (0=기본) |
+
+## 16. 한 페이지 서식 사이즈 계산 (2026-04-04 검증)
+
+서식을 한 페이지에 넣으려면 **콘텐츠 총 높이 < 본문 가용 높이** 여야 한다.
+
+### 사이즈 공식
+
+```
+A4: 59528 × 84188 (210 × 297mm)
+
+본문 가용 높이 = page.height - margin.top - margin.bottom
+             예: 84188 - 4252 - 4252 = 75684 (267mm)
+
+콘텐츠 총 높이 = 표 앞 텍스트 높이 + 표 높이 + outMargin
+             예: 제목 1100 + 표 67044 + outMargin 280 = 68424
+
+한 페이지 조건: 콘텐츠 총 높이 < 본문 가용 높이
+             예: 68424 < 75684 ✅
+```
+
+### 높이 계산 요소
+
+| 요소 | 계산 | 단위 |
+|------|------|------|
+| 텍스트 줄 높이 | charPr.height (예: 1100 = 11pt) | HWP Unit |
+| 줄 간격 | lineSpacing value (예: 150 = 1.5배) | % |
+| 표 높이 | `sum(row_heights)` 또는 `tbl.sz.height` | HWP Unit |
+| 표 마진 | outMargin.top + outMargin.bottom | HWP Unit |
+| 페이지 마진 | margin.top + margin.bottom | HWP Unit |
+
+### 표 높이가 넘칠 때 대처
+
+1. **행 높이 줄이기**: 빽빽한 서식은 행 높이 1500~2500 사용
+2. **마진 줄이기**: 정부 서식은 margin 1416~5104 (기본 8504보다 좁음)
+3. **폰트 크기 줄이기**: 800~900 사용 (기본 1000~1100)
+4. **p 수 최소화**: secPr p에 텍스트 합치기 (규칙 14-1)
+
+### 마진 프리셋
+
+| 유형 | left/right | top/bottom | 본문 가용 높이 |
+|------|-----------|-----------|-------------|
+| 일반 문서 | 8504 (30mm) | 5668/4252 | 74266 (262mm) |
+| 정부 서식 표준 | 5104 (18mm) | 4252 (15mm) | 75684 (267mm) |
+| 좁은 서식 | 4000 (14mm) | 4000 (14mm) | 76188 (269mm) |
+| 극소 마진 | 1416 (5mm) | 2836/1416 | 79936 (282mm) |
+
+## 17. paraPr 생성 규칙 (2026-04-04 검증)
+
+### 커스텀 paraPr 생성 시 필수: 기존 paraPr deep copy
+
+```python
+# ❌ align만 넣으면 글자 겹침 발생
+new_pp = SubElement(container, "paraPr")
+new_pp.set("id", pid)
+SubElement(new_pp, "align").set("horizontal", "CENTER")
+# heading, breakSetting, autoSpacing, switch(lineSpacing/margin) 전부 누락!
+
+# ✅ 기존 paraPr[0]을 deep copy한 후 horizontal만 변경
+import copy
+new_pp = copy.deepcopy(base_paraPr_element)
+new_pp.set("id", pid)
+new_pp.find("align").set("horizontal", "CENTER")
+```
+
+### paraPr 필수 자식 요소
+
+```xml
+<hh:paraPr id="0" tabPrIDRef="0" condense="0" fontLineHeight="0"
+           snapToGrid="0" suppressLineNumbers="0" checked="0">
+  <hh:align horizontal="CENTER" vertical="BASELINE"/>
+  <hh:heading type="NONE" idRef="0" level="0"/>
+  <hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="BREAK_WORD"
+                   widowOrphan="0" keepWithNext="0" keepLines="0"
+                   pageBreakBefore="0" lineWrap="BREAK"/>
+  <hh:autoSpacing eAsianEng="0" eAsianNum="0"/>
+  <hp:switch>
+    <hp:case ...>
+      <hh:margin>...</hh:margin>
+      <hh:lineSpacing type="PERCENT" value="150" unit="HWPUNIT"/>
+    </hp:case>
+    <hp:default>
+      <hh:margin>...</hh:margin>
+      <hh:lineSpacing type="PERCENT" value="150" unit="HWPUNIT"/>
+    </hp:default>
+  </hp:switch>
+</hh:paraPr>
+```
+
+**align만 있고 나머지가 없으면**: lineSpacing이 없어서 줄 간격 0 → 글자 겹침
+
+### 기존 paraPr 재사용 우선
+
+같은 horizontal 정렬이 이미 있으면 새로 만들지 말고 기존 id 재사용:
+```python
+# margin 변경 없는 경우 → 기존 paraPr에서 horizontal 일치하는 것 찾기
+for pp in existing_paraPrs:
+    if pp.align.horizontal == needed_horizontal:
+        return pp.id  # 재사용
+```
+
+## 18. 셀 텍스트 정렬 체계 (줄별 독립 정렬)
+
+### 구조
+
+```
+셀 텍스트 정렬
+├── 가로 → 각 <hp:p>의 paraPrIDRef → header의 paraPr.align.horizontal
+│          줄마다 다른 paraPrIDRef 가능 (같은 셀 안에서도)
+│
+└── 세로 → <hp:subList vertAlign="CENTER|TOP|BOTTOM">
+           셀 전체에 1개 (줄별 독립 불가)
+```
+
+### 줄별 다른 정렬 예시 (별지 제11호 서식 셀(11,0))
+
+```
+p[0] JUSTIFY   | (빈줄)
+p[1] JUSTIFY   | 조세감면규제법시행령... (left=2000, right=2000)
+p[2] JUSTIFY   | (빈줄)
+p[3] JUSTIFY   | (빈줄)
+p[4] CENTER    | 년        월       일
+p[5] JUSTIFY   | (빈줄)
+p[6] RIGHT     | 신청인 (서명 또는 인) (right=4000)
+p[7] JUSTIFY   | (빈줄)
+p[8] CENTER    | 세 무 서 장 귀 하
+```
+
+각 줄의 `paraPrIDRef`가 다름 → **paraPr deep copy로 생성** (규칙 17)
+
+### 가로 정렬 값
+
+| 값 | 의미 | 사용처 |
+|---|------|-------|
+| `JUSTIFY` | 양쪽 정렬 | 본문, 라벨, 입력칸 (가장 흔함) |
+| `CENTER` | 가운데 | 제목, 날짜, 섹션명 |
+| `LEFT` | 왼쪽 | 주소 입력칸 |
+| `RIGHT` | 오른쪽 | 서명란, 전화번호 |
+
+### 폰트 크기 패턴 (charPr.height)
+
+| 용도 | height | bold | spacing | 비고 |
+|------|--------|------|---------|------|
+| 서식 제목 | 1500~1800 | `<bold/>` | 0 | "신청서(갑)" |
+| 본문/라벨 | 1000~1100 | 없음 | 0 | "①성명", "처리기간" |
+| 넓은 자간 | 1100 | 없음 | 15~36 | "성명또는법인명" |
+| 좁은 자간 | 1000 | 없음 | -5~-20 | 긴 텍스트 압축 |
+| 소형 주석 | 800~900 | 없음 | 0 | 하단 용지 크기 |
+
+### 셀 패딩 (cellMargin)
+
+```xml
+<!-- hasMargin="0": 값 무시, 한컴 기본 패딩 (정부 서식 패턴) -->
+<hp:tc hasMargin="0">
+  <hp:cellMargin left="141" right="141" top="141" bottom="141"/>
+</hp:tc>
+
+<!-- hasMargin="1": 명시적 패딩 적용 (프로그래밍 생성 패턴) -->
+<hp:tc hasMargin="1">
+  <hp:cellMargin left="400" right="400" top="250" bottom="250"/>
+</hp:tc>
+```
+
+### 테두리 (borderFill) 패턴
+
+| 위치 | 테두리 |
+|------|--------|
+| 표 외곽 | SOLID 0.4mm (THICK) |
+| 표 내부 | SOLID 0.12mm (THIN) |
+| 구분선 없음 | NONE 0.1mm |
+
+셀마다 4변(left/right/top/bottom) 테두리가 독립 — 위치에 따라 17~21종 borderFill 조합
