@@ -981,7 +981,7 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         except:
                             pass
 
-                # 셀 텍스트
+                # 셀 텍스트 + charPr + borderFill + lineSpacing
                 for ncell_data in ntbl_data.get('cells', []):
                     nr, nc = ncell_data['row'], ncell_data['col']
                     if nr >= ntbl_rows or nc >= ntbl_cols:
@@ -996,6 +996,59 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                             temp_tbl.set_cell_text(nr, nc, full_text)
                         except:
                             pass
+
+                    try:
+                        ncell = temp_tbl.cell(nr, nc)
+
+                        # charPr 적용
+                        if ncell_data.get('lines'):
+                            first_runs = ncell_data['lines'][0].get('runs', [])
+                            if first_runs:
+                                orig_cpr = first_runs[0].get('charPr', '0')
+                                new_cpr = cpr_map.get(orig_cpr, 0)
+                                nsub = ncell.element.find(f"{_HP}subList")
+                                if nsub is not None:
+                                    for np in nsub.findall(f"{_HP}p"):
+                                        for nrun in np.findall(f"{_HP}run"):
+                                            nrun.set("charPrIDRef", str(new_cpr))
+
+                        # borderFill 적용
+                        orig_bf = ncell_data.get('borderFillIDRef', '1')
+                        new_bf = bf_map.get(orig_bf, '1')
+                        ncell.set_border_fill_id(new_bf)
+
+                        # cellMargin
+                        cm = ncell_data.get('cellMargin', 141)
+                        ncell.set_margin(left=cm, right=cm, top=cm, bottom=cm)
+
+                        # lineSpacing — 줄별 paraPr 적용
+                        nsub = ncell.element.find(f"{_HP}subList")
+                        if nsub is not None:
+                            nsub.set("vertAlign", ncell_data.get('vertAlign', 'CENTER'))
+                            nps = nsub.findall(f"{_HP}p")
+                            for ni, np in enumerate(nps):
+                                if ni < len(ncell_data.get('lines', [])):
+                                    line = ncell_data['lines'][ni]
+                                    ppid = get_or_create_paraPr(
+                                        line.get('horizontal', 'JUSTIFY'),
+                                        line.get('lineSpacing', 0),
+                                        line.get('margin_left', 0),
+                                        line.get('margin_right', 0),
+                                    )
+                                    np.set("paraPrIDRef", ppid)
+                    except Exception:
+                        pass
+
+                # cellSz 재설정 (병합 후 변경 대비)
+                for ncell_data in ntbl_data.get('cells', []):
+                    nr, nc = ncell_data['row'], ncell_data['col']
+                    if nr >= ntbl_rows or nc >= ntbl_cols:
+                        continue
+                    try:
+                        ncell = temp_tbl.cell(nr, nc)
+                        ncell.set_size(width=ncell_data['width'], height=ncell_data['height'])
+                    except:
+                        pass
 
                 # 병합
                 for m in ntbl_data.get('merges', []):
