@@ -109,8 +109,13 @@ def _extract_para_properties(hroot):
     for pp in hroot.findall(f'.//{_HH}paraPr'):
         pid = pp.get('id')
         align = pp.find(f'{_HH}align')
+        # lineSpacing: 직계 또는 switch 안에 있을 수 있음
         ls = pp.find(f'{_HH}lineSpacing')
+        if ls is None:
+            ls = pp.find(f'.//{_HH}lineSpacing')  # switch 안 탐색
         margin = pp.find(f'{_HH}margin')
+        if margin is None:
+            margin = pp.find(f'.//{_HH}margin')  # switch 안 탐색
 
         info = {
             'horizontal': align.get('horizontal', 'JUSTIFY') if align is not None else 'JUSTIFY',
@@ -141,6 +146,14 @@ def _extract_border_fills(hroot):
                     'width': b.get('width', '0.1 mm'),
                     'color': b.get('color', '#000000'),
                 }
+        # fillColor 추출
+        wb = bf.find(f'.//{_HC}winBrush')
+        if wb is not None:
+            fc = wb.get('faceColor', '')
+            if fc and fc != 'none':
+                borders['_fillColor'] = fc
+                borders['_hatchColor'] = wb.get('hatchColor', '#000000')
+                borders['_alpha'] = wb.get('alpha', '0')
         result[bfid] = borders
     return result
 
@@ -152,7 +165,11 @@ def _build_ppr_map(hroot):
         pid = pp.get('id')
         a = pp.find(f'{_HH}align')
         ls = pp.find(f'{_HH}lineSpacing')
+        if ls is None:
+            ls = pp.find(f'.//{_HH}lineSpacing')
         m = pp.find(f'{_HH}margin')
+        if m is None:
+            m = pp.find(f'.//{_HH}margin')
         info = {'horizontal': a.get('horizontal', 'JUSTIFY') if a is not None else 'JUSTIFY'}
         if ls is not None:
             info['lineSpacing'] = int(ls.get('value', 0))
@@ -534,24 +551,31 @@ def generate_form(form_data, output_path):
         if key in ppr_map:
             return ppr_map[key]
 
-        # 기존 paraPr 중 horizontal이 같은 게 있으면 재사용
+        # 기존 paraPr 중 horizontal + lineSpacing 모두 일치하는 게 있으면 재사용
         if ml == 0 and mr == 0:
             for pp in pp_container.findall(f"{_HH}paraPr"):
                 a = pp.find(f"{_HH}align")
                 if a is not None and a.get("horizontal") == horz:
-                    ppr_map[key] = pp.get("id")
-                    return pp.get("id")
+                    pp_ls = pp.find(f'.//{_HH}lineSpacing')
+                    pp_ls_val = int(pp_ls.get('value', 0)) if pp_ls is not None else 0
+                    if pp_ls_val == ls or (ls == 0 and pp_ls_val == 0):
+                        ppr_map[key] = pp.get("id")
+                        return pp.get("id")
 
         nonlocal next_pp_id
         pid = str(next_pp_id)
 
-        # paraPr[0] 전체를 deep copy한 후 id와 horizontal만 변경
+        # paraPr[0] 전체를 deep copy한 후 horizontal + lineSpacing 변경
         if base_pp is not None:
             new_pp = copy.deepcopy(base_pp)
             new_pp.set("id", pid)
             a = new_pp.find(f"{_HH}align")
             if a is not None:
                 a.set("horizontal", horz)
+            # lineSpacing 변경
+            if ls > 0:
+                for ls_el in new_pp.findall(f'.//{_HH}lineSpacing'):
+                    ls_el.set("value", str(ls))
             # margin 변경 (필요시)
             if ml or mr:
                 # switch 내부와 default 내부 모두 margin 수정
@@ -611,6 +635,14 @@ def generate_form(form_data, output_path):
                 {"type": b['type'], "width": b['width'], "color": b['color']})
         LET.SubElement(bf_el, f"{_HH}diagonal").attrib.update(
             {"type": "SOLID", "width": "0.12 mm", "color": "#000000"})
+        # fillColor 적용
+        fill_color = borders.get('_fillColor')
+        if fill_color:
+            fb = LET.SubElement(bf_el, f"{_HC}fillBrush")
+            wb = LET.SubElement(fb, f"{_HC}winBrush")
+            wb.set("faceColor", fill_color)
+            wb.set("hatchColor", borders.get('_hatchColor', '#000000'))
+            wb.set("alpha", borders.get('_alpha', '0'))
         next_bf += 1
     bf_container.set("itemCnt", str(len(bf_container)))
 
