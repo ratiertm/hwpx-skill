@@ -305,12 +305,13 @@ def _reverse_grid(cells, col_count, row_count):
     h_eq = [(c['row'], c['row'] + c['rowSpan'], c['height']) for c in cells]
 
     for s, e, w in w_eq:
-        if e - s == 1:
+        if e - s == 1 and s < col_count:
             col_widths[s] = w
     changed = True
     while changed:
         changed = False
         for s, e, w in w_eq:
+            if e > col_count: continue
             unknowns = [i for i in range(s, e) if col_widths[i] is None]
             knowns = sum(col_widths[i] for i in range(s, e) if col_widths[i] is not None)
             if len(unknowns) == 1:
@@ -318,12 +319,13 @@ def _reverse_grid(cells, col_count, row_count):
                 changed = True
 
     for s, e, h in h_eq:
-        if e - s == 1:
+        if e - s == 1 and s < row_count:
             row_heights[s] = h
     changed = True
     while changed:
         changed = False
         for s, e, h in h_eq:
+            if e > row_count: continue
             unknowns = [i for i in range(s, e) if row_heights[i] is None]
             knowns = sum(row_heights[i] for i in range(s, e) if row_heights[i] is not None)
             if len(unknowns) == 1:
@@ -621,6 +623,10 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     for cell_data in tbl['cells']:
         r, c = cell_data['row'], cell_data['col']
 
+        # 범위 체크 (중첩 표 등에서 선언된 크기 초과하는 셀 스킵)
+        if r >= rows or c >= cols:
+            continue
+
         # 텍스트 조합 (\n으로 줄 합침)
         text_parts = []
         for line in cell_data['lines']:
@@ -629,7 +635,10 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         full_text = '\n'.join(text_parts)
 
         if full_text.strip():
-            table.set_cell_text(r, c, full_text)
+            try:
+                table.set_cell_text(r, c, full_text)
+            except (IndexError, Exception):
+                continue
 
         try:
             cell = table.cell(r, c)
@@ -659,11 +668,15 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     hv_merges = [m for m in tbl['merges'] if m['r1'] != m['r2'] and m['c1'] != m['c2']]
 
     for m in h_merges:
+        if m['r2'] >= rows or m['c2'] >= cols:
+            continue
         try:
             table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
         except Exception:
             pass
     for m in v_merges:
+        if m['r2'] >= rows or m['c2'] >= cols:
+            continue
         try:
             table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
         except Exception:
@@ -672,6 +685,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     # 병합 후 cellSz를 원본 값으로 재설정 (병합이 크기를 바꿀 수 있음)
     for cell_data in tbl['cells']:
         r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
         try:
             cell = table.cell(r, c)
             cell.set_size(width=cell_data['width'], height=cell_data['height'])
@@ -681,6 +696,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     # 정렬 — 줄별 paraPr 적용
     for cell_data in tbl['cells']:
         r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
         try:
             cell = table.cell(r, c)
             sub = cell.element.find(f"{_HP}subList")

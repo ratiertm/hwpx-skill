@@ -345,6 +345,57 @@ height = sum(row_heights[row : row + rowSpan])
 | charPr.textColor | `#RRGGBB`, bold는 `<hh:bold/>` 태그 유무 |
 | spacing (자간) | charPr 하위 `<hh:spacing hangul="30"/>` (0=기본) |
 
+## 15-1. 중첩 표 구조 (2026-04-04 리버스)
+
+### 컨테이너 표 패턴
+
+복잡한 서식은 **표 안에 표**를 넣는 구조:
+
+```
+컨테이너 표 (1×1 또는 N×1)
+└── 셀(0,0)
+    └── <hp:subList>
+        └── <hp:p>
+            └── <hp:run>
+                └── <hp:tbl> ← 중첩 표 1
+        └── <hp:p>
+            └── <hp:run>
+                └── <hp:tbl> ← 중첩 표 2
+```
+
+**특징:**
+- 컨테이너 표의 `rowCnt×colCnt`는 `1×1` 또는 `2×1` 등 소형
+- 실제 데이터는 중첩 표들에 있음
+- 중첩 표의 셀 주소(colAddr, rowAddr)는 중첩 표 기준 (컨테이너 기준 아님)
+- 중첩은 3단계 이상도 가능 (표 > 셀 > 표 > 셀 > 표)
+
+### 리버스 시 주의
+
+```python
+# ❌ 모든 .//hp:tbl을 같은 레벨로 취급
+for tbl in root.findall('.//hp:tbl'):  # 중첩 표도 포함됨
+
+# ✅ 직계 표만 (run 직계 자식)
+for run in p.findall('hp:run'):
+    for tbl in run.findall('hp:tbl'):  # 최상위 표만
+        # 중첩 표는 재귀 탐색
+        for tc in tbl.findall('.//hp:tc'):
+            for nested_tbl in tc.findall('.//hp:tbl'):
+                ...
+```
+
+### 페이지 단위 구조
+
+```
+section0.xml
+├── p[0]: secPr + 1페이지 표 (또는 secPr만)
+├── p[1]: 텍스트 또는 2페이지 표
+├── p[2]: 컨테이너 표 (중첩 표 포함)
+└── p[N]: ...
+```
+
+**페이지 구분**: secPr이 있는 p가 새 페이지 시작. 단, 한 section에 secPr은 1개이므로 표의 `pageBreak="CELL"` 속성으로 페이지가 나뉨.
+
 ## 16. 한 페이지 서식 사이즈 계산 (2026-04-04 검증)
 
 서식을 한 페이지에 넣으려면 **콘텐츠 총 높이 < 본문 가용 높이** 여야 한다.
