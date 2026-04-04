@@ -828,24 +828,32 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             first_para = False
 
         elif para_data['texts']:
-            # 텍스트 전용 p
-            default_cpr = cpr_map.get(
-                para_data['runs'][0]['charPrIDRef'] if para_data['runs'] else '0', 0)
-            for text in para_data['texts']:
-                doc.add_paragraph(text, char_pr_id_ref=default_cpr)
-
-            # paraPrIDRef 설정
+            # 텍스트 전용 p — 직접 p/run XML 구성 (run 단위 charPr 보존)
             orig_ppr = para_data.get('paraPrIDRef', '0')
             orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
             horz = orig_pp_info.get('horizontal', 'JUSTIFY')
             ls = orig_pp_info.get('lineSpacing', 0)
-            ppid = get_or_create_paraPr(horz, ls)
-            # 마지막 추가된 p에 적용
-            last_p = list(section_el.findall(f'{_HP}p'))[-1]
-            last_p.set('paraPrIDRef', ppid)
+            ml = orig_pp_info.get('margin_left', 0)
+            mr = orig_pp_info.get('margin_right', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr)
+
+            new_p = LET.SubElement(section_el, f"{_HP}p")
+            new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
+            new_p.set("styleIDRef", "0"); new_p.set("pageBreak", "0")
+            new_p.set("columnBreak", "0"); new_p.set("merged", "0")
+
+            for run_data in para_data['runs']:
+                new_cpr = cpr_map.get(run_data.get('charPrIDRef', '0'), 0)
+                for content in run_data['contents']:
+                    if content['type'] == 'text':
+                        new_run = LET.SubElement(new_p, f"{_HP}run")
+                        new_run.set("charPrIDRef", str(new_cpr))
+                        t_el = LET.SubElement(new_run, f"{_HP}t")
+                        t_el.text = content['text'] or None
+
             # pageBreak 적용
             if para_data.get('pageBreak', '0') != '0':
-                last_p.set('pageBreak', para_data['pageBreak'])
+                new_p.set('pageBreak', para_data['pageBreak'])
 
             first_para = False
 

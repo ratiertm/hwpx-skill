@@ -162,6 +162,10 @@ async def form_fill(
     input_path = _tmp(".hwpx")
     output_path = _tmp(".hwpx")
 
+    suffix = Path(file.filename or "template.hwpx").suffix.lower()
+    if suffix != ".hwpx":
+        raise HTTPException(status_code=400, detail="Only .hwpx template files are supported for fill")
+
     try:
         with open(input_path, "wb") as f:
             f.write(await file.read())
