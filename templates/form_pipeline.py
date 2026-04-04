@@ -6,7 +6,7 @@ Usage:
     python form_pipeline.py generate <input.json> -o <output.hwpx>
     python form_pipeline.py clone <input.hwpx|owpml> -o <output.hwpx>
 """
-import zipfile, json, sys, os
+import zipfile, json, sys, os, re
 import logging
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -43,7 +43,6 @@ def extract_form(path):
 
     # 원본 header에서 fontfaces/charProperties/borderFills를 raw 문자열로 추출
     # ET.tostring은 ns0: 접두사로 변환하므로, 원본 XML 문자열에서 직접 추출
-    import re
     def _extract_raw_block(xml_str, tag_name):
         """원본 XML 문자열에서 <hh:tagName ...>...</hh:tagName> 블록 추출"""
         pattern = r'<[^>]*?' + tag_name + r'[^>]*>.*?</[^>]*?' + tag_name + r'>'
@@ -579,14 +578,13 @@ def generate_form(form_data, output_path):
     existing_pp = {pp.get("id") for pp in pp_container.findall(f"{_HH}paraPr")}
     next_pp_id = max(int(i) for i in existing_pp) + 1 if existing_pp else 0
 
-    # 기본 paraPr[0] 템플릿 찾기 (복제 원본)
     base_pp = None
     for pp in pp_container.findall(f"{_HH}paraPr"):
         if pp.get("id") == "0":
             base_pp = pp
             break
 
-    ppr_map = {}  # 키 = (horizontal, lineSpacing, ml, mr, mp, mn) → 새 id
+    ppr_map = {}
 
     import copy
 
@@ -622,7 +620,6 @@ def generate_form(form_data, output_path):
                     ls_el.set("value", str(ls))
             # margin 변경 (필요시)
             if ml or mr or mp or mn or mi:
-                # switch 내부와 default 내부 모두 margin 수정
                 for margin_el in new_pp.findall(f".//{_HH}margin"):
                     for tag, val in [("intent", mi), ("left", ml), ("right", mr), ("prev", mp), ("next", mn)]:
                         if val:
@@ -711,7 +708,7 @@ def generate_form(form_data, output_path):
 
     # save_to_path가 header를 재생성하므로, fontfaces/charProperties/borderFills만 원본으로 교체
     if _use_raw_header:
-        import shutil, tempfile, re
+        import shutil, tempfile
         tmp = tempfile.mktemp(suffix='.hwpx')
         shutil.copy2(output_path, tmp)
 
@@ -772,15 +769,7 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
 
             # 원본 paraPrIDRef 적용
             orig_ppr = para_data.get('paraPrIDRef', '0')
-            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
-            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
-            ls = orig_pp_info.get('lineSpacing', 0)
-            ml = orig_pp_info.get('margin_left', 0)
-            mr = orig_pp_info.get('margin_right', 0)
-            mp = orig_pp_info.get('margin_prev', 0)
-            mn = orig_pp_info.get('margin_next', 0)
-            mi = orig_pp_info.get('margin_intent', 0)
-            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
+            ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
             target_p.set('paraPrIDRef', ppid)
 
             # run 내용 추가 (secPr/ctrl 제외, 텍스트/표만)
@@ -815,15 +804,7 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
 
                         # 표를 감싸는 p의 paraPrIDRef 설정
                         orig_ppr = para_data.get('paraPrIDRef', '0')
-                        orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
-                        horz = orig_pp_info.get('horizontal', 'JUSTIFY')
-                        ls = orig_pp_info.get('lineSpacing', 0)
-                        ml = orig_pp_info.get('margin_left', 0)
-                        mr = orig_pp_info.get('margin_right', 0)
-                        mp = orig_pp_info.get('margin_prev', 0)
-                        mn = orig_pp_info.get('margin_next', 0)
-                        mi = orig_pp_info.get('margin_intent', 0)
-                        ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
+                        ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
 
                         # 마지막으로 추가된 표 p 찾아서 paraPrIDRef 설정
                         for p in reversed(list(section_el.findall(f'{_HP}p'))):
@@ -836,15 +817,7 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
         elif para_data['texts']:
             # 텍스트 전용 p — 직접 p/run XML 구성 (run 단위 charPr 보존)
             orig_ppr = para_data.get('paraPrIDRef', '0')
-            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
-            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
-            ls = orig_pp_info.get('lineSpacing', 0)
-            ml = orig_pp_info.get('margin_left', 0)
-            mr = orig_pp_info.get('margin_right', 0)
-            mp = orig_pp_info.get('margin_prev', 0)
-            mn = orig_pp_info.get('margin_next', 0)
-            mi = orig_pp_info.get('margin_intent', 0)
-            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
+            ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
 
             new_p = LET.SubElement(section_el, f"{_HP}p")
             new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
