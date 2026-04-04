@@ -29,6 +29,14 @@ def extract_form(path):
     hroot = ET.fromstring(header_xml)
     sroot = ET.fromstring(section_xml)
 
+    # p 구조 분석: secPr+표가 같은 p인지
+    p_count = len(sroot.findall(f'{_HP}p'))
+    secpr_and_tbl_same_p = False
+    for p in sroot.findall(f'{_HP}p'):
+        if p.find(f'.//{_HP}secPr') is not None and p.find(f'.//{_HP}tbl') is not None:
+            secpr_and_tbl_same_p = True
+            break
+
     form = {
         '_source': os.path.basename(path),
         'page': _extract_page(sroot),
@@ -38,6 +46,8 @@ def extract_form(path):
         'border_fills': _extract_border_fills(hroot),
         'tables': _extract_tables(sroot, hroot),
         'before_table_text': _extract_before_table_text(sroot),
+        'p_count': p_count,
+        'secpr_and_tbl_same_p': secpr_and_tbl_same_p,
     }
     return form
 
@@ -131,11 +141,33 @@ def _extract_border_fills(hroot):
 
 
 def _extract_before_table_text(sroot):
-    """표 앞에 있는 텍스트 추출"""
+    """표 앞에 있는 텍스트 추출 + p 구조 정보"""
     texts = []
+    # secPr과 표가 같은 p에 있는지 확인
+    secpr_has_table = False
     for p in sroot.findall(f'{_HP}p'):
-        if p.find(f'.//{_HP}tbl') is not None:
+        has_secpr = p.find(f'.//{_HP}secPr') is not None
+        has_tbl = p.find(f'.//{_HP}tbl') is not None
+        if has_secpr and has_tbl:
+            secpr_has_table = True
+            # secPr p 안의 텍스트도 추출 (표 앞에 있는 run)
+            for run in p.findall(f'{_HP}run'):
+                if run.find(f'{_HP}tbl') is not None:
+                    break
+                t = run.find(f'{_HP}t')
+                if t is not None and t.text and t.text.strip():
+                    texts.append(t.text)
             break
+        if has_tbl:
+            break
+        if has_secpr:
+            # secPr p 안의 텍스트
+            for run in p.findall(f'{_HP}run'):
+                t = run.find(f'{_HP}t')
+                if t is not None and t.text and t.text.strip():
+                    texts.append(t.text)
+            continue
+        # secPr 없는 표 앞 p
         for run in p.findall(f'{_HP}run'):
             t = run.find(f'{_HP}t')
             if t is not None and t.text and t.text.strip():
@@ -172,6 +204,17 @@ def _extract_tables(sroot, hroot):
 
         om = tbl.find(f'{_HP}outMargin')
         im = tbl.find(f'{_HP}inMargin')
+        pos = tbl.find(f'{_HP}pos')
+
+        # 표 pos 속성 보존
+        pos_attrs = dict(pos.attrib) if pos is not None else {}
+
+        # 표 감싸는 p의 paraPrIDRef
+        tbl_p_paraPrIDRef = None
+        for p in sroot.findall(f'{_HP}p'):
+            if p.find(f'.//{_HP}tbl') is not None:
+                tbl_p_paraPrIDRef = p.get('paraPrIDRef')
+                break
 
         # 셀 추출
         cells = []
@@ -191,6 +234,8 @@ def _extract_tables(sroot, hroot):
             'row_heights': row_heights,
             'outMargin': int(om.get('left', 0)) if om is not None else 0,
             'inMargin': int(im.get('left', 0)) if im is not None else 0,
+            'pos': pos_attrs,
+            'tbl_p_paraPrIDRef': tbl_p_paraPrIDRef,
             'cells': cells,
             'merges': merges,
         }
@@ -470,8 +515,54 @@ def generate_form(form_data, output_path):
                 doc.add_paragraph(text, char_pr_id_ref=default_cpr)
 
     # 6. 표 생성
+    # 원본이 secPr+표를 같은 p에 넣는 경우: pyhwpxlib add_table이 별도 p를 만들므로
+    # 생성 후 secPr p에 표를 이동시킴
+    secpr_same_p = form_data.get('secpr_and_tbl_same_p', False)
+
     for tbl_data in form_data['tables']:
         _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
+
+        # 표를 감싸는 p의 paraPrIDRef 설정 (표 가운데 정렬 등)
+        orig_tbl_ppr = tbl_data.get('tbl_p_paraPrIDRef')
+        if orig_tbl_ppr is not None:
+            section_el = sec.element if hasattr(sec, 'element') else sec._element
+            for p in section_el.findall(f'{_HP}p'):
+                if p.find(f'.//{_HP}tbl') is not None:
+                    # 원본 paraPr의 horizontal로 매칭
+                    orig_pp_info = form_data['para_properties'].get(orig_tbl_ppr, {})
+                    horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+                    ml = orig_pp_info.get('margin_left', 0)
+                    mr = orig_pp_info.get('margin_right', 0)
+                    ls = orig_pp_info.get('lineSpacing', 0)
+                    ppid = get_or_create_paraPr(horz, ls, ml, mr)
+                    p.set('paraPrIDRef', ppid)
+                    break
+
+    # secPr+표 같은 p 패턴 적용: 표 p를 제거하고 secPr p의 run으로 이동
+    if secpr_same_p:
+        try:
+            section_el = sec.element if hasattr(sec, 'element') else sec._element
+            sec_ps = list(section_el.findall(f'{_HP}p'))
+            secpr_p = None
+            tbl_p = None
+            for p in sec_ps:
+                if p.find(f'.//{_HP}secPr') is not None:
+                    secpr_p = p
+                if p.find(f'.//{_HP}tbl') is not None:
+                    tbl_p = p
+            if secpr_p is not None and tbl_p is not None and secpr_p is not tbl_p:
+                # 표 p의 paraPrIDRef를 secPr p에 적용
+                tbl_ppr = tbl_p.get('paraPrIDRef')
+                if tbl_ppr:
+                    secpr_p.set('paraPrIDRef', tbl_ppr)
+                # 표 run을 secPr p로 이동
+                for run in list(tbl_p.findall(f'{_HP}run')):
+                    tbl_p.remove(run)
+                    secpr_p.append(run)
+                # 빈 tbl p 제거
+                section_el.remove(tbl_p)
+        except Exception:
+            pass
 
     # paraPr itemCnt 업데이트
     pp_container.set("itemCnt", str(len(pp_container)))
@@ -492,6 +583,14 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     in_margin = tbl.get('inMargin', 140)
 
     table = doc.add_table(rows, cols, width=tw)
+
+    # 표 pos 속성 원본값 복원
+    orig_pos = tbl.get('pos', {})
+    if orig_pos:
+        pos_el = table.element.find(f"{_HP}pos")
+        if pos_el is not None:
+            for k, v in orig_pos.items():
+                pos_el.set(k, v)
 
     # 표 크기
     sz_el = table.element.find(f"{_HP}sz")
