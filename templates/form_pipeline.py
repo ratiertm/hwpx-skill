@@ -21,7 +21,7 @@ _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
 # ============================================================
 
 def extract_form(path):
-    """서식 파일에서 재생성에 필요한 모든 구조 데이터 추출"""
+    """서식 파일에서 재생성에 필요한 모든 구조 데이터 추출 — p 단위"""
     with zipfile.ZipFile(path) as z:
         header_xml = z.read('Contents/header.xml').decode('utf-8')
         section_xml = z.read('Contents/section0.xml').decode('utf-8')
@@ -29,13 +29,14 @@ def extract_form(path):
     hroot = ET.fromstring(header_xml)
     sroot = ET.fromstring(section_xml)
 
-    # p 구조 분석: secPr+표가 같은 p인지
-    p_count = len(sroot.findall(f'{_HP}p'))
-    secpr_and_tbl_same_p = False
+    # paraPr 매핑 (셀 추출에 필요)
+    ppr_map = _build_ppr_map(hroot)
+
+    # p 단위 구조 추출
+    paragraphs = []
     for p in sroot.findall(f'{_HP}p'):
-        if p.find(f'.//{_HP}secPr') is not None and p.find(f'.//{_HP}tbl') is not None:
-            secpr_and_tbl_same_p = True
-            break
+        para = _extract_paragraph(p, ppr_map)
+        paragraphs.append(para)
 
     form = {
         '_source': os.path.basename(path),
@@ -44,10 +45,14 @@ def extract_form(path):
         'char_properties': _extract_char_properties(hroot),
         'para_properties': _extract_para_properties(hroot),
         'border_fills': _extract_border_fills(hroot),
+        'paragraphs': paragraphs,
+        # 하위 호환: 기존 필드도 유지
         'tables': _extract_tables(sroot, hroot),
         'before_table_text': _extract_before_table_text(sroot),
-        'p_count': p_count,
-        'secpr_and_tbl_same_p': secpr_and_tbl_same_p,
+        'p_count': len(paragraphs),
+        'secpr_and_tbl_same_p': any(
+            p.get('has_secpr') and p.get('has_table') for p in paragraphs
+        ),
     }
     return form
 
@@ -138,6 +143,119 @@ def _extract_border_fills(hroot):
                 }
         result[bfid] = borders
     return result
+
+
+def _build_ppr_map(hroot):
+    """paraPr id → 정보 매핑"""
+    ppr_map = {}
+    for pp in hroot.findall(f'.//{_HH}paraPr'):
+        pid = pp.get('id')
+        a = pp.find(f'{_HH}align')
+        ls = pp.find(f'{_HH}lineSpacing')
+        m = pp.find(f'{_HH}margin')
+        info = {'horizontal': a.get('horizontal', 'JUSTIFY') if a is not None else 'JUSTIFY'}
+        if ls is not None:
+            info['lineSpacing'] = int(ls.get('value', 0))
+        if m is not None:
+            for ch in m:
+                tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
+                val = int(ch.get('value', '0'))
+                if val != 0:
+                    info[f'margin_{tag}'] = val
+        ppr_map[pid] = info
+    return ppr_map
+
+
+def _extract_paragraph(p, ppr_map):
+    """단일 p의 전체 구조 추출"""
+    has_secpr = p.find(f'.//{_HP}secPr') is not None
+    ppr_id = p.get('paraPrIDRef', '0')
+
+    # run별 내용 추출
+    runs = []
+    for run in p.findall(f'{_HP}run'):
+        cpr = run.get('charPrIDRef', '0')
+        run_data = {'charPrIDRef': cpr, 'contents': []}
+
+        for ch in run:
+            tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
+
+            if tag == 't':
+                txt = ch.text if ch.text else ''
+                run_data['contents'].append({'type': 'text', 'text': txt})
+
+            elif tag == 'tbl':
+                tbl_data = _extract_single_table(ch, ppr_map)
+                run_data['contents'].append({'type': 'table', 'table': tbl_data})
+
+            elif tag == 'secPr':
+                run_data['contents'].append({'type': 'secPr'})
+
+            elif tag == 'ctrl':
+                run_data['contents'].append({'type': 'ctrl'})
+            # linesegarray, 기타는 스킵 (한컴 자동 생성)
+
+        runs.append(run_data)
+
+    # 표 포함 여부
+    has_table = any(
+        c['type'] == 'table'
+        for r in runs for c in r['contents']
+    )
+    # 텍스트 추출
+    texts = []
+    for r in runs:
+        for c in r['contents']:
+            if c['type'] == 'text' and c['text'].strip():
+                texts.append(c['text'])
+
+    return {
+        'paraPrIDRef': ppr_id,
+        'has_secpr': has_secpr,
+        'has_table': has_table,
+        'texts': texts,
+        'runs': runs,
+    }
+
+
+def _extract_single_table(tbl, ppr_map):
+    """단일 표(중첩 포함) 추출 — 재귀"""
+    rows = int(tbl.get('rowCnt', 0))
+    cols = int(tbl.get('colCnt', 0))
+    sz = tbl.find(f'{_HP}sz')
+    tw = int(sz.get('width', 0)) if sz is not None else 0
+    th = int(sz.get('height', 0)) if sz is not None else 0
+
+    om = tbl.find(f'{_HP}outMargin')
+    im = tbl.find(f'{_HP}inMargin')
+    pos = tbl.find(f'{_HP}pos')
+
+    # 직계 셀만 추출 (tr > tc)
+    cells = []
+    for tr in tbl.findall(f'{_HP}tr'):
+        for tc in tr.findall(f'{_HP}tc'):
+            cell = _extract_cell(tc, ppr_map)
+            cells.append(cell)
+
+    # 그리드 역산
+    col_widths, row_heights = _reverse_grid(cells, cols, rows)
+
+    # 병합 추출
+    merges = _extract_merges(cells)
+
+    return {
+        'rows': rows, 'cols': cols,
+        'width': tw, 'height': th,
+        'col_widths': col_widths,
+        'row_heights': row_heights,
+        'outMargin': int(om.get('left', 0)) if om is not None else 0,
+        'inMargin': int(im.get('left', 0)) if im is not None else 0,
+        'pos': dict(pos.attrib) if pos is not None else {},
+        'borderFillIDRef': tbl.get('borderFillIDRef', '1'),
+        'pageBreak': tbl.get('pageBreak', 'CELL'),
+        'cells': cells,
+        'merges': merges,
+    }
 
 
 def _extract_before_table_text(sroot):
@@ -263,8 +381,9 @@ def _extract_cell(tc, ppr_map):
     has_margin = tc.get('hasMargin', '0')
     cell_margin = int(cm.get('left', 141)) if cm is not None else 141
 
-    # 줄별 정보 (paraPr + charPr + text)
+    # 줄별 정보 (paraPr + charPr + text) + 중첩 표
     lines = []
+    nested_tables = []
     if sub is not None:
         for p in sub.findall(f'{_HP}p'):
             ppr = p.get('paraPrIDRef', '0')
@@ -276,6 +395,10 @@ def _extract_cell(tc, ppr_map):
                 t = run.find(f'{_HP}t')
                 txt = t.text if t is not None and t.text else ''
                 runs_data.append({'charPr': cpr, 'text': txt})
+
+                # 중첩 표 추출 (재귀)
+                for ntbl in run.findall(f'{_HP}tbl'):
+                    nested_tables.append(_extract_single_table(ntbl, ppr_map))
 
             lines.append({
                 'paraPr': ppr,
@@ -293,6 +416,7 @@ def _extract_cell(tc, ppr_map):
         'borderFillIDRef': bf,
         'cellMargin': cell_margin,
         'lines': lines,
+        'nested_tables': nested_tables,
     }
 
 
@@ -490,87 +614,138 @@ def generate_form(form_data, output_path):
         next_bf += 1
     bf_container.set("itemCnt", str(len(bf_container)))
 
-    # 5. 표 앞 텍스트 — secPr 문단의 run으로 추가 (별도 p 만들지 않음)
-    #    원본 패턴: secPr p에 텍스트 run 포함 + linesegarray
-    before_texts = form_data.get('before_table_text', [])
-    if before_texts:
-        default_cpr = cpr_map.get('4', cpr_map.get('0', 0))
-        # secPr이 있는 첫 번째 p 찾기
-        section_el = sec.element if hasattr(sec, 'element') else sec._element
-        sec_ps = section_el.findall(f'{_HP}p')
-        secpr_p = None
-        for p in sec_ps:
-            if p.find(f'.//{_HP}secPr') is not None:
-                secpr_p = p
-                break
+    # 5. p 단위 생성 (paragraphs 기반)
+    paragraphs = form_data.get('paragraphs', [])
 
-        if secpr_p is not None:
-            # secPr p에 텍스트 run 추가
-            for text in before_texts:
-                run = LET.SubElement(secpr_p, f'{_HP}run')
-                run.set('charPrIDRef', str(default_cpr))
-                t = LET.SubElement(run, f'{_HP}t')
-                t.text = text
-        else:
-            # fallback: 별도 p
+    if paragraphs:
+        _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
+                                  get_or_create_paraPr, form_data)
+    else:
+        # 하위 호환: 기존 tables + before_table_text 방식
+        before_texts = form_data.get('before_table_text', [])
+        if before_texts:
+            default_cpr = cpr_map.get('4', cpr_map.get('0', 0))
             for text in before_texts:
                 doc.add_paragraph(text, char_pr_id_ref=default_cpr)
-
-    # 6. 표 생성
-    # 원본이 secPr+표를 같은 p에 넣는 경우: pyhwpxlib add_table이 별도 p를 만들므로
-    # 생성 후 secPr p에 표를 이동시킴
-    secpr_same_p = form_data.get('secpr_and_tbl_same_p', False)
-
-    for tbl_data in form_data['tables']:
-        _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
-
-        # 표를 감싸는 p의 paraPrIDRef 설정 (표 가운데 정렬 등)
-        orig_tbl_ppr = tbl_data.get('tbl_p_paraPrIDRef')
-        if orig_tbl_ppr is not None:
-            section_el = sec.element if hasattr(sec, 'element') else sec._element
-            for p in section_el.findall(f'{_HP}p'):
-                if p.find(f'.//{_HP}tbl') is not None:
-                    # 원본 paraPr의 horizontal로 매칭
-                    orig_pp_info = form_data['para_properties'].get(orig_tbl_ppr, {})
-                    horz = orig_pp_info.get('horizontal', 'JUSTIFY')
-                    ml = orig_pp_info.get('margin_left', 0)
-                    mr = orig_pp_info.get('margin_right', 0)
-                    ls = orig_pp_info.get('lineSpacing', 0)
-                    ppid = get_or_create_paraPr(horz, ls, ml, mr)
-                    p.set('paraPrIDRef', ppid)
-                    break
-
-    # secPr+표 같은 p 패턴 적용: 표 p를 제거하고 secPr p의 run으로 이동
-    if secpr_same_p:
-        try:
-            section_el = sec.element if hasattr(sec, 'element') else sec._element
-            sec_ps = list(section_el.findall(f'{_HP}p'))
-            secpr_p = None
-            tbl_p = None
-            for p in sec_ps:
-                if p.find(f'.//{_HP}secPr') is not None:
-                    secpr_p = p
-                if p.find(f'.//{_HP}tbl') is not None:
-                    tbl_p = p
-            if secpr_p is not None and tbl_p is not None and secpr_p is not tbl_p:
-                # 표 p의 paraPrIDRef를 secPr p에 적용
-                tbl_ppr = tbl_p.get('paraPrIDRef')
-                if tbl_ppr:
-                    secpr_p.set('paraPrIDRef', tbl_ppr)
-                # 표 run을 secPr p로 이동
-                for run in list(tbl_p.findall(f'{_HP}run')):
-                    tbl_p.remove(run)
-                    secpr_p.append(run)
-                # 빈 tbl p 제거
-                section_el.remove(tbl_p)
-        except Exception:
-            pass
+        for tbl_data in form_data['tables']:
+            _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
 
     # paraPr itemCnt 업데이트
     pp_container.set("itemCnt", str(len(pp_container)))
 
     doc.save_to_path(output_path)
     return output_path
+
+
+def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
+                               get_or_create_paraPr, form_data):
+    """p 단위로 원본 구조를 재생성 — 다중 페이지/다중 표 지원"""
+    try:
+        from lxml import etree as LET
+    except ImportError:
+        import xml.etree.ElementTree as LET
+
+    section_el = sec.element if hasattr(sec, 'element') else sec._element
+
+    # pyhwpxlib가 만든 기본 secPr p 찾기
+    base_secpr_p = None
+    for p in list(section_el.findall(f'{_HP}p')):
+        if p.find(f'.//{_HP}secPr') is not None:
+            base_secpr_p = p
+            break
+
+    # 첫 번째 p(secPr 포함)는 이미 존재 — 나머지 p의 내용을 추가
+    first_para = True
+    for para_data in paragraphs:
+        if para_data['has_secpr'] and first_para:
+            # secPr p는 이미 존재 — 여기에 텍스트/표 run 추가
+            target_p = base_secpr_p
+            first_para = False
+
+            if target_p is None:
+                continue
+
+            # 원본 paraPrIDRef 적용
+            orig_ppr = para_data.get('paraPrIDRef', '0')
+            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+            ls = orig_pp_info.get('lineSpacing', 0)
+            ml = orig_pp_info.get('margin_left', 0)
+            mr = orig_pp_info.get('margin_right', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr)
+            target_p.set('paraPrIDRef', ppid)
+
+            # run 내용 추가 (secPr/ctrl 제외, 텍스트/표만)
+            for run_data in para_data['runs']:
+                new_cpr = cpr_map.get(run_data['charPrIDRef'], 0)
+                for content in run_data['contents']:
+                    if content['type'] == 'text' and content['text'].strip():
+                        run = LET.SubElement(target_p, f'{_HP}run')
+                        run.set('charPrIDRef', str(new_cpr))
+                        t = LET.SubElement(run, f'{_HP}t')
+                        t.text = content['text']
+                    elif content['type'] == 'table':
+                        # 표를 add_table로 생성 후 secPr p로 이동
+                        tbl_data = content['table']
+                        _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
+                        # 방금 생성된 표 p를 찾아서 secPr p로 이동
+                        for p in list(section_el.findall(f'{_HP}p')):
+                            if p is not target_p and p.find(f'.//{_HP}tbl') is not None:
+                                for run in list(p.findall(f'{_HP}run')):
+                                    p.remove(run)
+                                    target_p.append(run)
+                                section_el.remove(p)
+                                break
+
+        elif para_data['has_table']:
+            # 표 포함 p — 표 생성
+            for run_data in para_data['runs']:
+                for content in run_data['contents']:
+                    if content['type'] == 'table':
+                        tbl_data = content['table']
+                        _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
+
+                        # 표를 감싸는 p의 paraPrIDRef 설정
+                        orig_ppr = para_data.get('paraPrIDRef', '0')
+                        orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+                        horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+                        ls = orig_pp_info.get('lineSpacing', 0)
+                        ml = orig_pp_info.get('margin_left', 0)
+                        mr = orig_pp_info.get('margin_right', 0)
+                        ppid = get_or_create_paraPr(horz, ls, ml, mr)
+
+                        # 마지막으로 추가된 표 p 찾아서 paraPrIDRef 설정
+                        for p in reversed(list(section_el.findall(f'{_HP}p'))):
+                            if p.find(f'.//{_HP}tbl') is not None:
+                                p.set('paraPrIDRef', ppid)
+                                break
+
+            first_para = False
+
+        elif para_data['texts']:
+            # 텍스트 전용 p
+            default_cpr = cpr_map.get(
+                para_data['runs'][0]['charPrIDRef'] if para_data['runs'] else '0', 0)
+            for text in para_data['texts']:
+                doc.add_paragraph(text, char_pr_id_ref=default_cpr)
+
+            # paraPrIDRef 설정
+            orig_ppr = para_data.get('paraPrIDRef', '0')
+            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+            ls = orig_pp_info.get('lineSpacing', 0)
+            ppid = get_or_create_paraPr(horz, ls)
+            # 마지막 추가된 p에 적용
+            last_p = list(section_el.findall(f'{_HP}p'))[-1]
+            last_p.set('paraPrIDRef', ppid)
+
+            first_para = False
+
+        else:
+            # 빈 p (구분선 등)
+            if not first_para:
+                doc.add_paragraph("")
+            first_para = False
 
 
 def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
@@ -717,6 +892,112 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         line.get('margin_right', 0),
                     )
                     p.set("paraPrIDRef", ppid)
+        except Exception:
+            pass
+
+    # 중첩 표 생성 — 셀 안에 표 삽입 (재귀)
+    try:
+        from lxml import etree as LET2
+    except ImportError:
+        import xml.etree.ElementTree as LET2
+
+    for cell_data in tbl['cells']:
+        nested = cell_data.get('nested_tables', [])
+        if not nested:
+            continue
+        r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
+        try:
+            cell = table.cell(r, c)
+            sub = cell.element.find(f"{_HP}subList")
+            if sub is None:
+                continue
+
+            for ntbl_data in nested:
+                # 중첩 표를 위한 새 p > run > tbl 구조 생성
+                # 임시로 doc.add_table 사용 후 표 element를 셀 안으로 이동
+                ntbl_rows = ntbl_data['rows']
+                ntbl_cols = ntbl_data['cols']
+                ntbl_w = ntbl_data['width']
+                ntbl_h = ntbl_data['height']
+
+                # 임시 표 생성
+                temp_tbl = doc.add_table(ntbl_rows, ntbl_cols, width=ntbl_w)
+
+                # 표 크기 설정
+                nsz = temp_tbl.element.find(f"{_HP}sz")
+                nsz.set("width", str(ntbl_w))
+                nsz.set("height", str(ntbl_h))
+
+                # pos 복원
+                npos = temp_tbl.element.find(f"{_HP}pos")
+                if npos is not None and ntbl_data.get('pos'):
+                    for k, v in ntbl_data['pos'].items():
+                        npos.set(k, v)
+
+                # 셀 크기 + 텍스트
+                ncol_widths = ntbl_data.get('col_widths', [])
+                nrow_heights = ntbl_data.get('row_heights', [])
+                for nr in range(ntbl_rows):
+                    for nc in range(ntbl_cols):
+                        try:
+                            ncell = temp_tbl.cell(nr, nc)
+                            cw = ncol_widths[nc] if nc < len(ncol_widths) and ncol_widths[nc] else ntbl_w // ntbl_cols
+                            rh = nrow_heights[nr] if nr < len(nrow_heights) and nrow_heights[nr] else 3600
+                            ncell.set_size(width=cw, height=rh)
+                        except:
+                            pass
+
+                # 셀 텍스트
+                for ncell_data in ntbl_data.get('cells', []):
+                    nr, nc = ncell_data['row'], ncell_data['col']
+                    if nr >= ntbl_rows or nc >= ntbl_cols:
+                        continue
+                    text_parts = []
+                    for line in ncell_data.get('lines', []):
+                        line_text = ''.join(run['text'] for run in line.get('runs', []))
+                        text_parts.append(line_text)
+                    full_text = '\n'.join(text_parts)
+                    if full_text.strip():
+                        try:
+                            temp_tbl.set_cell_text(nr, nc, full_text)
+                        except:
+                            pass
+
+                # 병합
+                for m in ntbl_data.get('merges', []):
+                    if m['r2'] < ntbl_rows and m['c2'] < ntbl_cols:
+                        try:
+                            temp_tbl.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
+                        except:
+                            pass
+
+                # 생성된 표 element를 셀의 subList 안으로 이동
+                section_el = doc.sections[0].element if hasattr(doc.sections[0], 'element') else doc.sections[0]._element
+                for sp in list(section_el.findall(f'{_HP}p')):
+                    tbl_el = sp.find(f'.//{_HP}tbl')
+                    if tbl_el is not None and tbl_el is temp_tbl.element:
+                        # 이 p에서 tbl을 꺼내서 셀의 subList로 이동
+                        new_p = LET2.SubElement(sub, f'{_HP}p')
+                        new_p.set('id', '0')
+                        new_p.set('paraPrIDRef', '0')
+                        new_p.set('styleIDRef', '0')
+                        new_p.set('pageBreak', '0')
+                        new_p.set('columnBreak', '0')
+                        new_p.set('merged', '0')
+                        new_run = LET2.SubElement(new_p, f'{_HP}run')
+                        new_run.set('charPrIDRef', '0')
+                        # tbl element를 run 안으로
+                        for run in sp.findall(f'{_HP}run'):
+                            for ch in list(run):
+                                tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
+                                if tag == 'tbl':
+                                    run.remove(ch)
+                                    new_run.append(ch)
+                        # 빈 p 제거
+                        section_el.remove(sp)
+                        break
         except Exception:
             pass
 
