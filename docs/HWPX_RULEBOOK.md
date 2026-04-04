@@ -678,3 +678,99 @@ para['pageBreak'] = p.get('pageBreak', '0')
 if para_data.get('pageBreak', '0') != '0':
     last_p.set('pageBreak', para_data['pageBreak'])
 ```
+
+## 24. 서식 자동화: pyhwpxlib 재생성 vs 원본 ZIP 텍스트 교체
+
+**핵심 발견 (2026-04-05)**:
+
+pyhwpxlib API로 HWPX를 처음부터 재생성하면 header.xml(styles, paraProperties, charProperties)이
+원본과 달라져서 서식이 깨진다. 특히:
+
+- `condense` (글자 간격 축소율) 누락 → JUSTIFY 정렬 시 글자 벌어짐
+- `breakSetting` (breakLatinWord/breakNonLatinWord) 반전 → 줄바꿈 동작 변경
+- `styleIDRef` 누락 → 스타일 기반 들여쓰기(margin_intent) 미적용
+- `margin_intent` (들여쓰기) 누락 → 줄 길이 변경으로 정렬 깨짐
+
+```
+❌ 재생성 방식 (서식 깨짐):
+원본 → extract(JSON) → pyhwpxlib로 새 HWPX 생성 → header가 다름
+
+✅ 텍스트 교체 방식 (서식 100% 보존):
+원본 ZIP 복사 → section0.xml 내 텍스트만 교체 → header 그대로
+```
+
+## 25. 텍스트 교체 방식 — 구현 패턴
+
+원본 HWPX/OWPML을 템플릿으로, 데이터만 교체하여 자동화:
+
+```python
+import zipfile, shutil
+
+src = 'template.hwpx'
+dst = 'output.hwpx'
+shutil.copy2(src, dst)
+
+with zipfile.ZipFile(dst, 'r') as z:
+    all_files = {name: z.read(name) for name in z.namelist()}
+
+section_xml = all_files['Contents/section0.xml'].decode('utf-8')
+
+# 텍스트 교체 (원본 XML 문자열 직접 치환 → 구조 보존)
+section_xml = section_xml.replace('>성 명<', '>성 명  홍길동<', 1)
+
+# 체크박스: [  ] → [√]
+section_xml = section_xml.replace('민간기업 [  ]', '민간기업 [√]', 1)
+
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zout:
+    for name, data in all_files.items():
+        if name == 'Contents/section0.xml':
+            zout.writestr(name, section_xml.encode('utf-8'))
+        else:
+            zout.writestr(name, data)
+```
+
+**주의사항**:
+- `ET.tostring()`으로 재직렬화하면 네임스페이스 선언이 바뀌어 Whale에서 에러 발생
+- 반드시 **원본 XML 문자열을 직접 교체**할 것 (`.replace()` 사용)
+- `replace(old, new, 1)` — 첫 번째만 교체하여 다른 페이지 보호
+
+## 26. body 텍스트 multi-run charPr 보존
+
+form_pipeline.py에서 body 텍스트(표 바깥) 생성 시, `add_paragraph()` 대신
+직접 p/run XML을 구성해야 run 단위 charPr(볼드, 색깔, 폰트 크기)이 보존된다.
+
+```python
+# ❌ add_paragraph → 단일 run만 생성, charPr 손실
+doc.add_paragraph(text, char_pr_id_ref=default_cpr)
+
+# ✅ 직접 p/run XML 구성 → run별 charPr 보존
+new_p = LET.SubElement(section_el, f"{_HP}p")
+new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
+new_p.set("styleIDRef", para_data.get('styleIDRef', '0'))
+for run_data in para_data['runs']:
+    new_cpr = cpr_map.get(run_data.get('charPrIDRef', '0'), 0)
+    for content in run_data['contents']:
+        if content['type'] == 'text':
+            new_run = LET.SubElement(new_p, f"{_HP}run")
+            new_run.set("charPrIDRef", str(new_cpr))
+            t_el = LET.SubElement(new_run, f"{_HP}t")
+            t_el.text = content['text'] or None
+```
+
+## 27. paraPr 생성 시 필수 속성
+
+pyhwpxlib의 base paraPr을 deep copy할 때, 원본과 다른 속성을 반드시 보정:
+
+| 속성 | 위치 | 역할 | 미적용 시 |
+|------|------|------|----------|
+| `condense` | paraPr 속성 | 글자 간격 축소율 (%) | JUSTIFY 시 글자 벌어짐 |
+| `margin_intent` | margin > intent | 들여쓰기 | 줄 길이 변경, 정렬 깨짐 |
+| `styleIDRef` | p 속성 | 단락 스타일 참조 | 스타일 기반 속성 누락 |
+| `breakLatinWord` | breakSetting | 영문 단어 줄바꿈 | 줄바꿈 위치 변경 |
+
+추출 시 `_extract_para_properties()`에서 `condense` 반드시 포함:
+```python
+cd = int(pp.get('condense', '0'))
+if cd:
+    info['condense'] = cd
+```

@@ -140,10 +140,13 @@ def _extract_para_properties(hroot):
         if margin is None:
             margin = pp.find(f'.//{_HH}margin')  # switch 안 탐색
 
+        cd = int(pp.get('condense', '0'))
         info = {
             'horizontal': align.get('horizontal', 'JUSTIFY') if align is not None else 'JUSTIFY',
             'lineSpacing': int(ls.get('value', 0)) if ls is not None else 0,
         }
+        if cd:
+            info['condense'] = cd
 
         if margin is not None:
             for ch in margin:
@@ -194,6 +197,9 @@ def _build_ppr_map(hroot):
         if m is None:
             m = pp.find(f'.//{_HH}margin')
         info = {'horizontal': a.get('horizontal', 'JUSTIFY') if a is not None else 'JUSTIFY'}
+        cd = pp.get('condense', '0')
+        if cd and cd != '0':
+            info['condense'] = int(cd)
         if ls is not None:
             info['lineSpacing'] = int(ls.get('value', 0))
         if m is not None:
@@ -251,6 +257,7 @@ def _extract_paragraph(p, ppr_map):
 
     return {
         'paraPrIDRef': ppr_id,
+        'styleIDRef': p.get('styleIDRef', '0'),
         'has_secpr': has_secpr,
         'has_table': has_table,
         'pageBreak': p.get('pageBreak', '0'),
@@ -588,8 +595,8 @@ def generate_form(form_data, output_path):
 
     import copy
 
-    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0, mp=0, mn=0, mi=0):
-        key = (horz, ls, ml, mr, mp, mn, mi)
+    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0, mp=0, mn=0, mi=0, cd=0):
+        key = (horz, ls, ml, mr, mp, mn, mi, cd)
         if key in ppr_map:
             return ppr_map[key]
 
@@ -600,20 +607,22 @@ def generate_form(form_data, output_path):
                 if a is not None and a.get("horizontal") == horz:
                     pp_ls = pp.find(f'.//{_HH}lineSpacing')
                     pp_ls_val = int(pp_ls.get('value', 0)) if pp_ls is not None else 0
-                    if pp_ls_val == ls or (ls == 0 and pp_ls_val == 0):
+                    pp_cd = int(pp.get('condense', '0'))
+                    if (pp_ls_val == ls or (ls == 0 and pp_ls_val == 0)) and pp_cd == cd:
                         ppr_map[key] = pp.get("id")
                         return pp.get("id")
 
         nonlocal next_pp_id
         pid = str(next_pp_id)
 
-        # paraPr[0] 전체를 deep copy한 후 horizontal + lineSpacing 변경
         if base_pp is not None:
             new_pp = copy.deepcopy(base_pp)
             new_pp.set("id", pid)
             a = new_pp.find(f"{_HH}align")
             if a is not None:
                 a.set("horizontal", horz)
+            # condense 설정
+            new_pp.set("condense", str(cd))
             # lineSpacing 변경
             if ls > 0:
                 for ls_el in new_pp.findall(f'.//{_HH}lineSpacing'):
@@ -630,11 +639,10 @@ def generate_form(form_data, output_path):
                                 el.set("value", str(val))
             pp_container.append(new_pp)
         else:
-            # fallback: 최소 구조
             pp_el = LET.SubElement(pp_container, f"{_HH}paraPr")
             pp_el.set("id", pid)
             pp_el.set("tabPrIDRef", "0")
-            pp_el.set("condense", "0")
+            pp_el.set("condense", str(cd))
             a = LET.SubElement(pp_el, f"{_HH}align")
             a.set("horizontal", horz)
             a.set("vertical", "BASELINE")
@@ -772,7 +780,13 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
             horz = orig_pp_info.get('horizontal', 'JUSTIFY')
             ls = orig_pp_info.get('lineSpacing', 0)
-            ppid = get_or_create_paraPr(horz, ls)
+            ml = orig_pp_info.get('margin_left', 0)
+            mr = orig_pp_info.get('margin_right', 0)
+            mp = orig_pp_info.get('margin_prev', 0)
+            mn = orig_pp_info.get('margin_next', 0)
+            mi = orig_pp_info.get('margin_intent', 0)
+            cd = orig_pp_info.get('condense', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi, cd=cd)
             target_p.set('paraPrIDRef', ppid)
 
             # run 내용 추가 (secPr/ctrl 제외, 텍스트/표만)
@@ -808,9 +822,15 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
                         # 표를 감싸는 p의 paraPrIDRef 설정
                         orig_ppr = para_data.get('paraPrIDRef', '0')
                         orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
-                        horz = orig_pp_info.get('horizontal', 'LEFT')
+                        horz = orig_pp_info.get('horizontal', 'JUSTIFY')
                         ls = orig_pp_info.get('lineSpacing', 0)
-                        ppid = get_or_create_paraPr(horz, ls)
+                        ml = orig_pp_info.get('margin_left', 0)
+                        mr = orig_pp_info.get('margin_right', 0)
+                        mp = orig_pp_info.get('margin_prev', 0)
+                        mn = orig_pp_info.get('margin_next', 0)
+                        mi = orig_pp_info.get('margin_intent', 0)
+                        cd = orig_pp_info.get('condense', 0)
+                        ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi, cd=cd)
 
                         # 마지막으로 추가된 표 p 찾아서 paraPrIDRef 설정
                         for p in reversed(list(section_el.findall(f'{_HP}p'))):
@@ -826,11 +846,18 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
             horz = orig_pp_info.get('horizontal', 'JUSTIFY')
             ls = orig_pp_info.get('lineSpacing', 0)
-            ppid = get_or_create_paraPr(horz, ls)
+            ml = orig_pp_info.get('margin_left', 0)
+            mr = orig_pp_info.get('margin_right', 0)
+            mp = orig_pp_info.get('margin_prev', 0)
+            mn = orig_pp_info.get('margin_next', 0)
+            mi = orig_pp_info.get('margin_intent', 0)
+            cd = orig_pp_info.get('condense', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi, cd=cd)
 
             new_p = LET.SubElement(section_el, f"{_HP}p")
             new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
-            new_p.set("styleIDRef", "0"); new_p.set("pageBreak", "0")
+            new_p.set("styleIDRef", para_data.get('styleIDRef', '0'))
+            new_p.set("pageBreak", "0")
             new_p.set("columnBreak", "0"); new_p.set("merged", "0")
 
             for run_data in para_data['runs']:
