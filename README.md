@@ -308,6 +308,12 @@ This project is functional but has real constraints that affect practical use:
 - Cell padding requires `hasMargin="1"`
 - CSS files control document styling, changes apply without server restart
 
+**Form clone pipeline (`templates/form_pipeline.py`)**
+- `clone <input.hwpx> -o <output.hwpx>` -- one command to clone any form
+- Preserves original fonts (11+), charPr (94+), borderFill (66+) via post-save header replacement
+- Multi-page support with nested tables, per-run charPr, marker-based table insertion
+- pageBreak, cellMargin, lineSpacing, fillColor all preserved from original
+
 **OWPML table sizing rules ([OWPML_TABLE_SIZING.md](docs/OWPML_TABLE_SIZING.md))**
 - No explicit column definitions -- all sizing lives in `cellSz` per cell
 - Hidden column grid: `SUM(col_widths) == tbl.sz.width` (exact match)

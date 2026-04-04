@@ -566,3 +566,115 @@ p[8] CENTER    | 세 무 서 장 귀 하
 | 구분선 없음 | NONE 0.1mm |
 
 셀마다 4변(left/right/top/bottom) 테두리가 독립 — 위치에 따라 17~21종 borderFill 조합
+
+## 19. 원본 header 보존 (post-save regex 교체) (2026-04-04)
+
+pyhwpxlib의 `save_to_path`가 header.xml을 재생성하므로, **save 후 ZIP 안의 header.xml을 원본 블록으로 교체**:
+
+```python
+# save 후 fontfaces/charProperties/borderFills를 원본 raw XML로 교체
+for tag in ['fontfaces', 'charProperties', 'borderFills']:
+    pattern = r'<[^>]*?' + tag + r'[^>]*>.*?</[^>]*?' + tag + r'>'
+    saved_header = re.sub(pattern, original_raw[tag], saved_header, flags=re.DOTALL)
+
+# paraPr의 border borderFillIDRef를 "1"(NONE)로 — 글자 박스 방지
+saved_header = re.sub(
+    r'(<[^>]*?border[^>]*borderFillIDRef=")[^"]*(")',
+    r'\g<1>1\2', saved_header)
+```
+
+**이유**: pyhwpxlib charPr/borderFill ID가 원본과 다름 → 원본 블록으로 교체하면 ID 일치
+
+**주의**: paraProperties는 교체하면 안 됨 (pyhwpxlib이 만든 paraPrIDRef와 불일치)
+
+## 20. run 단위 charPr 보존 (2026-04-04)
+
+원본은 같은 `<hp:p>` 안에 여러 `<hp:run>`이 각각 다른 charPrIDRef를 가짐:
+
+```xml
+<hp:p>
+  <hp:run charPrIDRef="54"><hp:t> ※ </hp:t></hp:run>
+  <hp:run charPrIDRef="55"><hp:t>위 개인정보의 수집·이용에...</hp:t></hp:run>
+  <hp:run charPrIDRef="46"><hp:t> 서비스 이용이</hp:t></hp:run>
+</hp:p>
+```
+
+**규칙**: 다중 run이 있는 셀은 `set_cell_text` 대신 **직접 p/run XML을 구성**:
+```python
+if has_multi_run or has_nested:
+    for old_p in sub.findall("hp:p"): sub.remove(old_p)
+    for line in lines:
+        new_p = SubElement(sub, "hp:p")
+        new_p.set("paraPrIDRef", ppid)  # get_or_create_paraPr로 결정
+        for run_data in line['runs']:
+            new_run = SubElement(new_p, "hp:run")
+            new_run.set("charPrIDRef", str(cpr_map[run_data['charPr']]))
+            t = SubElement(new_run, "hp:t")
+            t.text = run_data['text']
+```
+
+## 21. 중첩 표 삽입 순서 — 마커 기반 (2026-04-04)
+
+셀 안에 텍스트와 중첩 표가 섞여 있을 때, **순서 보존**이 핵심:
+
+```
+원본: 텍스트p → 표p → 텍스트p → 표p → 텍스트p
+```
+
+**방법**: 모든 line을 순서대로 처리, 중첩 표 line은 마커 p를 만들고 나중에 표로 교체:
+```python
+for line in lines:
+    if line.has_nested_tables:
+        marker_p = SubElement(sub, "hp:p")
+        marker_p.set("_nested_marker", "1")  # 나중에 표로 교체
+    else:
+        new_p = SubElement(sub, "hp:p")  # 텍스트 p
+        ...
+
+# 중첩 표 생성 후 마커 p를 찾아서 교체
+for mp in sub.findall("hp:p"):
+    if mp.get("_nested_marker") == "1":
+        idx = list(sub).index(mp)
+        sub.remove(mp)
+        sub.insert(idx, table_p)  # 표 p로 교체
+```
+
+## 22. 중첩 표 margin 규칙 (2026-04-04)
+
+| 항목 | 원본값 | pyhwpxlib 기본값 | 주의 |
+|------|--------|----------------|------|
+| 중첩 표 outMargin | 283 | 0 | 반드시 설정 |
+| 중첩 표 inMargin (L/R) | 510 | 0 | 반드시 설정 |
+| 중첩 표 inMargin (T/B) | 141 | 0 | 반드시 설정 |
+| 셀 cellMargin hasMargin | **0** | 1 (set_margin이 강제) | 직접 XML로 설정 |
+| 셀 cellMargin T/B | **141** | 510 | hasMargin=0이면 한컴 기본 |
+
+```python
+# ❌ set_margin은 hasMargin=1을 강제 설정
+ncell.set_margin(left=510, right=510, top=141, bottom=141)
+
+# ✅ 직접 XML로 설정 + hasMargin=0 유지
+cm_el = ncell.element.find("hp:cellMargin")
+cm_el.set("left", "510"); cm_el.set("right", "510")
+cm_el.set("top", "141"); cm_el.set("bottom", "141")
+ncell.element.set("hasMargin", "0")
+```
+
+## 23. pageBreak 속성 보존 (2026-04-04)
+
+`<hp:p pageBreak="1">`이면 해당 문단 앞에서 **페이지 나눔** 발생:
+
+```xml
+<!-- pageBreak="1": 이 p 앞에서 페이지 나눔 -->
+<hp:p pageBreak="1"><hp:run><hp:t>[별지 제2호 서식]</hp:t></hp:run></hp:p>
+```
+
+**규칙**: extract에서 `pageBreak` 추출 → generate에서 적용:
+```python
+# 추출
+para['pageBreak'] = p.get('pageBreak', '0')
+
+# 적용
+if para_data.get('pageBreak', '0') != '0':
+    last_p.set('pageBreak', para_data['pageBreak'])
+```
