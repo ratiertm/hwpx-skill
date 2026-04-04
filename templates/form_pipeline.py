@@ -927,16 +927,25 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                     sub.remove(old_p)
 
                 for line in cell_data['lines']:
+                    # 각 line의 paraPr 결정
+                    ppid = get_or_create_paraPr(
+                        line.get('horizontal', 'JUSTIFY'),
+                        line.get('lineSpacing', 0),
+                        line.get('margin_left', 0),
+                        line.get('margin_right', 0),
+                        line.get('margin_prev', 0),
+                        line.get('margin_next', 0),
+                    )
+
                     if line.get('nested_tables'):
-                        # 중첩 표 line — 표 생성 후 여기에 삽입 (마커 p)
                         marker_p = LET3.SubElement(sub, f"{_HP}p")
-                        marker_p.set("id", "0"); marker_p.set("paraPrIDRef", "0")
+                        marker_p.set("id", "0"); marker_p.set("paraPrIDRef", ppid)
                         marker_p.set("styleIDRef", "0"); marker_p.set("pageBreak", "0")
                         marker_p.set("columnBreak", "0"); marker_p.set("merged", "0")
-                        marker_p.set("_nested_marker", "1")  # 나중에 표로 교체
+                        marker_p.set("_nested_marker", "1")
                     else:
                         new_p = LET3.SubElement(sub, f"{_HP}p")
-                        new_p.set("id", "0"); new_p.set("paraPrIDRef", "0")
+                        new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
                         new_p.set("styleIDRef", "0"); new_p.set("pageBreak", "0")
                         new_p.set("columnBreak", "0"); new_p.set("merged", "0")
                         for run_data in line.get('runs', []):
@@ -1097,6 +1106,15 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                     for k, v in ntbl_data['pos'].items():
                         npos.set(k, v)
 
+                # outMargin + inMargin 원본값 복원
+                n_om = ntbl_data.get('outMargin', 283)
+                n_im = ntbl_data.get('inMargin', 510)
+                nom_el = temp_tbl.element.find(f"{_HP}outMargin")
+                if nom_el is not None:
+                    for k in ["left","right","top","bottom"]:
+                        nom_el.set(k, str(n_om))
+                temp_tbl.set_in_margin(left=n_im, right=n_im, top=141, bottom=141)
+
                 # 셀 크기 + 텍스트
                 ncol_widths = ntbl_data.get('col_widths', [])
                 nrow_heights = ntbl_data.get('row_heights', [])
@@ -1146,9 +1164,13 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         new_bf = bf_map.get(orig_bf, '1')
                         ncell.set_border_fill_id(new_bf)
 
-                        # cellMargin
-                        cm = ncell_data.get('cellMargin', 141)
-                        ncell.set_margin(left=cm, right=cm, top=cm, bottom=cm)
+                        # cellMargin — hasMargin=0 유지 (원본 패턴)
+                        cm_el = ncell.element.find(f"{_HP}cellMargin")
+                        if cm_el is not None:
+                            cm_val = ncell_data.get('cellMargin', 141)
+                            cm_el.set("left", str(cm_val)); cm_el.set("right", str(cm_val))
+                            cm_el.set("top", "141"); cm_el.set("bottom", "141")
+                        ncell.element.set("hasMargin", "0")
 
                         # lineSpacing — 줄별 paraPr 적용
                         nsub = ncell.element.find(f"{_HP}subList")
