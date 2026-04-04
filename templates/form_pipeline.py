@@ -909,14 +909,46 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         except ImportError:
             import xml.etree.ElementTree as LET3
 
-        has_multi_run = any(len(line.get('runs', [])) > 1 for line in cell_data['lines'] if not line.get('nested_tables'))
+        # 중첩 표 유무 + 다중 run 유무 판단
+        has_nested = any(line.get('nested_tables') for line in cell_data['lines'])
+        has_multi_run = any(len(line.get('runs', [])) > 1 for line in cell_data['lines'])
 
-        if not has_multi_run:
-            # 단일 run만 — set_cell_text 사용 (검증된 방식)
+        if has_multi_run or has_nested:
+            # 다중 run 또는 중첩 표 — 모든 line을 순서대로 직접 p/run 구성
+            try:
+                from lxml import etree as LET3
+            except ImportError:
+                import xml.etree.ElementTree as LET3
+
+            cell = table.cell(r, c)
+            sub = cell.element.find(f"{_HP}subList")
+            if sub is not None:
+                for old_p in list(sub.findall(f"{_HP}p")):
+                    sub.remove(old_p)
+
+                for line in cell_data['lines']:
+                    if line.get('nested_tables'):
+                        # 중첩 표 line — 표 생성 후 여기에 삽입 (마커 p)
+                        marker_p = LET3.SubElement(sub, f"{_HP}p")
+                        marker_p.set("id", "0"); marker_p.set("paraPrIDRef", "0")
+                        marker_p.set("styleIDRef", "0"); marker_p.set("pageBreak", "0")
+                        marker_p.set("columnBreak", "0"); marker_p.set("merged", "0")
+                        marker_p.set("_nested_marker", "1")  # 나중에 표로 교체
+                    else:
+                        new_p = LET3.SubElement(sub, f"{_HP}p")
+                        new_p.set("id", "0"); new_p.set("paraPrIDRef", "0")
+                        new_p.set("styleIDRef", "0"); new_p.set("pageBreak", "0")
+                        new_p.set("columnBreak", "0"); new_p.set("merged", "0")
+                        for run_data in line.get('runs', []):
+                            new_cpr = cpr_map.get(run_data.get('charPr', '0'), 0)
+                            new_run = LET3.SubElement(new_p, f"{_HP}run")
+                            new_run.set("charPrIDRef", str(new_cpr))
+                            t_el = LET3.SubElement(new_run, f"{_HP}t")
+                            t_el.text = run_data.get('text', '') or None
+        else:
+            # 단일 run + 중첩 표 없음 — set_cell_text 사용 (안정적)
             text_parts = []
             for line in cell_data['lines']:
-                if line.get('nested_tables'):
-                    continue
                 line_text = ''.join(run['text'] for run in line['runs'])
                 text_parts.append(line_text)
             full_text = '\n'.join(text_parts)
@@ -929,46 +961,18 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         try:
             cell = table.cell(r, c)
 
-            if has_multi_run:
-                # 다중 run — subList 내 p를 직접 구성
-                sub = cell.element.find(f"{_HP}subList")
-                if sub is not None:
-                    # 기존 p 모두 제거
-                    for old_p in list(sub.findall(f"{_HP}p")):
-                        sub.remove(old_p)
-                    # 원본 line별 p/run 구성
-                    for line in cell_data['lines']:
-                        if line.get('nested_tables'):
-                            continue  # 중첩 표는 나중에
-                        new_p = LET3.SubElement(sub, f"{_HP}p")
-                        new_p.set("id", "0")
-                        new_p.set("paraPrIDRef", "0")
-                        new_p.set("styleIDRef", "0")
-                        new_p.set("pageBreak", "0")
-                        new_p.set("columnBreak", "0")
-                        new_p.set("merged", "0")
-                        for run_data in line.get('runs', []):
-                            new_cpr = cpr_map.get(run_data.get('charPr', '0'), 0)
-                            new_run = LET3.SubElement(new_p, f"{_HP}run")
-                            new_run.set("charPrIDRef", str(new_cpr))
-                            t_el = LET3.SubElement(new_run, f"{_HP}t")
-                            t_el.text = run_data.get('text', '') or None
-            else:
+            if not (has_multi_run or has_nested):
                 # 단일 run — p별 첫 run charPr 적용
                 sub = cell.element.find(f"{_HP}subList")
                 if sub is not None and cell_data['lines']:
-                    ps = sub.findall(f"{_HP}p")
-                    line_idx = 0
-                    for line in cell_data['lines']:
-                        if line.get('nested_tables'):
-                            continue
-                        if line_idx < len(ps):
-                            line_runs = line.get('runs', [])
+                    ps_list = sub.findall(f"{_HP}p")
+                    for pi, p in enumerate(ps_list):
+                        if pi < len(cell_data['lines']):
+                            line_runs = cell_data['lines'][pi].get('runs', [])
                             if line_runs:
                                 new_cpr = cpr_map.get(line_runs[0].get('charPr', '0'), 0)
-                                for run in ps[line_idx].findall(f"{_HP}run"):
+                                for run in p.findall(f"{_HP}run"):
                                     run.set("charPrIDRef", str(new_cpr))
-                        line_idx += 1
 
             # borderFill 적용
             orig_bf = cell_data.get('borderFillIDRef', '1')
@@ -1205,14 +1209,22 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                                 if tag == 'tbl':
                                     run.remove(ch)
                                     new_run.append(ch)
-                        # 올바른 위치에 삽입 (insert_after_line 기반)
-                        existing_ps = list(sub.findall(f'{_HP}p'))
-                        if insert_after_line >= 0 and insert_after_line < len(existing_ps):
-                            # line index 뒤에 삽입
-                            insert_idx = list(sub).index(existing_ps[insert_after_line]) + 1
-                            sub.insert(insert_idx, new_p)
-                        else:
-                            sub.append(new_p)
+                        # 마커 p를 찾아서 교체, 없으면 line index로 삽입
+                        marker_found = False
+                        for mp in list(sub.findall(f'{_HP}p')):
+                            if mp.get('_nested_marker') == '1':
+                                idx = list(sub).index(mp)
+                                sub.remove(mp)
+                                sub.insert(idx, new_p)
+                                marker_found = True
+                                break
+                        if not marker_found:
+                            existing_ps = list(sub.findall(f'{_HP}p'))
+                            if insert_after_line >= 0 and insert_after_line < len(existing_ps):
+                                insert_idx = list(sub).index(existing_ps[insert_after_line]) + 1
+                                sub.insert(insert_idx, new_p)
+                            else:
+                                sub.append(new_p)
                         section_el.remove(sp)
                         break
         except Exception:
