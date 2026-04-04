@@ -398,24 +398,28 @@ def _extract_cell(tc, ppr_map):
     has_margin = tc.get('hasMargin', '0')
     cell_margin = int(cm.get('left', 141)) if cm is not None else 141
 
-    # 줄별 정보 (paraPr + charPr + text) + 중첩 표
+    # 줄별 정보 (paraPr + charPr + text + 중첩 표)
+    # 중첩 표는 해당 line에 포함 (순서 보존)
     lines = []
-    nested_tables = []
+    nested_tables = []  # 하위 호환
     if sub is not None:
         for p in sub.findall(f'{_HP}p'):
             ppr = p.get('paraPrIDRef', '0')
             ppr_info = ppr_map.get(ppr, {'horizontal': 'JUSTIFY'})
 
             runs_data = []
+            line_nested = []
             for run in p.findall(f'{_HP}run'):
                 cpr = run.get('charPrIDRef', '0')
                 t = run.find(f'{_HP}t')
                 txt = t.text if t is not None and t.text else ''
                 runs_data.append({'charPr': cpr, 'text': txt})
 
-                # 중첩 표 추출 (재귀)
+                # 중첩 표 추출 (재귀) — 이 line에 포함
                 for ntbl in run.findall(f'{_HP}tbl'):
-                    nested_tables.append(_extract_single_table(ntbl, ppr_map))
+                    ntbl_data = _extract_single_table(ntbl, ppr_map)
+                    line_nested.append(ntbl_data)
+                    nested_tables.append(ntbl_data)
 
             lines.append({
                 'paraPr': ppr,
@@ -423,7 +427,10 @@ def _extract_cell(tc, ppr_map):
                 'lineSpacing': ppr_info.get('lineSpacing', 0),
                 'margin_left': ppr_info.get('margin_left', 0),
                 'margin_right': ppr_info.get('margin_right', 0),
+                'margin_prev': ppr_info.get('margin_prev', 0),
+                'margin_next': ppr_info.get('margin_next', 0),
                 'runs': runs_data,
+                'nested_tables': line_nested,
             })
 
     return {
@@ -542,17 +549,17 @@ def generate_form(form_data, output_path):
             base_pp = pp
             break
 
-    ppr_map = {}  # 키 = (horizontal, lineSpacing, margin_left, margin_right) → 새 id
+    ppr_map = {}  # 키 = (horizontal, lineSpacing, ml, mr, mp, mn) → 새 id
 
     import copy
 
-    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0):
-        key = (horz, ls, ml, mr)
+    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0, mp=0, mn=0):
+        key = (horz, ls, ml, mr, mp, mn)
         if key in ppr_map:
             return ppr_map[key]
 
-        # 기존 paraPr 중 horizontal + lineSpacing 모두 일치하는 게 있으면 재사용
-        if ml == 0 and mr == 0:
+        # 기존 paraPr 중 모든 조건 일치하는 게 있으면 재사용
+        if ml == 0 and mr == 0 and mp == 0 and mn == 0:
             for pp in pp_container.findall(f"{_HH}paraPr"):
                 a = pp.find(f"{_HH}align")
                 if a is not None and a.get("horizontal") == horz:
@@ -577,19 +584,16 @@ def generate_form(form_data, output_path):
                 for ls_el in new_pp.findall(f'.//{_HH}lineSpacing'):
                     ls_el.set("value", str(ls))
             # margin 변경 (필요시)
-            if ml or mr:
+            if ml or mr or mp or mn:
                 # switch 내부와 default 내부 모두 margin 수정
                 for margin_el in new_pp.findall(f".//{_HH}margin"):
-                    left_el = margin_el.find(f".//{_HC}left")
-                    if left_el is None:
-                        left_el = margin_el.find(f".//{_HH}left")
-                    right_el = margin_el.find(f".//{_HC}right")
-                    if right_el is None:
-                        right_el = margin_el.find(f".//{_HH}right")
-                    if left_el is not None:
-                        left_el.set("value", str(ml))
-                    if right_el is not None:
-                        right_el.set("value", str(mr))
+                    for tag, val in [("left", ml), ("right", mr), ("prev", mp), ("next", mn)]:
+                        if val:
+                            el = margin_el.find(f".//{_HC}{tag}")
+                            if el is None:
+                                el = margin_el.find(f".//{_HH}{tag}")
+                            if el is not None:
+                                el.set("value", str(val))
             pp_container.append(new_pp)
         else:
             # fallback: 최소 구조
@@ -834,9 +838,11 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         if r >= rows or c >= cols:
             continue
 
-        # 텍스트 조합 (\n으로 줄 합침)
+        # 텍스트 조합 — 중첩 표가 있는 line은 제외 (나중에 표와 함께 삽입)
         text_parts = []
         for line in cell_data['lines']:
+            if line.get('nested_tables'):
+                continue  # 이 줄은 중첩 표 삽입 시 처리
             line_text = ''.join(run['text'] for run in line['runs'])
             text_parts.append(line_text)
         full_text = '\n'.join(text_parts)
@@ -920,9 +926,11 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                     line = cell_data['lines'][i]
                     ppid = get_or_create_paraPr(
                         line.get('horizontal', 'JUSTIFY'),
-                        line.get('lineSpacing', 150),
+                        line.get('lineSpacing', 0),
                         line.get('margin_left', 0),
                         line.get('margin_right', 0),
+                        line.get('margin_prev', 0),
+                        line.get('margin_next', 0),
                     )
                     p.set("paraPrIDRef", ppid)
         except Exception:
@@ -935,8 +943,13 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         import xml.etree.ElementTree as LET2
 
     for cell_data in tbl['cells']:
-        nested = cell_data.get('nested_tables', [])
-        if not nested:
+        # line별 중첩 표 확인
+        has_any_nested = any(
+            line.get('nested_tables', [])
+            for line in cell_data.get('lines', [])
+        )
+        # 하위호환: 기존 nested_tables도 확인
+        if not has_any_nested and not cell_data.get('nested_tables', []):
             continue
         r, c = cell_data['row'], cell_data['col']
         if r >= rows or c >= cols:
@@ -947,7 +960,17 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             if sub is None:
                 continue
 
-            for ntbl_data in nested:
+            # line별 중첩 표 수집 (순서 보존)
+            all_nested = []
+            for li, line in enumerate(cell_data.get('lines', [])):
+                for ntbl_data in line.get('nested_tables', []):
+                    all_nested.append((li, ntbl_data))
+            # 하위호환
+            if not all_nested:
+                for ntbl_data in cell_data.get('nested_tables', []):
+                    all_nested.append((-1, ntbl_data))
+
+            for insert_after_line, ntbl_data in all_nested:
                 # 중첩 표를 위한 새 p > run > tbl 구조 생성
                 # 임시로 doc.add_table 사용 후 표 element를 셀 안으로 이동
                 ntbl_rows = ntbl_data['rows']
@@ -1035,6 +1058,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                                         line.get('lineSpacing', 0),
                                         line.get('margin_left', 0),
                                         line.get('margin_right', 0),
+                                        line.get('margin_prev', 0),
+                                        line.get('margin_next', 0),
                                     )
                                     np.set("paraPrIDRef", ppid)
                     except Exception:
@@ -1059,13 +1084,12 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         except:
                             pass
 
-                # 생성된 표 element를 셀의 subList 안으로 이동
+                # 생성된 표 element를 셀의 subList 안으로 이동 (올바른 위치에)
                 section_el = doc.sections[0].element if hasattr(doc.sections[0], 'element') else doc.sections[0]._element
                 for sp in list(section_el.findall(f'{_HP}p')):
                     tbl_el = sp.find(f'.//{_HP}tbl')
                     if tbl_el is not None and tbl_el is temp_tbl.element:
-                        # 이 p에서 tbl을 꺼내서 셀의 subList로 이동
-                        new_p = LET2.SubElement(sub, f'{_HP}p')
+                        new_p = LET2.Element(f'{_HP}p')
                         new_p.set('id', '0')
                         new_p.set('paraPrIDRef', '0')
                         new_p.set('styleIDRef', '0')
@@ -1074,14 +1098,20 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         new_p.set('merged', '0')
                         new_run = LET2.SubElement(new_p, f'{_HP}run')
                         new_run.set('charPrIDRef', '0')
-                        # tbl element를 run 안으로
                         for run in sp.findall(f'{_HP}run'):
                             for ch in list(run):
                                 tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
                                 if tag == 'tbl':
                                     run.remove(ch)
                                     new_run.append(ch)
-                        # 빈 p 제거
+                        # 올바른 위치에 삽입 (insert_after_line 기반)
+                        existing_ps = list(sub.findall(f'{_HP}p'))
+                        if insert_after_line >= 0 and insert_after_line < len(existing_ps):
+                            # line index 뒤에 삽입
+                            insert_idx = list(sub).index(existing_ps[insert_after_line]) + 1
+                            sub.insert(insert_idx, new_p)
+                        else:
+                            sub.append(new_p)
                         section_el.remove(sp)
                         break
         except Exception:
