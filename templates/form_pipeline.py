@@ -251,6 +251,7 @@ def _extract_paragraph(p, ppr_map):
         'paraPrIDRef': ppr_id,
         'has_secpr': has_secpr,
         'has_table': has_table,
+        'pageBreak': p.get('pageBreak', '0'),
         'texts': texts,
         'runs': runs,
     }
@@ -839,6 +840,9 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             # 마지막 추가된 p에 적용
             last_p = list(section_el.findall(f'{_HP}p'))[-1]
             last_p.set('paraPrIDRef', ppid)
+            # pageBreak 적용
+            if para_data.get('pageBreak', '0') != '0':
+                last_p.set('pageBreak', para_data['pageBreak'])
 
             first_para = False
 
