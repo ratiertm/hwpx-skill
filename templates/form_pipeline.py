@@ -914,18 +914,37 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         try:
             cell = table.cell(r, c)
 
-            # charPr 적용 — 각 p별로 해당 line의 charPr 사용
+            # charPr 적용 — run 단위로 원본 charPr 재구성
+            try:
+                from lxml import etree as LET3
+            except ImportError:
+                import xml.etree.ElementTree as LET3
+
             sub = cell.element.find(f"{_HP}subList")
             if sub is not None and cell_data['lines']:
                 ps = sub.findall(f"{_HP}p")
                 for pi, p in enumerate(ps):
-                    if pi < len(cell_data['lines']):
-                        line_runs = cell_data['lines'][pi].get('runs', [])
+                    if pi >= len(cell_data['lines']):
+                        continue
+                    line = cell_data['lines'][pi]
+                    line_runs = line.get('runs', [])
+
+                    if len(line_runs) <= 1:
+                        # 단일 run — 기존 방식
                         if line_runs:
-                            orig_cpr = line_runs[0].get('charPr', '0')
-                            new_cpr = cpr_map.get(orig_cpr, 0)
+                            new_cpr = cpr_map.get(line_runs[0].get('charPr', '0'), 0)
                             for run in p.findall(f"{_HP}run"):
                                 run.set("charPrIDRef", str(new_cpr))
+                    else:
+                        # 다중 run — 기존 run 제거 후 원본 run 구조로 재구성
+                        for old_run in list(p.findall(f"{_HP}run")):
+                            p.remove(old_run)
+                        for run_data in line_runs:
+                            new_cpr = cpr_map.get(run_data.get('charPr', '0'), 0)
+                            new_run = LET3.SubElement(p, f"{_HP}run")
+                            new_run.set("charPrIDRef", str(new_cpr))
+                            t = LET3.SubElement(new_run, f"{_HP}t")
+                            t.text = run_data.get('text', '') or None
 
             # borderFill 적용
             orig_bf = cell_data.get('borderFillIDRef', '1')
