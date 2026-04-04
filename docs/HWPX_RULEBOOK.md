@@ -18,6 +18,78 @@ tbl.set_cell_text(0, 0, "첫줄\n둘째줄")
 
 **수정**: `text.setter`에서 `\n` 감지 시 자동으로 `<hp:p>` 분리 처리.
 
+## 1-1. linesegarray 규칙 (글자 겹침 방지)
+
+```xml
+<!-- ✅ secPr 포함 첫 문단에만 linesegarray 1개 -->
+<hp:p>
+  <hp:run charPrIDRef="0"><secPr .../></hp:run>
+  <hp:linesegarray>
+    <hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000"
+                baseline="850" spacing="600" horzpos="0" horzsize="42520" flags="393216"/>
+  </hp:linesegarray>
+</hp:p>
+
+<!-- ✅ 나머지 문단에는 linesegarray 없음 — 한컴이 자동 계산 -->
+<hp:p paraPrIDRef="0">
+  <hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run>
+</hp:p>
+```
+
+**규칙**:
+- `linesegarray`는 **secPr 포함 첫 문단에만** 1개
+- 나머지 모든 `<hp:p>` (본문, 셀 내부)에는 **넣지 않음**
+- 한컴오피스가 열 때 자동으로 레이아웃 재계산
+
+**❌ 잘못 넣으면**: 모든 줄이 겹쳐서 렌더링됨 (vertpos 충돌)
+
+## 1-2. secPr 문단에 텍스트 금지
+
+```xml
+<!-- ❌ secPr과 텍스트를 같은 p에 넣으면 겹침 발생 -->
+<hp:p>
+  <hp:run><secPr .../></hp:run>
+  <hp:run><hp:t>제목 텍스트</hp:t></hp:run>
+</hp:p>
+
+<!-- ✅ secPr은 빈 문단, 텍스트는 다음 p -->
+<hp:p>
+  <hp:run><secPr .../></hp:run>
+  <hp:linesegarray>...</hp:linesegarray>
+</hp:p>
+<hp:p>
+  <hp:run><hp:t>제목 텍스트</hp:t></hp:run>
+</hp:p>
+```
+
+**원인**: secPr 문단에 텍스트를 합치면 표/텍스트 위치가 겹침. python-hwpx(공식)도 secPr을 빈 문단으로 분리.
+
+## 1-3. paraPr에 lineSpacing 필수
+
+```xml
+<!-- ❌ lineSpacing 없으면 글자 겹침 -->
+<hh:paraPr id="20" tabPrIDRef="0" condense="0">
+  <hh:align horizontal="CENTER" vertical="BASELINE"/>
+</hh:paraPr>
+
+<!-- ✅ lineSpacing 필수 -->
+<hh:paraPr id="20" tabPrIDRef="0" condense="0">
+  <hh:align horizontal="CENTER" vertical="BASELINE"/>
+  <hh:lineSpacing type="PERCENT" value="150" unit="HWPUNIT"/>
+</hh:paraPr>
+```
+
+**원인**: paraPr에 `<hh:lineSpacing>`이 없으면 한컴오피스가 줄 간격을 0으로 처리하여 모든 줄이 같은 위치에 겹침.
+
+**규칙**: 새로 만드는 paraPr에는 반드시 `lineSpacing` 포함. 원본 서식 기본값: `type="PERCENT" value="150"`.
+
+| value | 의미 |
+|-------|------|
+| 100 | 1줄 (빽빽) |
+| 120 | 1.2줄 (구비서류 등 좁은 간격) |
+| 150 | 1.5줄 (표준, 가장 흔함) |
+| 160 | 1.6줄 (hwpxlib 기본) |
+
 ## 2. 셀 병합: 빈 행 금지
 
 ```python
@@ -181,3 +253,77 @@ row7  │ 6.비고      │  (입력 ← col1+2+3 가로병합)     │
 핵심: 세로 병합 후 각 행의 나머지 열을 개별 가로 병합
       → 모든 행에 최소 1개 셀 유지
 ```
+
+## 13. HWPX 파일 생성 시 필수 구조
+
+```
+HWPX (ZIP)
+├── mimetype                    → "application/hwp+zip" (고정)
+├── version.xml                 → 버전 정보
+├── Contents/
+│   ├── header.xml              → 폰트, charPr, paraPr, borderFill, style 정의
+│   ├── section0.xml            → 본문 (페이지 설정 + 문단/표)
+│   └── content.hpf             → 파일 매니페스트
+├── settings.xml                → 커서 위치 등
+├── Preview/PrvText.txt         → 미리보기 텍스트
+└── META-INF/
+    ├── container.xml           → OPC 루트
+    └── manifest.xml            → ODF 매니페스트
+```
+
+## 14. section0.xml 문단 구조 규칙 (2026-04-04 검증)
+
+```xml
+<!-- ✅ 올바른 구조 (pyhwpxlib 검증 완료) -->
+<hs:sec>
+  <!-- p[0]: secPr만 포함, 텍스트 없음, linesegarray 1개 -->
+  <hp:p>
+    <hp:run charPrIDRef="0">
+      <hp:secPr ...>페이지설정</hp:secPr>
+    </hp:run>
+    <hp:linesegarray><hp:lineseg .../></hp:linesegarray>
+  </hp:p>
+
+  <!-- p[1~N]: 본문 텍스트, linesegarray 없음 -->
+  <hp:p><hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run></hp:p>
+
+  <!-- 표: 별도 p 안에 -->
+  <hp:p>
+    <hp:run charPrIDRef="0">
+      <hp:tbl ...>표 XML</hp:tbl>
+      <hp:t/>
+    </hp:run>
+  </hp:p>
+
+  <!-- 표 뒤 텍스트 -->
+  <hp:p><hp:run charPrIDRef="0"><hp:t>표 뒤 텍스트</hp:t></hp:run></hp:p>
+</hs:sec>
+```
+
+**핵심 3원칙**:
+1. **secPr 문단 분리**: secPr은 빈 문단에 단독 배치, 텍스트와 합치면 겹침 발생
+2. **linesegarray 최소화**: secPr 문단에만 1개, 나머지는 한컴이 자동 계산
+3. **셀 내 줄바꿈**: `<hp:subList>` 안에 별도 `<hp:p>`로 분리, linesegarray 불필요
+
+## 15. 서식 표 사이즈 규칙 (별지 리버스)
+
+상세 문서: [OWPML_TABLE_SIZING.md](OWPML_TABLE_SIZING.md)
+
+```python
+# 표 너비 = 본문영역 - outMargin×2
+text_area = page_width - margin_left - margin_right
+table_width = text_area - 280  # outMargin 140×2
+
+# cellSz = span 범위 컬럼/행 합
+width = sum(col_widths[col : col + colSpan])
+height = sum(row_heights[row : row + rowSpan])
+```
+
+| 항목 | 규칙 |
+|------|------|
+| cellSz.width | `sum(col_widths[col:col+colSpan])` — 별도 컬럼 정의 없음 |
+| cellSz.height | `sum(row_heights[row:row+rowSpan])` |
+| cellMargin | 기본 `141/141/141/141`, hasMargin="0"이면 무시 |
+| charPr.height | 글자 크기 (100=1pt), 제목 1500~1800, 본문 1000~1100 |
+| charPr.textColor | `#RRGGBB`, bold는 `<hh:bold/>` 태그 유무 |
+| spacing (자간) | charPr 하위 `<hh:spacing hangul="30"/>` (0=기본) |

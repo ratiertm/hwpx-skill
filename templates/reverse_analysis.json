@@ -1,0 +1,3668 @@
+[
+  {
+    "filename": "HeaderFooter.hwpx",
+    "size_bytes": 12798,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 4,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 7,
+      "paraPr_count": 17,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "MultiColumn.hwpx",
+    "size_bytes": 25049,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 127,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 7,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "PageFunctions.hwpx",
+    "size_bytes": 13563,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 3,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 7,
+      "paraPr_count": 16,
+      "borderFill_count": 3,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "PageSize_Margin.hwpx",
+    "size_bytes": 11135,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 1,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 72852,
+      "height": 103180,
+      "landscape": "NARROWLY",
+      "margin": {
+        "header": "4251",
+        "footer": "4251",
+        "gutter": "0",
+        "left": "8503",
+        "right": "8503",
+        "top": "5669",
+        "bottom": "4251"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 7,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "SimpleButtons.hwpx",
+    "size_bytes": 13307,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 1,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 8,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "SimpleComboBox.hwpx",
+    "size_bytes": 13130,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "Scripts/headerScripts.js",
+      "Scripts/sourceScripts.js",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 1,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 8,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "SimpleEdit.hwpx",
+    "size_bytes": 13023,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "Scripts/headerScripts.js",
+      "Scripts/sourceScripts.js",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 1,
+        "tables": 0,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 8,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "SimpleTable.hwpx",
+    "size_bytes": 13315,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 7,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [
+      {
+        "rows": 3,
+        "cols": 3,
+        "width": 19029,
+        "height": 8657,
+        "col_widths": [
+          6344,
+          6344,
+          6341
+        ],
+        "row_heights": [
+          2886,
+          2886,
+          2885
+        ],
+        "col_solved": "3/3",
+        "row_solved": "3/3",
+        "cell_count": 5,
+        "input_cells": 0,
+        "label_cells": 0,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 2,
+            "rs": 2,
+            "w": 12688,
+            "h": 5772,
+            "role": "CONTENT",
+            "text": "1",
+            "bf": "3"
+          },
+          {
+            "row": 0,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 6341,
+            "h": 2886,
+            "role": "CONTENT",
+            "text": "2",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 6341,
+            "h": 2886,
+            "role": "CONTENT",
+            "text": "3",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 6344,
+            "h": 2885,
+            "role": "CONTENT",
+            "text": "5",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 1,
+            "cs": 2,
+            "rs": 1,
+            "w": 12685,
+            "h": 2885,
+            "role": "CONTENT",
+            "text": "4",
+            "bf": "3"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 7,
+      "paraPr_count": 17,
+      "borderFill_count": 3,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "sample1.hwpx",
+    "size_bytes": 16165,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.xml",
+      "Contents/content.hpf",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 3,
+        "tables": 0,
+        "images": 0,
+        "shapes": 1
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [],
+    "styles": {
+      "charPr_count": 8,
+      "paraPr_count": 16,
+      "borderFill_count": 2,
+      "style_count": 18
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "sample_의견제출서.hwpx",
+    "size_bytes": 9285,
+    "zip_entries": [
+      "mimetype",
+      "Contents/content.hpf",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "META-INF/container.rdf",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml",
+      "Preview/PrvImage.png",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "version.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 47,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84186,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [
+      {
+        "rows": 7,
+        "cols": 4,
+        "width": 42520,
+        "height": 25200,
+        "col_widths": [
+          10630,
+          10630,
+          10630,
+          10630
+        ],
+        "row_heights": [
+          3600,
+          3600,
+          3600,
+          3600,
+          3600,
+          3600,
+          3600
+        ],
+        "col_solved": "4/4",
+        "row_solved": "7/7",
+        "cell_count": 28,
+        "input_cells": 21,
+        "label_cells": 0,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "1. 명칭(단체 이름)",
+            "bf": "4"
+          },
+          {
+            "row": 0,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 0,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "소유주가 받은자가 또는 정당에 대한 행정상고",
+            "bf": "3"
+          },
+          {
+            "row": 0,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "(단체명)",
+            "bf": "5"
+          },
+          {
+            "row": 1,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "2. 직위(직명)",
+            "bf": "6"
+          },
+          {
+            "row": 2,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "의 견 제 출",
+            "bf": "7"
+          },
+          {
+            "row": 3,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "취 지 론",
+            "bf": "8"
+          },
+          {
+            "row": 4,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "증 거 란",
+            "bf": "9"
+          },
+          {
+            "row": 5,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "10"
+          },
+          {
+            "row": 6,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 10,
+      "paraPr_count": 28,
+      "borderFill_count": 10,
+      "style_count": 23
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "template_의견제출서.hwpx",
+    "size_bytes": 9245,
+    "zip_entries": [
+      "mimetype",
+      "Contents/content.hpf",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "META-INF/container.rdf",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml",
+      "Preview/PrvImage.png",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "version.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 39,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84186,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "8504",
+        "right": "8504",
+        "top": "5668",
+        "bottom": "4252"
+      }
+    },
+    "tables": [
+      {
+        "rows": 8,
+        "cols": 4,
+        "width": 42520,
+        "height": 28800,
+        "col_widths": [
+          10630,
+          10630,
+          10630,
+          10630
+        ],
+        "row_heights": [
+          3600,
+          3600,
+          3600,
+          3600,
+          3600,
+          3600,
+          3600,
+          3600
+        ],
+        "col_solved": "4/4",
+        "row_solved": "8/8",
+        "cell_count": 18,
+        "input_cells": 10,
+        "label_cells": 0,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "1. 명칭(단체이름)",
+            "bf": "4"
+          },
+          {
+            "row": 0,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 0,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "소속기관",
+            "bf": "12"
+          },
+          {
+            "row": 0,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "2. 직위(직명)",
+            "bf": "5"
+          },
+          {
+            "row": 1,
+            "col": 1,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 1,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "전화번호",
+            "bf": "13"
+          },
+          {
+            "row": 1,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "3. 의견제출   취지",
+            "bf": "6"
+          },
+          {
+            "row": 2,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 0,
+            "cs": 1,
+            "rs": 3,
+            "w": 10630,
+            "h": 10800,
+            "role": "CONTENT",
+            "text": "4. 의견내용",
+            "bf": "9"
+          },
+          {
+            "row": 3,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "5. 첨부서류",
+            "bf": "10"
+          },
+          {
+            "row": 6,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 7,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 10630,
+            "h": 3600,
+            "role": "CONTENT",
+            "text": "6. 비고",
+            "bf": "11"
+          },
+          {
+            "row": 7,
+            "col": 1,
+            "cs": 3,
+            "rs": 1,
+            "w": 31890,
+            "h": 3600,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 11,
+      "paraPr_count": 32,
+      "borderFill_count": 13,
+      "style_count": 23
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "근로지원인서비스신청서.hwpx",
+    "size_bytes": 10778,
+    "zip_entries": [
+      "mimetype",
+      "Contents/content.hpf",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "META-INF/container.rdf",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml",
+      "Preview/PrvImage.png",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "version.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 76,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84186,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "4252",
+        "footer": "4252",
+        "gutter": "0",
+        "left": "4000",
+        "right": "4000",
+        "top": "4000",
+        "bottom": "4000"
+      }
+    },
+    "tables": [
+      {
+        "rows": 33,
+        "cols": 10,
+        "width": 42520,
+        "height": 59986,
+        "col_widths": [
+          3532,
+          789,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "row_heights": [
+          2244,
+          598,
+          1596,
+          1596,
+          2842,
+          1346,
+          1546,
+          498,
+          1396,
+          null,
+          null,
+          1396,
+          1446,
+          1396,
+          2793,
+          548,
+          1645,
+          1396,
+          1496,
+          1496,
+          1546,
+          1496,
+          1546,
+          1496,
+          2543,
+          9526,
+          1147,
+          2543,
+          598,
+          1246,
+          498,
+          1995,
+          2194
+        ],
+        "col_solved": "2/10",
+        "row_solved": "31/33",
+        "cell_count": 54,
+        "input_cells": 8,
+        "label_cells": 0,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 14212,
+            "h": 2244,
+            "role": "CONTENT",
+            "text": "접수번호",
+            "bf": "4"
+          },
+          {
+            "row": 0,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 2244,
+            "role": "CONTENT",
+            "text": "접수일",
+            "bf": "5"
+          },
+          {
+            "row": 0,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 2244,
+            "role": "CONTENT",
+            "text": "처리기간14일",
+            "bf": "6"
+          },
+          {
+            "row": 1,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 598,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 0,
+            "cs": 1,
+            "rs": 5,
+            "w": 3532,
+            "h": 8926,
+            "role": "CONTENT",
+            "text": "신청인",
+            "bf": "7"
+          },
+          {
+            "row": 2,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 1596,
+            "role": "CONTENT",
+            "text": "성 명",
+            "bf": "3"
+          },
+          {
+            "row": 2,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 1596,
+            "role": "CONTENT",
+            "text": "주민등록번호",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 1596,
+            "role": "CONTENT",
+            "text": "주 소",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 1596,
+            "role": "CONTENT",
+            "text": "장애유형",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 2842,
+            "role": "CONTENT",
+            "text": "전화번호  (    )       -휴대전화:",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 2842,
+            "role": "CONTENT",
+            "text": "중증여부□ 중증  □ 경증",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 1346,
+            "role": "CONTENT",
+            "text": "현 직장 취업일자",
+            "bf": "3"
+          },
+          {
+            "row": 5,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 1346,
+            "role": "CONTENT",
+            "text": "보조공학기기□ 예  □ 아니오",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 1546,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 6,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 1546,
+            "role": "CONTENT",
+            "text": "사용여부      기기명",
+            "bf": "3"
+          },
+          {
+            "row": 7,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 498,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 8,
+            "col": 0,
+            "cs": 1,
+            "rs": 8,
+            "w": 3532,
+            "h": 13313,
+            "role": "CONTENT",
+            "text": "사업주동의",
+            "bf": "8"
+          },
+          {
+            "row": 8,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10680,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "사업체명",
+            "bf": "3"
+          },
+          {
+            "row": 8,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "대표자",
+            "bf": "3"
+          },
+          {
+            "row": 9,
+            "col": 1,
+            "cs": 9,
+            "rs": 2,
+            "w": 38988,
+            "h": 4338,
+            "role": "CONTENT",
+            "text": "사업체  □국가 (□공무원 □비공무원), □지방자치단체 (□공무원 □비공무원)유형    □공공기관(공기업) ",
+            "bf": "3"
+          },
+          {
+            "row": 11,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10680,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "소재지",
+            "bf": "3"
+          },
+          {
+            "row": 11,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 1396,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 12,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10680,
+            "h": 1446,
+            "role": "CONTENT",
+            "text": "담당자명",
+            "bf": "3"
+          },
+          {
+            "row": 12,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 1446,
+            "role": "CONTENT",
+            "text": "연락처",
+            "bf": "3"
+          },
+          {
+            "row": 13,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10680,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "사업자등록번호",
+            "bf": "3"
+          },
+          {
+            "row": 13,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "상시근로자 수",
+            "bf": "3"
+          },
+          {
+            "row": 14,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10680,
+            "h": 2793,
+            "role": "CONTENT",
+            "text": "업종(주된 생산품)",
+            "bf": "3"
+          },
+          {
+            "row": 14,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 2793,
+            "role": "CONTENT",
+            "text": "장애인 근로자 수",
+            "bf": "3"
+          },
+          {
+            "row": 15,
+            "col": 1,
+            "cs": 7,
+            "rs": 1,
+            "w": 24686,
+            "h": 548,
+            "role": "CONTENT",
+            "text": "사업장에서 근로지원인 서비스 제공에 동의합니다.",
+            "bf": "3"
+          },
+          {
+            "row": 15,
+            "col": 8,
+            "cs": 2,
+            "rs": 1,
+            "w": 14302,
+            "h": 548,
+            "role": "CONTENT",
+            "text": "(서명 또는 인)",
+            "bf": "3"
+          },
+          {
+            "row": 16,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 1645,
+            "role": "CONTENT",
+            "text": "근로지원인 서비스 신청 내용",
+            "bf": "9"
+          },
+          {
+            "row": 17,
+            "col": 0,
+            "cs": 5,
+            "rs": 6,
+            "w": 14212,
+            "h": 8976,
+            "role": "CONTENT",
+            "text": "담당 직무(핵심직무 위주로 기술)",
+            "bf": "3"
+          },
+          {
+            "row": 17,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1396,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 17,
+            "col": 8,
+            "cs": 2,
+            "rs": 6,
+            "w": 14302,
+            "h": 8976,
+            "role": "CONTENT",
+            "text": "근로지원인 서비스필요영역",
+            "bf": "3"
+          },
+          {
+            "row": 18,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1496,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 19,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1496,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 20,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1546,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 21,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1496,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 22,
+            "col": 5,
+            "cs": 3,
+            "rs": 1,
+            "w": 14006,
+            "h": 1546,
+            "role": "CONTENT",
+            "text": "(수행시간:    )",
+            "bf": "3"
+          },
+          {
+            "row": 23,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 14212,
+            "h": 1496,
+            "role": "CONTENT",
+            "text": "근로지원인 서비스 희망기간",
+            "bf": "3"
+          },
+          {
+            "row": 23,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 1496,
+            "role": "CONTENT",
+            "text": "년    월  ~      년    월",
+            "bf": "3"
+          },
+          {
+            "row": 24,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 14212,
+            "h": 2543,
+            "role": "CONTENT",
+            "text": "근로지원인 서비스 요청시간",
+            "bf": "3"
+          },
+          {
+            "row": 24,
+            "col": 5,
+            "cs": 5,
+            "rs": 1,
+            "w": 28308,
+            "h": 2543,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 25,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 9526,
+            "role": "CONTENT",
+            "text": "「장애인고용촉진 및 직업재활법」 제19조의2, 같은 법 시행령 제20조의2 및같은 법 시행규칙 제7조의2에 ",
+            "bf": "3"
+          },
+          {
+            "row": 26,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 3532,
+            "h": 1147,
+            "role": "CONTENT",
+            "text": "첨부서류",
+            "bf": "3"
+          },
+          {
+            "row": 26,
+            "col": 1,
+            "cs": 9,
+            "rs": 2,
+            "w": 38988,
+            "h": 3690,
+            "role": "CONTENT",
+            "text": "「장애인고용촉진 및 직업재활법 시행령」 제4조제1항 각 호의 기준에 해당함을증명할 수 있는 서류, 「중복된 ",
+            "bf": "3"
+          },
+          {
+            "row": 27,
+            "col": 0,
+            "cs": 1,
+            "rs": 1,
+            "w": 3532,
+            "h": 2543,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 28,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 598,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 29,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 1246,
+            "role": "CONTENT",
+            "text": "처리절차",
+            "bf": "3"
+          },
+          {
+            "row": 30,
+            "col": 0,
+            "cs": 2,
+            "rs": 1,
+            "w": 4321,
+            "h": 498,
+            "role": "CONTENT",
+            "text": "신청서 작성",
+            "bf": "3"
+          },
+          {
+            "row": 30,
+            "col": 2,
+            "cs": 8,
+            "rs": 1,
+            "w": 38199,
+            "h": 498,
+            "role": "CONTENT",
+            "text": "▶  접 수  ▶  검 토  ▶  결 재  ▶  결정 통지",
+            "bf": "3"
+          },
+          {
+            "row": 31,
+            "col": 0,
+            "cs": 2,
+            "rs": 1,
+            "w": 4321,
+            "h": 1995,
+            "role": "CONTENT",
+            "text": "신청인",
+            "bf": "3"
+          },
+          {
+            "row": 31,
+            "col": 2,
+            "cs": 8,
+            "rs": 1,
+            "w": 38199,
+            "h": 1995,
+            "role": "CONTENT",
+            "text": "처 리 기 관",
+            "bf": "3"
+          },
+          {
+            "row": 32,
+            "col": 0,
+            "cs": 10,
+            "rs": 1,
+            "w": 42520,
+            "h": 2194,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 9,
+      "paraPr_count": 29,
+      "borderFill_count": 9,
+      "style_count": 23
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANGUL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "LATIN",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "HANJA",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "OTHER",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "함초롬바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬돋움"
+      },
+      {
+        "lang": "USER",
+        "face": "함초롬바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "서식SAMPLE1.owpml",
+    "size_bytes": 46271,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.rdf",
+      "Contents/content.hpf",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 47,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "2836",
+        "footer": "2836",
+        "gutter": "0",
+        "left": "5104",
+        "right": "5104",
+        "top": "4252",
+        "bottom": "4252"
+      }
+    },
+    "tables": [
+      {
+        "rows": 14,
+        "cols": 9,
+        "width": 49040,
+        "height": 67044,
+        "col_widths": [
+          2140,
+          3976,
+          8388,
+          11044,
+          9916,
+          1120,
+          5404,
+          284,
+          6768
+        ],
+        "row_heights": [
+          2900,
+          2900,
+          780,
+          4320,
+          4320,
+          0,
+          4604,
+          4440,
+          4320,
+          4320,
+          4320,
+          18816,
+          2900,
+          3184
+        ],
+        "col_solved": "9/9",
+        "row_solved": "14/14",
+        "cell_count": 31,
+        "input_cells": 10,
+        "label_cells": 9,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 7,
+            "rs": 2,
+            "w": 41988,
+            "h": 5800,
+            "role": "CONTENT",
+            "text": "세 액 면 제 (감 면) 신 청 서(갑)",
+            "bf": "14"
+          },
+          {
+            "row": 0,
+            "col": 7,
+            "cs": 2,
+            "rs": 1,
+            "w": 7052,
+            "h": 2900,
+            "role": "CONTENT",
+            "text": "처리기간",
+            "bf": "6"
+          },
+          {
+            "row": 1,
+            "col": 7,
+            "cs": 2,
+            "rs": 1,
+            "w": 7052,
+            "h": 2900,
+            "role": "CONTENT",
+            "text": "즉    시",
+            "bf": "5"
+          },
+          {
+            "row": 2,
+            "col": 0,
+            "cs": 7,
+            "rs": 1,
+            "w": 41988,
+            "h": 780,
+            "role": "INPUT",
+            "text": "",
+            "bf": "11"
+          },
+          {
+            "row": 2,
+            "col": 7,
+            "cs": 2,
+            "rs": 1,
+            "w": 7052,
+            "h": 780,
+            "role": "INPUT",
+            "text": "",
+            "bf": "15"
+          },
+          {
+            "row": 3,
+            "col": 0,
+            "cs": 1,
+            "rs": 3,
+            "w": 2140,
+            "h": 12960,
+            "role": "CONTENT",
+            "text": "신청인",
+            "bf": "2"
+          },
+          {
+            "row": 3,
+            "col": 1,
+            "cs": 2,
+            "rs": 1,
+            "w": 12364,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "①성명또는법인명",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 11044,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 4,
+            "cs": 2,
+            "rs": 1,
+            "w": 11036,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "②사업자등록번호",
+            "bf": "3"
+          },
+          {
+            "row": 3,
+            "col": 6,
+            "cs": 3,
+            "rs": 1,
+            "w": 12456,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 4,
+            "col": 1,
+            "cs": 2,
+            "rs": 1,
+            "w": 12364,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "③대  표  자  성  명",
+            "bf": "4"
+          },
+          {
+            "row": 4,
+            "col": 3,
+            "cs": 1,
+            "rs": 1,
+            "w": 11044,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "4"
+          },
+          {
+            "row": 4,
+            "col": 4,
+            "cs": 2,
+            "rs": 1,
+            "w": 11036,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "④주민등록번호",
+            "bf": "4"
+          },
+          {
+            "row": 4,
+            "col": 6,
+            "cs": 3,
+            "rs": 1,
+            "w": 12456,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "5"
+          },
+          {
+            "row": 5,
+            "col": 1,
+            "cs": 2,
+            "rs": 1,
+            "w": 12364,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "③주소또는본점소재지",
+            "bf": "4"
+          },
+          {
+            "row": 5,
+            "col": 3,
+            "cs": 2,
+            "rs": 1,
+            "w": 20960,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "10"
+          },
+          {
+            "row": 5,
+            "col": 5,
+            "cs": 4,
+            "rs": 1,
+            "w": 13576,
+            "h": 0,
+            "role": "CONTENT",
+            "text": "(☎ :       )",
+            "bf": "12"
+          },
+          {
+            "row": 6,
+            "col": 0,
+            "cs": 9,
+            "rs": 1,
+            "w": 49040,
+            "h": 4604,
+            "role": "CONTENT",
+            "text": "신     청     내     용",
+            "bf": "13"
+          },
+          {
+            "row": 7,
+            "col": 0,
+            "cs": 3,
+            "rs": 1,
+            "w": 14504,
+            "h": 4440,
+            "role": "LABEL",
+            "text": "⑥과    세    연    도",
+            "bf": "7"
+          },
+          {
+            "row": 7,
+            "col": 3,
+            "cs": 6,
+            "rs": 1,
+            "w": 34536,
+            "h": 4440,
+            "role": "CONTENT",
+            "text": "년      월      일 부터년      월      일 까지",
+            "bf": "5"
+          },
+          {
+            "row": 8,
+            "col": 0,
+            "cs": 2,
+            "rs": 3,
+            "w": 6116,
+            "h": 12960,
+            "role": "CONTENT",
+            "text": "면    제(감  면)받 고 자하는세액",
+            "bf": "7"
+          },
+          {
+            "row": 8,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 8388,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "⑦법 인 세",
+            "bf": "4"
+          },
+          {
+            "row": 8,
+            "col": 3,
+            "cs": 6,
+            "rs": 1,
+            "w": 34536,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "5"
+          },
+          {
+            "row": 9,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 8388,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "⑧",
+            "bf": "4"
+          },
+          {
+            "row": 9,
+            "col": 3,
+            "cs": 6,
+            "rs": 1,
+            "w": 34536,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "5"
+          },
+          {
+            "row": 10,
+            "col": 2,
+            "cs": 1,
+            "rs": 1,
+            "w": 8388,
+            "h": 4320,
+            "role": "LABEL",
+            "text": "⑨",
+            "bf": "4"
+          },
+          {
+            "row": 10,
+            "col": 3,
+            "cs": 6,
+            "rs": 1,
+            "w": 34536,
+            "h": 4320,
+            "role": "INPUT",
+            "text": "",
+            "bf": "5"
+          },
+          {
+            "row": 11,
+            "col": 0,
+            "cs": 9,
+            "rs": 1,
+            "w": 49040,
+            "h": 18816,
+            "role": "CONTENT",
+            "text": "조세감면규제법시행령 제(     )조 제(     )항의 규정에 의하여 세액면제(감면)를 받고자 신청합니다.",
+            "bf": "13"
+          },
+          {
+            "row": 12,
+            "col": 0,
+            "cs": 8,
+            "rs": 2,
+            "w": 42272,
+            "h": 6084,
+            "role": "CONTENT",
+            "text": "※ 구비서류 : 당해 감면관련 조세감면규제법시행령 및 동법시행규칙에 규정된 제출서류 각 1 부.",
+            "bf": "9"
+          },
+          {
+            "row": 12,
+            "col": 8,
+            "cs": 1,
+            "rs": 1,
+            "w": 6768,
+            "h": 2900,
+            "role": "CONTENT",
+            "text": "수 수 료",
+            "bf": "5"
+          },
+          {
+            "row": 13,
+            "col": 8,
+            "cs": 1,
+            "rs": 1,
+            "w": 6768,
+            "h": 3184,
+            "role": "CONTENT",
+            "text": "없    음",
+            "bf": "8"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 8,
+      "paraPr_count": 10,
+      "borderFill_count": 17,
+      "style_count": 1
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "한컴바탕"
+      }
+    ],
+    "form_controls": []
+  },
+  {
+    "filename": "서식SAMPLE2.owpml",
+    "size_bytes": 39564,
+    "zip_entries": [
+      "mimetype",
+      "version.xml",
+      "Contents/header.xml",
+      "Contents/section0.xml",
+      "Preview/PrvText.txt",
+      "settings.xml",
+      "Preview/PrvImage.png",
+      "META-INF/container.rdf",
+      "Contents/content.hpf",
+      "META-INF/container.xml",
+      "META-INF/manifest.xml"
+    ],
+    "sections": [
+      {
+        "file": "Contents/section0.xml",
+        "paragraphs": 68,
+        "tables": 1,
+        "images": 0,
+        "shapes": 0
+      }
+    ],
+    "page": {
+      "width": 59528,
+      "height": 84188,
+      "landscape": "WIDELY",
+      "margin": {
+        "header": "5668",
+        "footer": "2836",
+        "gutter": "0",
+        "left": "1416",
+        "right": "1416",
+        "top": "2836",
+        "bottom": "1416"
+      }
+    },
+    "tables": [
+      {
+        "rows": 17,
+        "cols": 14,
+        "width": 43656,
+        "height": 62984,
+        "col_widths": [
+          2392,
+          2108,
+          2024,
+          1408,
+          4524,
+          13180,
+          1926,
+          4490,
+          744,
+          1756,
+          1912,
+          532,
+          452,
+          6208
+        ],
+        "row_heights": [
+          1848,
+          1680,
+          1020,
+          1476,
+          2984,
+          3268,
+          3268,
+          3176,
+          3900,
+          3900,
+          3836,
+          13236,
+          11700,
+          1564,
+          1848,
+          1564,
+          2716
+        ],
+        "col_solved": "14/14",
+        "row_solved": "17/17",
+        "cell_count": 39,
+        "input_cells": 17,
+        "label_cells": 8,
+        "cells": [
+          {
+            "row": 0,
+            "col": 0,
+            "cs": 14,
+            "rs": 1,
+            "w": 43656,
+            "h": 1848,
+            "role": "CONTENT",
+            "text": "[별지 제 13 호 서식] (95. 4. 1. 개정)",
+            "bf": "14"
+          },
+          {
+            "row": 1,
+            "col": 0,
+            "cs": 1,
+            "rs": 3,
+            "w": 2392,
+            "h": 4176,
+            "role": "INPUT",
+            "text": "",
+            "bf": "11"
+          },
+          {
+            "row": 1,
+            "col": 1,
+            "cs": 1,
+            "rs": 3,
+            "w": 2108,
+            "h": 4176,
+            "role": "INPUT",
+            "text": "",
+            "bf": "14"
+          },
+          {
+            "row": 1,
+            "col": 2,
+            "cs": 5,
+            "rs": 2,
+            "w": 23062,
+            "h": 2700,
+            "role": "CONTENT",
+            "text": "신고수리(인가)된 영업외의 사업",
+            "bf": "15"
+          },
+          {
+            "row": 1,
+            "col": 7,
+            "cs": 3,
+            "rs": 2,
+            "w": 6990,
+            "h": 2700,
+            "role": "CONTENT",
+            "text": "□ 신  고  서□ 허가신청서",
+            "bf": "15"
+          },
+          {
+            "row": 1,
+            "col": 10,
+            "cs": 2,
+            "rs": 3,
+            "w": 2444,
+            "h": 4176,
+            "role": "INPUT",
+            "text": "",
+            "bf": "19"
+          },
+          {
+            "row": 1,
+            "col": 12,
+            "cs": 2,
+            "rs": 1,
+            "w": 6660,
+            "h": 1680,
+            "role": "CONTENT",
+            "text": "처 리 기 간",
+            "bf": "5"
+          },
+          {
+            "row": 2,
+            "col": 12,
+            "cs": 2,
+            "rs": 2,
+            "w": 6660,
+            "h": 2496,
+            "role": "CONTENT",
+            "text": "신고 :  3일허가 : 15일",
+            "bf": "10"
+          },
+          {
+            "row": 3,
+            "col": 2,
+            "cs": 5,
+            "rs": 1,
+            "w": 23062,
+            "h": 1476,
+            "role": "INPUT",
+            "text": "",
+            "bf": "16"
+          },
+          {
+            "row": 3,
+            "col": 7,
+            "cs": 3,
+            "rs": 1,
+            "w": 6990,
+            "h": 1476,
+            "role": "INPUT",
+            "text": "",
+            "bf": "16"
+          },
+          {
+            "row": 4,
+            "col": 0,
+            "cs": 1,
+            "rs": 4,
+            "w": 2392,
+            "h": 12696,
+            "role": "CONTENT",
+            "text": "외국인투자기업",
+            "bf": "3"
+          },
+          {
+            "row": 4,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10064,
+            "h": 2984,
+            "role": "LABEL",
+            "text": "① 상호 또는 명칭",
+            "bf": "4"
+          },
+          {
+            "row": 4,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 2984,
+            "role": "INPUT",
+            "text": "",
+            "bf": "7"
+          },
+          {
+            "row": 5,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10064,
+            "h": 3268,
+            "role": "LABEL",
+            "text": "② 사업자등록번호",
+            "bf": "5"
+          },
+          {
+            "row": 5,
+            "col": 5,
+            "cs": 1,
+            "rs": 1,
+            "w": 13180,
+            "h": 3268,
+            "role": "INPUT",
+            "text": "",
+            "bf": "5"
+          },
+          {
+            "row": 5,
+            "col": 6,
+            "cs": 3,
+            "rs": 1,
+            "w": 7160,
+            "h": 3268,
+            "role": "LABEL",
+            "text": "③ 자 본 금",
+            "bf": "5"
+          },
+          {
+            "row": 5,
+            "col": 9,
+            "cs": 5,
+            "rs": 1,
+            "w": 10860,
+            "h": 3268,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 6,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10064,
+            "h": 3268,
+            "role": "LABEL",
+            "text": "④ 소    재    지",
+            "bf": "5"
+          },
+          {
+            "row": 6,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 3268,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 7,
+            "col": 1,
+            "cs": 4,
+            "rs": 1,
+            "w": 10064,
+            "h": 3176,
+            "role": "LABEL",
+            "text": "⑤ 신고수리(인가)된     사           업",
+            "bf": "5"
+          },
+          {
+            "row": 7,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 3176,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 8,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 12456,
+            "h": 3900,
+            "role": "LABEL",
+            "text": "⑥ 신고수리(허가)받고자     하는 사업",
+            "bf": "9"
+          },
+          {
+            "row": 8,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 3900,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 9,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 12456,
+            "h": 3900,
+            "role": "LABEL",
+            "text": "⑦ 한국표준산업분류상     세세분류",
+            "bf": "9"
+          },
+          {
+            "row": 9,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 3900,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 10,
+            "col": 0,
+            "cs": 5,
+            "rs": 1,
+            "w": 12456,
+            "h": 3836,
+            "role": "LABEL",
+            "text": "⑧ 사 업 추 가 이 유",
+            "bf": "9"
+          },
+          {
+            "row": 10,
+            "col": 5,
+            "cs": 9,
+            "rs": 1,
+            "w": 31200,
+            "h": 3836,
+            "role": "INPUT",
+            "text": "",
+            "bf": "6"
+          },
+          {
+            "row": 11,
+            "col": 0,
+            "cs": 14,
+            "rs": 1,
+            "w": 43656,
+            "h": 13236,
+            "role": "CONTENT",
+            "text": "외자도입법 제13조제2항 또는 동조 제4항의 규정에 의하여 위와 같이 신고(신청)합니다.           ",
+            "bf": "17"
+          },
+          {
+            "row": 12,
+            "col": 0,
+            "cs": 14,
+            "rs": 1,
+            "w": 43656,
+            "h": 11700,
+            "role": "CONTENT",
+            "text": "신고(신청)인 귀하    위의 신고(신청)를 수리(허가)합니다.                         ",
+            "bf": "17"
+          },
+          {
+            "row": 13,
+            "col": 0,
+            "cs": 3,
+            "rs": 3,
+            "w": 6524,
+            "h": 4976,
+            "role": "CONTENT",
+            "text": "구비서류 :",
+            "bf": "18"
+          },
+          {
+            "row": 13,
+            "col": 3,
+            "cs": 8,
+            "rs": 3,
+            "w": 29940,
+            "h": 4976,
+            "role": "CONTENT",
+            "text": "당해 사업의 사업계획서 1부 (외자도입법 시행규칙 별지 제2호 서식에 의합니다.)",
+            "bf": "12"
+          },
+          {
+            "row": 13,
+            "col": 11,
+            "cs": 2,
+            "rs": 2,
+            "w": 984,
+            "h": 3412,
+            "role": "INPUT",
+            "text": "",
+            "bf": "20"
+          },
+          {
+            "row": 13,
+            "col": 13,
+            "cs": 1,
+            "rs": 1,
+            "w": 6208,
+            "h": 1564,
+            "role": "CONTENT",
+            "text": "수 수 료",
+            "bf": "6"
+          },
+          {
+            "row": 14,
+            "col": 13,
+            "cs": 1,
+            "rs": 1,
+            "w": 6208,
+            "h": 1848,
+            "role": "CONTENT",
+            "text": "없    음",
+            "bf": "6"
+          },
+          {
+            "row": 15,
+            "col": 11,
+            "cs": 2,
+            "rs": 1,
+            "w": 984,
+            "h": 1564,
+            "role": "INPUT",
+            "text": "",
+            "bf": "14"
+          },
+          {
+            "row": 15,
+            "col": 13,
+            "cs": 1,
+            "rs": 1,
+            "w": 6208,
+            "h": 1564,
+            "role": "INPUT",
+            "text": "",
+            "bf": "13"
+          },
+          {
+            "row": 16,
+            "col": 0,
+            "cs": 4,
+            "rs": 1,
+            "w": 7932,
+            "h": 2716,
+            "role": "CONTENT",
+            "text": "22225-02511민 1995. 3. 24. 승인",
+            "bf": "8"
+          },
+          {
+            "row": 16,
+            "col": 4,
+            "cs": 4,
+            "rs": 1,
+            "w": 24120,
+            "h": 2716,
+            "role": "INPUT",
+            "text": "",
+            "bf": "8"
+          },
+          {
+            "row": 16,
+            "col": 8,
+            "cs": 6,
+            "rs": 1,
+            "w": 11604,
+            "h": 2716,
+            "role": "CONTENT",
+            "text": "210㎜ × 297㎜           (신문용지 54g/㎡)",
+            "bf": "8"
+          }
+        ]
+      }
+    ],
+    "styles": {
+      "charPr_count": 14,
+      "paraPr_count": 23,
+      "borderFill_count": 21,
+      "style_count": 12
+    },
+    "fonts": [
+      {
+        "lang": "HANGUL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "LATIN",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "HANJA",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "JAPANESE",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "OTHER",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "SYMBOL",
+        "face": "한컴바탕"
+      },
+      {
+        "lang": "USER",
+        "face": "한컴바탕"
+      }
+    ],
+    "form_controls": []
+  }
+]

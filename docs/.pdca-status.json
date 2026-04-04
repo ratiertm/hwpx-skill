@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-03T23:23:22.832Z",
+  "lastUpdated": "2026-04-04T00:36:56.994Z",
   "activeFeatures": [
     "agent-harness",
     "hwpx",
@@ -21,7 +21,8 @@
     "references",
     "section",
     "tools",
-    "writer"
+    "writer",
+    "templates"
   ],
   "primaryFeature": "cli-oneshot-autosave",
   "features": {
@@ -291,6 +292,19 @@
         "lastUpdated": "2026-04-03T14:48:35.461Z"
       },
       "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/pyhwpxlib/writer/shape_writer.py"
+    },
+    "templates": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-04T00:36:56.994Z",
+        "lastUpdated": "2026-04-04T00:36:56.994Z"
+      },
+      "lastFile": "/Users/leeeunmi/Projects/active/hwpx-skill/templates/hwpx_generator.py"
     }
   },
   "pipeline": {
@@ -301,7 +315,7 @@
   "session": {
     "startedAt": "2026-03-26T12:36:25.613Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-03T23:23:22.832Z"
+    "lastActivity": "2026-04-04T00:36:56.994Z"
   },
   "history": [
     {
@@ -2977,6 +2991,12 @@
     {
       "timestamp": "2026-04-03T23:23:22.832Z",
       "feature": "pyhwpxlib",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-04T00:36:56.994Z",
+      "feature": "templates",
       "phase": "do",
       "action": "updated"
     }

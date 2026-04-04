@@ -308,6 +308,14 @@ This project is functional but has real constraints that affect practical use:
 - Cell padding requires `hasMargin="1"`
 - CSS files control document styling, changes apply without server restart
 
+**OWPML table sizing rules ([OWPML_TABLE_SIZING.md](docs/OWPML_TABLE_SIZING.md))**
+- No explicit column definitions -- all sizing lives in `cellSz` per cell
+- Hidden column grid: `SUM(col_widths) == tbl.sz.width` (exact match)
+- `cellSz.width = sum(col_widths[col : col+colSpan])`, same for height
+- Table width = text area - outMargin×2
+- Unit: 1mm ≈ 283.46 HWP units, 7200 units = 1 inch
+- Define `col_widths[]` + `row_heights[]` → all cell sizes auto-calculated
+
 ## License
 
 MIT
