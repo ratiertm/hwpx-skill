@@ -769,7 +769,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
 
             # 원본 paraPrIDRef 적용
             orig_ppr = para_data.get('paraPrIDRef', '0')
-            ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
+            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+            ls = orig_pp_info.get('lineSpacing', 0)
+            ppid = get_or_create_paraPr(horz, ls)
             target_p.set('paraPrIDRef', ppid)
 
             # run 내용 추가 (secPr/ctrl 제외, 텍스트/표만)
@@ -804,7 +807,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
 
                         # 표를 감싸는 p의 paraPrIDRef 설정
                         orig_ppr = para_data.get('paraPrIDRef', '0')
-                        ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
+                        orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+                        horz = orig_pp_info.get('horizontal', 'LEFT')
+                        ls = orig_pp_info.get('lineSpacing', 0)
+                        ppid = get_or_create_paraPr(horz, ls)
 
                         # 마지막으로 추가된 표 p 찾아서 paraPrIDRef 설정
                         for p in reversed(list(section_el.findall(f'{_HP}p'))):
@@ -817,7 +823,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
         elif para_data['texts']:
             # 텍스트 전용 p — 직접 p/run XML 구성 (run 단위 charPr 보존)
             orig_ppr = para_data.get('paraPrIDRef', '0')
-            ppid = get_or_create_paraPr('JUSTIFY', orig_id=orig_ppr)
+            orig_pp_info = form_data['para_properties'].get(orig_ppr, {})
+            horz = orig_pp_info.get('horizontal', 'JUSTIFY')
+            ls = orig_pp_info.get('lineSpacing', 0)
+            ppid = get_or_create_paraPr(horz, ls)
 
             new_p = LET.SubElement(section_el, f"{_HP}p")
             new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)
