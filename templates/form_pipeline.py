@@ -850,15 +850,16 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         try:
             cell = table.cell(r, c)
 
-            # charPr 적용 (첫 번째 run의 charPr 사용)
-            if cell_data['lines']:
-                first_runs = cell_data['lines'][0].get('runs', [])
-                if first_runs:
-                    orig_cpr = first_runs[0].get('charPr', '0')
-                    new_cpr = cpr_map.get(orig_cpr, 0)
-                    sub = cell.element.find(f"{_HP}subList")
-                    if sub is not None:
-                        for p in sub.findall(f"{_HP}p"):
+            # charPr 적용 — 각 p별로 해당 line의 charPr 사용
+            sub = cell.element.find(f"{_HP}subList")
+            if sub is not None and cell_data['lines']:
+                ps = sub.findall(f"{_HP}p")
+                for pi, p in enumerate(ps):
+                    if pi < len(cell_data['lines']):
+                        line_runs = cell_data['lines'][pi].get('runs', [])
+                        if line_runs:
+                            orig_cpr = line_runs[0].get('charPr', '0')
+                            new_cpr = cpr_map.get(orig_cpr, 0)
                             for run in p.findall(f"{_HP}run"):
                                 run.set("charPrIDRef", str(new_cpr))
 
