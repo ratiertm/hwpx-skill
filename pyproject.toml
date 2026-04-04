@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "pyhwpxlib"
+version = "0.1.0"
+description = "Python library for creating and editing HWPX (Hancom Office) documents without Hancom Office"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["hwpx", "hwp", "hancom", "korean", "document", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business :: Office Suites",
+    "Natural Language :: Korean",
+]
+dependencies = []
+
+[project.optional-dependencies]
+images = ["Pillow>=9.0"]
+lxml = ["lxml>=4.9"]
+all = ["Pillow>=9.0", "lxml>=4.9"]
+
+[project.scripts]
+pyhwpxlib = "pyhwpxlib.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/leeeunmi/hwpx-skill"
+Repository = "https://github.com/leeeunmi/hwpx-skill"
+Issues = "https://github.com/leeeunmi/hwpx-skill/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyhwpxlib*"]
+
+[tool.setuptools.package-data]
+pyhwpxlib = ["tools/*.hwpx", "tools/*.xml"]
