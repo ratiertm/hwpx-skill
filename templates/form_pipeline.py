@@ -38,6 +38,22 @@ def extract_form(path):
         para = _extract_paragraph(p, ppr_map)
         paragraphs.append(para)
 
+    # 원본 header에서 fontfaces/charProperties/borderFills를 raw 문자열로 추출
+    # ET.tostring은 ns0: 접두사로 변환하므로, 원본 XML 문자열에서 직접 추출
+    import re
+    def _extract_raw_block(xml_str, tag_name):
+        """원본 XML 문자열에서 <hh:tagName ...>...</hh:tagName> 블록 추출"""
+        pattern = r'<[^>]*?' + tag_name + r'[^>]*>.*?</[^>]*?' + tag_name + r'>'
+        match = re.search(pattern, xml_str, re.DOTALL)
+        return match.group(0) if match else ''
+
+    raw_fontfaces = _extract_raw_block(header_xml, 'fontfaces')
+    raw_charProperties = _extract_raw_block(header_xml, 'charProperties')
+    raw_borderFills = _extract_raw_block(header_xml, 'borderFills')
+    raw_paraProperties = _extract_raw_block(header_xml, 'paraProperties')
+    # 원본 header.xml 전체도 보존
+    raw_header_xml = header_xml
+
     form = {
         '_source': os.path.basename(path),
         'page': _extract_page(sroot),
@@ -46,6 +62,11 @@ def extract_form(path):
         'para_properties': _extract_para_properties(hroot),
         'border_fills': _extract_border_fills(hroot),
         'paragraphs': paragraphs,
+        '_raw_fontfaces': raw_fontfaces,
+        '_raw_charProperties': raw_charProperties,
+        '_raw_borderFills': raw_borderFills,
+        '_raw_paraProperties': raw_paraProperties,
+        '_raw_header_xml': raw_header_xml,
         # 하위 호환: 기존 필드도 유지
         'tables': _extract_tables(sroot, hroot),
         'before_table_text': _extract_before_table_text(sroot),
@@ -522,20 +543,32 @@ def generate_form(form_data, output_path):
         header=m.get('header', 4252), footer=m.get('footer', 4252)
     )
 
-    # 2. charPr 스타일 생성
-    cpr_map = {}  # 원본 id → 새 id
-    for orig_id, cp in form_data['char_properties'].items():
-        sp = cp.get('spacing', 0)
-        sp_kwargs = {}
-        if sp != 0:
-            for lang in ['hangul', 'latin', 'hanja', 'japanese', 'other', 'symbol', 'user']:
-                sp_kwargs[f'spacing_{lang}'] = sp
-        new_id = doc.ensure_run_style(
-            bold=cp.get('bold', False),
-            height=cp.get('height', 1000),
-            **sp_kwargs
-        )
-        cpr_map[orig_id] = new_id
+    # 2. fontfaces + charProperties + borderFills: 원본 XML 통째 교체
+    raw_ff = form_data.get('_raw_fontfaces', '')
+    raw_cp = form_data.get('_raw_charProperties', '')
+    raw_bf = form_data.get('_raw_borderFills', '')
+    _use_raw_header = bool(raw_ff and raw_cp and raw_bf)
+
+    if _use_raw_header:
+        # 원본 id = 클론 id (동일 매핑) — 실제 XML 교체는 save 후 regex로
+        cpr_map = {orig_id: int(orig_id) for orig_id in form_data['char_properties']}
+        bf_map = {orig_id: orig_id for orig_id in form_data['border_fills']}
+    else:
+        # fallback: ensure_run_style로 charPr 개별 생성
+        cpr_map = {}
+        bf_map = {}
+        for orig_id, cp in form_data['char_properties'].items():
+            sp = cp.get('spacing', 0)
+            sp_kwargs = {}
+            if sp != 0:
+                for lang in ['hangul', 'latin', 'hanja', 'japanese', 'other', 'symbol', 'user']:
+                    sp_kwargs[f'spacing_{lang}'] = sp
+            new_id = doc.ensure_run_style(
+                bold=cp.get('bold', False),
+                height=cp.get('height', 1000),
+                **sp_kwargs
+            )
+            cpr_map[orig_id] = new_id
 
     # 3. paraPr 생성 — 기존 paraPr[0]을 복제한 후 horizontal/margin만 변경
     pp_container = header.element.find(f".//{_HH}paraProperties")
@@ -609,13 +642,14 @@ def generate_form(form_data, output_path):
         next_pp_id += 1
         return pid
 
-    # 4. borderFill 생성
+    # 4. borderFill 생성 (raw로 이미 교체된 경우 스킵)
     bf_container = header.element.find(f".//{_HH}borderFills")
     existing_bf = set(bf.get("id") for bf in bf_container.findall(f"{_HH}borderFill"))
     next_bf = max(int(i) for i in existing_bf) + 1 if existing_bf else 2
 
-    bf_map = {}  # 원본 id → 새 id
     for orig_id, borders in form_data['border_fills'].items():
+        if _use_raw_header:
+            continue
         # 기본 borderFill(id=1 NONE)은 스킵
         if all(b.get('type') == 'NONE' for b in borders.values()):
             bf_map[orig_id] = '1'  # 기존 NONE bf 사용
@@ -670,6 +704,30 @@ def generate_form(form_data, output_path):
     pp_container.set("itemCnt", str(len(pp_container)))
 
     doc.save_to_path(output_path)
+
+    # save_to_path가 header를 재생성하므로, fontfaces/charProperties/borderFills만 원본으로 교체
+    if _use_raw_header:
+        import shutil, tempfile, re
+        tmp = tempfile.mktemp(suffix='.hwpx')
+        shutil.copy2(output_path, tmp)
+
+        with zipfile.ZipFile(tmp, 'r') as zin:
+            saved_header = zin.read('Contents/header.xml').decode('utf-8')
+
+        for tag_name, raw_xml in [('fontfaces', raw_ff), ('charProperties', raw_cp), ('borderFills', raw_bf)]:
+            pattern = r'<[^>]*?' + tag_name + r'[^>]*>.*?</[^>]*?' + tag_name + r'>'
+            match = re.search(pattern, saved_header, re.DOTALL)
+            if match:
+                saved_header = saved_header[:match.start()] + raw_xml + saved_header[match.end():]
+
+        with zipfile.ZipFile(tmp, 'r') as zin, zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.namelist():
+                if item == 'Contents/header.xml':
+                    zout.writestr(item, saved_header)
+                else:
+                    zout.writestr(item, zin.read(item))
+        os.remove(tmp)
+
     return output_path
 
 
