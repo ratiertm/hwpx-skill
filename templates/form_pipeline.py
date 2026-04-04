@@ -359,8 +359,8 @@ def _extract_tables(sroot, hroot):
         rows = int(tbl.get('rowCnt', 0))
         cols = int(tbl.get('colCnt', 0))
         sz = tbl.find(f'{_HP}sz')
-        tw = int(sz.get('width', 0))
-        th = int(sz.get('height', 0))
+        tw = int(sz.get('width', 0)) if sz is not None else 0
+        th = int(sz.get('height', 0)) if sz is not None else 0
 
         om = tbl.find(f'{_HP}outMargin')
         im = tbl.find(f'{_HP}inMargin')
@@ -411,12 +411,12 @@ def _extract_cell(tc, ppr_map):
     cm = tc.find(f'{_HP}cellMargin')
     sub = tc.find(f'{_HP}subList')
 
-    r = int(addr.get('rowAddr', 0))
-    c = int(addr.get('colAddr', 0))
-    cs = int(span.get('colSpan', 1))
-    rs = int(span.get('rowSpan', 1))
-    w = int(csz.get('width', 0))
-    h = int(csz.get('height', 0))
+    r = int(addr.get('rowAddr', 0)) if addr is not None else 0
+    c = int(addr.get('colAddr', 0)) if addr is not None else 0
+    cs = int(span.get('colSpan', 1)) if span is not None else 1
+    rs = int(span.get('rowSpan', 1)) if span is not None else 1
+    w = int(csz.get('width', 0)) if csz is not None else 0
+    h = int(csz.get('height', 0)) if csz is not None else 0
 
     vert_align = sub.get('vertAlign', 'CENTER') if sub is not None else 'CENTER'
     bf = tc.get('borderFillIDRef', '1')
@@ -590,13 +590,13 @@ def generate_form(form_data, output_path):
 
     import copy
 
-    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0, mp=0, mn=0):
-        key = (horz, ls, ml, mr, mp, mn)
+    def get_or_create_paraPr(horz, ls=0, ml=0, mr=0, mp=0, mn=0, mi=0):
+        key = (horz, ls, ml, mr, mp, mn, mi)
         if key in ppr_map:
             return ppr_map[key]
 
         # 기존 paraPr 중 모든 조건 일치하는 게 있으면 재사용
-        if ml == 0 and mr == 0 and mp == 0 and mn == 0:
+        if ml == 0 and mr == 0 and mp == 0 and mn == 0 and mi == 0:
             for pp in pp_container.findall(f"{_HH}paraPr"):
                 a = pp.find(f"{_HH}align")
                 if a is not None and a.get("horizontal") == horz:
@@ -621,10 +621,10 @@ def generate_form(form_data, output_path):
                 for ls_el in new_pp.findall(f'.//{_HH}lineSpacing'):
                     ls_el.set("value", str(ls))
             # margin 변경 (필요시)
-            if ml or mr or mp or mn:
+            if ml or mr or mp or mn or mi:
                 # switch 내부와 default 내부 모두 margin 수정
                 for margin_el in new_pp.findall(f".//{_HH}margin"):
-                    for tag, val in [("left", ml), ("right", mr), ("prev", mp), ("next", mn)]:
+                    for tag, val in [("intent", mi), ("left", ml), ("right", mr), ("prev", mp), ("next", mn)]:
                         if val:
                             el = margin_el.find(f".//{_HC}{tag}")
                             if el is None:
@@ -777,7 +777,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             ls = orig_pp_info.get('lineSpacing', 0)
             ml = orig_pp_info.get('margin_left', 0)
             mr = orig_pp_info.get('margin_right', 0)
-            ppid = get_or_create_paraPr(horz, ls, ml, mr)
+            mp = orig_pp_info.get('margin_prev', 0)
+            mn = orig_pp_info.get('margin_next', 0)
+            mi = orig_pp_info.get('margin_intent', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
             target_p.set('paraPrIDRef', ppid)
 
             # run 내용 추가 (secPr/ctrl 제외, 텍스트/표만)
@@ -817,7 +820,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
                         ls = orig_pp_info.get('lineSpacing', 0)
                         ml = orig_pp_info.get('margin_left', 0)
                         mr = orig_pp_info.get('margin_right', 0)
-                        ppid = get_or_create_paraPr(horz, ls, ml, mr)
+                        mp = orig_pp_info.get('margin_prev', 0)
+                        mn = orig_pp_info.get('margin_next', 0)
+                        mi = orig_pp_info.get('margin_intent', 0)
+                        ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
 
                         # 마지막으로 추가된 표 p 찾아서 paraPrIDRef 설정
                         for p in reversed(list(section_el.findall(f'{_HP}p'))):
@@ -835,7 +841,10 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             ls = orig_pp_info.get('lineSpacing', 0)
             ml = orig_pp_info.get('margin_left', 0)
             mr = orig_pp_info.get('margin_right', 0)
-            ppid = get_or_create_paraPr(horz, ls, ml, mr)
+            mp = orig_pp_info.get('margin_prev', 0)
+            mn = orig_pp_info.get('margin_next', 0)
+            mi = orig_pp_info.get('margin_intent', 0)
+            ppid = get_or_create_paraPr(horz, ls, ml, mr, mp, mn, mi)
 
             new_p = LET.SubElement(section_el, f"{_HP}p")
             new_p.set("id", "0"); new_p.set("paraPrIDRef", ppid)

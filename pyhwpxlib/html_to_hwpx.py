@@ -749,7 +749,8 @@ class HwpxHtmlParser(HTMLParser):
         try:
             ch = html.unescape(f"&{name};")
             self.handle_data(ch)
-        except Exception:
+        except Exception as e:
+            logger.debug("Entity ref unescape failed for &%s;: %s — using raw", name, e)
             self.handle_data(f"&{name};")
 
     def handle_charref(self, name: str):
@@ -757,8 +758,8 @@ class HwpxHtmlParser(HTMLParser):
         try:
             ch = html.unescape(f"&#{name};")
             self.handle_data(ch)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Char ref unescape failed for &#%s;: %s — skipping", name, e)
 
     # -- finalize -----------------------------------------------------------
 
@@ -802,8 +803,8 @@ class HwpxHtmlParser(HTMLParser):
             # Try urllib if available (it's stdlib)
             try:
                 self._handle_url_image(src)
-            except Exception:
-                # Can't download — emit placeholder text
+            except Exception as e:
+                logger.warning("URL image download failed for %s: %s — using placeholder", src, e)
                 api.add_paragraph(self.hwpx, f"[Image: {src}]")
             return
 
