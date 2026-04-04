@@ -7,8 +7,11 @@ Usage:
     python form_pipeline.py clone <input.hwpx|owpml> -o <output.hwpx>
 """
 import zipfile, json, sys, os
+import logging
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
@@ -876,8 +879,11 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
 
     # 표 크기
     sz_el = table.element.find(f"{_HP}sz")
-    sz_el.set("width", str(tw))
-    sz_el.set("height", str(th))
+    if sz_el is not None:
+        sz_el.set("width", str(tw))
+        sz_el.set("height", str(th))
+    else:
+        logger.warning("sz element not found in table; skipping size assignment (tw=%s, th=%s)", tw, th)
 
     # 표 마진
     table.set_in_margin(left=in_margin, right=in_margin, top=in_margin, bottom=in_margin)
@@ -896,8 +902,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                 cell.set_size(width=cw, height=rh)
                 cm = tbl['cells'][0].get('cellMargin', 141) if tbl['cells'] else 141
                 cell.set_margin(left=cm, right=cm, top=cm, bottom=cm)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to set cell size/margin [row=%s, col=%s]: %s", r, c, e)
 
     # 셀 텍스트 + 스타일 (set_cell_text 사용)
     for cell_data in tbl['cells']:
@@ -991,8 +997,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             orig_bf = cell_data.get('borderFillIDRef', '1')
             new_bf = bf_map.get(orig_bf, '1')
             cell.set_border_fill_id(new_bf)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to apply cell style [row=%s, col=%s]: %s", r, c, e)
 
     # 병합 — 가로 먼저, 세로 나중 (빈 행 방지)
     h_merges = [m for m in tbl['merges'] if m['r1'] == m['r2'] and m['c1'] != m['c2']]
@@ -1004,15 +1010,15 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             continue
         try:
             table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to merge cells horizontally [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
     for m in v_merges:
         if m['r2'] >= rows or m['c2'] >= cols:
             continue
         try:
             table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to merge cells vertically [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
 
     # 병합 후 cellSz를 원본 값으로 재설정 (병합이 크기를 바꿀 수 있음)
     for cell_data in tbl['cells']:
@@ -1022,8 +1028,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         try:
             cell = table.cell(r, c)
             cell.set_size(width=cell_data['width'], height=cell_data['height'])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to reset cell size after merge [row=%s, col=%s]: %s", r, c, e)
 
     # 정렬 — 줄별 paraPr 적용
     for cell_data in tbl['cells']:
@@ -1051,8 +1057,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                         line.get('margin_next', 0),
                     )
                     p.set("paraPrIDRef", ppid)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to apply paraPr alignment [row=%s, col=%s]: %s", r, c, e)
 
     # 중첩 표 생성 — 셀 안에 표 삽입 (재귀)
     try:
@@ -1101,8 +1107,11 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
 
                 # 표 크기 설정
                 nsz = temp_tbl.element.find(f"{_HP}sz")
-                nsz.set("width", str(ntbl_w))
-                nsz.set("height", str(ntbl_h))
+                if nsz is not None:
+                    nsz.set("width", str(ntbl_w))
+                    nsz.set("height", str(ntbl_h))
+                else:
+                    logger.warning("sz element not found in nested table; skipping size (w=%s, h=%s)", ntbl_w, ntbl_h)
 
                 # pos 복원
                 npos = temp_tbl.element.find(f"{_HP}pos")
@@ -1129,8 +1138,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                             cw = ncol_widths[nc] if nc < len(ncol_widths) and ncol_widths[nc] else ntbl_w // ntbl_cols
                             rh = nrow_heights[nr] if nr < len(nrow_heights) and nrow_heights[nr] else 3600
                             ncell.set_size(width=cw, height=rh)
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning("Failed to set nested cell size [row=%s, col=%s]: %s", nr, nc, e)
 
                 # 셀 텍스트 + charPr + borderFill + lineSpacing
                 for ncell_data in ntbl_data.get('cells', []):
@@ -1145,8 +1154,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                     if full_text.strip():
                         try:
                             temp_tbl.set_cell_text(nr, nc, full_text)
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning("Failed to set nested cell text [row=%s, col=%s]: %s", nr, nc, e)
 
                     try:
                         ncell = temp_tbl.cell(nr, nc)
@@ -1193,8 +1202,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                                         line.get('margin_next', 0),
                                     )
                                     np.set("paraPrIDRef", ppid)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("Failed to apply nested cell paraPr [row=%s, col=%s]: %s", nr, nc, e)
 
                 # cellSz 재설정 (병합 후 변경 대비)
                 for ncell_data in ntbl_data.get('cells', []):
@@ -1204,16 +1213,16 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                     try:
                         ncell = temp_tbl.cell(nr, nc)
                         ncell.set_size(width=ncell_data['width'], height=ncell_data['height'])
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning("Failed to reset nested cell size [row=%s, col=%s]: %s", nr, nc, e)
 
                 # 병합
                 for m in ntbl_data.get('merges', []):
                     if m['r2'] < ntbl_rows and m['c2'] < ntbl_cols:
                         try:
                             temp_tbl.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning("Failed to merge nested cells [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
 
                 # 생성된 표 element를 셀의 subList 안으로 이동 (올바른 위치에)
                 section_el = doc.sections[0].element if hasattr(doc.sections[0], 'element') else doc.sections[0]._element
@@ -1253,8 +1262,8 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                                 sub.append(new_p)
                         section_el.remove(sp)
                         break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to insert nested table into cell [row=%s, col=%s]: %s", r, c, e)
 
 
 # ============================================================

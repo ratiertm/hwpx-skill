@@ -8,12 +8,15 @@ images, equations, and hyperlinks.
 from __future__ import annotations
 
 import base64
+import logging
 import mimetypes
 import re
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Namespace constants (canonical 2011 URIs)
@@ -734,8 +737,10 @@ def convert_hwpx_to_html(
                 header_root = ET.fromstring(raw)
                 char_styles.update(_parse_char_styles(header_root))
                 border_fills.update(_parse_border_fills(header_root))
-            except Exception:
-                pass  # Header parsing is best-effort
+            except ET.ParseError as e:
+                logger.warning("Failed to parse header XML [%s]: %s", hname, e)
+            except Exception as e:
+                logger.warning("Unexpected error reading header [%s]: %s", hname, e)
 
         # 2. Parse section files
         section_names = sorted(n for n in names if _SECTION_RE.match(n))
@@ -748,16 +753,18 @@ def convert_hwpx_to_html(
                 raw = _normalize_ns(zf.read(sec_name))
                 root = ET.fromstring(raw)
                 section_roots.append(root)
-            except Exception:
-                pass
+            except ET.ParseError as e:
+                logger.warning("Failed to parse section XML [%s]: %s", sec_name, e)
+            except Exception as e:
+                logger.warning("Unexpected error reading section [%s]: %s", sec_name, e)
 
         # 3. Load BinData images
         for name in names:
             if name.startswith("BinData/") and not name.endswith("/"):
                 try:
                     images[name] = zf.read(name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to read BinData image [%s]: %s", name, e)
 
     # Convert
     converter = _HwpxToHtmlConverter(

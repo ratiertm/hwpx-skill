@@ -18,6 +18,7 @@ Public API::
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import re
 import tempfile
@@ -25,6 +26,8 @@ from html.parser import HTMLParser
 from typing import Optional
 
 from . import api
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -287,8 +290,8 @@ class HwpxHtmlParser(HTMLParser):
 
         try:
             self._handle_starttag_inner(tag, attr_dict)
-        except Exception:
-            pass  # graceful degradation
+        except Exception as e:
+            logger.warning("HTML start tag handler error [<%s>]: %s", tag, e)
 
     def _handle_starttag_inner(self, tag: str, attrs: dict) -> None:
         # --- Block-level: flush text first ---
@@ -506,8 +509,8 @@ class HwpxHtmlParser(HTMLParser):
             return
         try:
             self._handle_endtag_inner(tag)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("HTML end tag handler error [</%s>]: %s", tag, e)
 
     def _handle_endtag_inner(self, tag: str) -> None:
         # --- Headings ---
@@ -708,8 +711,8 @@ class HwpxHtmlParser(HTMLParser):
             return
         try:
             self._handle_data_inner(data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("HTML data handler error: %s", e)
 
     def _handle_data_inner(self, data: str) -> None:
         # Skip content inside <style> and <script>
@@ -832,7 +835,8 @@ class HwpxHtmlParser(HTMLParser):
 
         try:
             img_bytes = base64.b64decode(b64_data)
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to decode base64 image data: %s", e)
             return
 
         # Write to temp file
@@ -843,7 +847,8 @@ class HwpxHtmlParser(HTMLParser):
             os.close(fd)
             self._temp_files.append(tmp_path)
             api.add_image(self.hwpx, tmp_path)
-        except Exception:
+        except OSError as e:
+            logger.warning("Failed to write base64 image to temp file: %s", e)
             try:
                 os.close(fd)
             except OSError:
@@ -879,7 +884,8 @@ class HwpxHtmlParser(HTMLParser):
             os.close(fd)
             self._temp_files.append(tmp_path)
             api.add_image(self.hwpx, tmp_path)
-        except Exception:
+        except OSError as e:
+            logger.warning("Failed to write URL image to temp file [%s]: %s", url, e)
             try:
                 os.close(fd)
             except OSError:
@@ -909,9 +915,8 @@ def convert_html_to_hwpx(hwpx_file, html_content: str) -> int:
     try:
         parser.feed(html_content)
         parser.finalize()
-    except Exception:
-        # Graceful degradation — return what we have so far
-        pass
+    except Exception as e:
+        logger.warning("HTML parser error (partial output may be returned): %s", e)
     finally:
         parser.cleanup()
 
@@ -919,7 +924,7 @@ def convert_html_to_hwpx(hwpx_file, html_content: str) -> int:
     try:
         section = hwpx_file.section_xml_file_list.get(0)
         return section.count_of_para() - 1  # subtract the blank SecPr para
-    except Exception:
+    except (AttributeError, IndexError, TypeError):
         return 0
 
 

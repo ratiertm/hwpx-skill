@@ -11,10 +11,13 @@ Usage::
 from __future__ import annotations
 
 import io as _io
+import logging
 import pathlib as _pathlib
 import re as _re
 import random as _random
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from .hwpx_file import HWPXFile
 from .objects.section.paragraph import Para, Run, T
@@ -721,8 +724,10 @@ def add_image(
         pw, ph = pil_img.size
         org_width = int(pw * 28.35)
         org_height = int(ph * 28.35)
-    except Exception:
-        pass
+    except ImportError:
+        logger.debug("Pillow not installed; using default image dimensions")
+    except Exception as e:
+        logger.warning("Failed to read image dimensions via PIL: %s", e)
 
     disp_width = width if width is not None else org_width
     disp_height = height if height is not None else org_height
