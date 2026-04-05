@@ -731,6 +731,7 @@ def add_styled_paragraph(
     font_size: Optional[int] = None,
     text_color: Optional[str] = None,
     font_name: Optional[str] = None,
+    bg_color: Optional[str] = None,
     char_pr_id_ref: Optional[str] = None,
     section_index: int = 0,
 ) -> Para:
@@ -741,6 +742,7 @@ def add_styled_paragraph(
     - *font_size*: font size in pt (e.g. 12, 16, 20)
     - *text_color*: hex color string (e.g. "#FF0000")
     - *font_name*: font face name (e.g. "D2Coding"); auto-registered
+    - *bg_color*: background color hex string (e.g. "#E8F5E9")
     - *char_pr_id_ref*: directly specify a charPr ID from the header.
       When provided, this overrides bold/italic/font_size/text_color.
 
@@ -758,6 +760,12 @@ def add_styled_paragraph(
             text_color=text_color,
             font_name=font_name,
         )
+
+    if bg_color:
+        # 배경색이 있으면 highlight로 처리
+        return add_highlight(hwpx_file, text, color=bg_color,
+                             char_pr_id_ref=char_pr_id_ref,
+                             section_index=section_index)
 
     return add_paragraph(
         hwpx_file,
@@ -1687,10 +1695,19 @@ def convert_html_to_hwpx(hwpx_file: HWPXFile, html_content: str) -> int:
     return _convert(hwpx_file, html_content)
 
 
-def convert_html_file_to_hwpx(html_path: str, hwpx_path: str) -> None:
-    """Convert an HTML file to a HWPX file."""
+def convert_html_file_to_hwpx(html_path: str, hwpx_path: str, strip_links: bool = True) -> None:
+    """Convert an HTML file to a HWPX file.
+
+    Parameters
+    ----------
+    strip_links : bool
+        If True (default), remove ``<a>`` tags and keep only their text.
+        Prevents Whale rendering errors caused by fieldBegin/fieldEnd.
+    """
     with open(html_path, 'r', encoding='utf-8') as f:
         content = f.read()
+    if strip_links:
+        content = _re.sub(r'<a\b[^>]*>(.*?)</a>', r'\1', content, flags=_re.DOTALL)
     doc = create_document()
     convert_html_to_hwpx(doc, content)
     save(doc, hwpx_path)

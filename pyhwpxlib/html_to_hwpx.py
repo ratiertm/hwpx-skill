@@ -64,6 +64,18 @@ def _css_color_to_hex(color_str: str) -> Optional[str]:
     m = re.match(r"rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", color_str)
     if m:
         return "#{:02X}{:02X}{:02X}".format(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    # rgba(r,g,b,a) — alpha 무시
+    m = re.match(r"rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*[\d.]+\s*\)", color_str)
+    if m:
+        return "#{:02X}{:02X}{:02X}".format(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    # linear-gradient → 첫 번째 색상 추출
+    m = re.search(r"(#[0-9a-fA-F]{3,6})", color_str)
+    if m:
+        h = m.group(1)[1:]
+        if len(h) == 3:
+            return "#" + "".join(c * 2 for c in h)
+        if len(h) == 6:
+            return m.group(1).upper()
     return None
 
 
@@ -206,6 +218,11 @@ class HwpxHtmlParser(HTMLParser):
         self._in_mark: bool = False
         self._mark_text: str = ""
 
+        # Flex card context (display:flex → 표 변환)
+        self._flex_depth: int = 0
+        self._flex_cells: list[str] = []
+        self._in_flex_cell: bool = False
+
         # Temp files to clean up
         self._temp_files: list[str] = []
 
@@ -263,14 +280,12 @@ class HwpxHtmlParser(HTMLParser):
             api.add_styled_paragraph(
                 self.hwpx, text, italic=True, text_color="#666666",
             )
-        elif s.bg_color and not s.has_style():
-            # highlight-only
-            api.add_highlight(self.hwpx, text, color=s.bg_color)
-        elif s.has_style():
+        elif s.has_style() or s.bg_color:
             api.add_styled_paragraph(
                 self.hwpx, text,
                 bold=s.bold, italic=s.italic, underline=s.underline,
                 font_size=s.font_size, text_color=s.text_color,
+                bg_color=s.bg_color,
             )
         else:
             api.add_paragraph(self.hwpx, text)
@@ -295,7 +310,10 @@ class HwpxHtmlParser(HTMLParser):
 
     def _handle_starttag_inner(self, tag: str, attrs: dict) -> None:
         # --- Block-level: flush text first ---
-        if tag in _BLOCK_TAGS and tag not in ("br",):
+        # div는 wrapper 역할이 많으므로 p/heading/table 등만 flush
+        if tag in _BLOCK_TAGS and tag not in ("br", "div"):
+            self._flush_text()
+        elif tag == "div" and self._text_buf.strip():
             self._flush_text()
 
         # --- Headings ---
@@ -306,6 +324,37 @@ class HwpxHtmlParser(HTMLParser):
         # --- Paragraph / div ---
         if tag in ("p", "div"):
             style = _parse_inline_style(attrs.get("style", ""))
+
+            # flex 레이아웃 감지 → 자식 div를 표 셀로 수집
+            display = style.get("display", "")
+            if "flex" in display and tag == "div":
+                self._flush_text()
+                self._flex_depth += 1
+                self._flex_cells = []
+                return
+
+            # flex 자식 div → 셀 시작
+            if self._flex_depth > 0 and tag == "div":
+                if self._in_flex_cell and self._text_buf.strip():
+                    self._flex_cells.append(self._text_buf.strip())
+                    self._text_buf = ""
+                self._in_flex_cell = True
+                # 스타일도 적용
+                overrides: dict = {}
+                color = _css_color_to_hex(style.get("color", ""))
+                if color:
+                    overrides["text_color"] = color
+                if overrides:
+                    self._push_style(**overrides)
+                return
+
+            # flex 안의 p → 셀 내 줄바꿈으로 이어 붙이기
+            if self._flex_depth > 0 and tag == "p":
+                text = self._text_buf.strip()
+                if text:
+                    self._text_buf = text + "\n"
+                return
+
             overrides: dict = {}
             if style.get("font-weight") in ("bold", "700", "800", "900"):
                 overrides["bold"] = True
@@ -319,7 +368,10 @@ class HwpxHtmlParser(HTMLParser):
             size = _css_size_to_pt(style.get("font-size", ""))
             if size:
                 overrides["font_size"] = size
+            # background-color 또는 background (gradient 포함)
             bg = _css_color_to_hex(style.get("background-color", ""))
+            if not bg:
+                bg = _css_color_to_hex(style.get("background", ""))
             if bg:
                 overrides["bg_color"] = bg
             if overrides:
@@ -364,30 +416,24 @@ class HwpxHtmlParser(HTMLParser):
             self._text_buf = ""
             return
 
-        # --- Inline styles ---
+        # --- Inline styles (flush 하지 않음 — 텍스트 이어 붙이기) ---
         if tag in ("strong", "b"):
-            self._flush_text()
             self._push_style(bold=True)
             return
         if tag in ("em", "i"):
-            self._flush_text()
             self._push_style(italic=True)
             return
         if tag == "u":
-            self._flush_text()
             self._push_style(underline=True)
             return
         if tag in ("s", "strike", "del"):
-            self._flush_text()
             self._push_style(strikeout=True)
             return
         if tag == "mark":
-            self._flush_text()
             self._in_mark = True
             self._mark_text = ""
             return
         if tag == "span":
-            self._flush_text()
             style = _parse_inline_style(attrs.get("style", ""))
             overrides = {}
             if style.get("font-weight") in ("bold", "700", "800", "900"):
@@ -403,6 +449,8 @@ class HwpxHtmlParser(HTMLParser):
             if size:
                 overrides["font_size"] = size
             bg = _css_color_to_hex(style.get("background-color", ""))
+            if not bg:
+                bg = _css_color_to_hex(style.get("background", ""))
             if bg:
                 overrides["bg_color"] = bg
             self._push_style(**overrides)
@@ -525,12 +573,57 @@ class HwpxHtmlParser(HTMLParser):
 
         # --- Paragraph / div ---
         if tag in ("p", "div"):
+            # flex 안의 p 닫힘 → 텍스트 이어 붙이기만
+            if self._flex_depth > 0 and tag == "p":
+                return
+
+            # flex 자식 div 닫힘 → 셀 수집
+            if self._flex_depth > 0 and tag == "div" and self._in_flex_cell:
+                text = self._text_buf.strip()
+                self._text_buf = ""
+                if text:
+                    self._flex_cells.append(text)
+                self._in_flex_cell = False
+                if len(self._style_stack) > 1:
+                    self._pop_style()
+                return
+
+            # flex 컨테이너 div 닫힘 → 표 생성
+            if self._flex_depth > 0 and tag == "div":
+                # 마지막 텍스트도 수집
+                text = self._text_buf.strip()
+                self._text_buf = ""
+                if text:
+                    self._flex_cells.append(text)
+                self._flex_depth -= 1
+                if self._flex_cells:
+                    # 셀에 줄바꿈이 있으면 행으로 분리
+                    max_lines = max(len(c.split('\n')) for c in self._flex_cells)
+                    cols = len(self._flex_cells)
+                    if max_lines > 1:
+                        # 여러 행: 각 셀의 줄바꿈을 행으로
+                        rows_data = []
+                        for row_idx in range(max_lines):
+                            row = []
+                            for cell in self._flex_cells:
+                                lines = cell.split('\n')
+                                row.append(lines[row_idx] if row_idx < len(lines) else '')
+                            rows_data.append(row)
+                        api.add_table(self.hwpx, rows=max_lines, cols=cols,
+                                      data=rows_data)
+                    else:
+                        api.add_table(self.hwpx, rows=1, cols=cols,
+                                      data=[self._flex_cells])
+                    self._flex_cells = []
+                return
+
             text = self._text_buf.strip()
             self._text_buf = ""
             if text:
                 self._emit_text(text)
-            # Pop style if we pushed one in starttag
-            # (we pushed only if there were CSS overrides — pop cautiously)
+                # p 태그 후 문단 간격 (빈 단락 추가)
+                if tag == "p":
+                    api.add_paragraph(self.hwpx, "")
             if len(self._style_stack) > 1:
                 self._pop_style()
             return
@@ -608,20 +701,12 @@ class HwpxHtmlParser(HTMLParser):
             self._table_data = []
             return
 
-        # --- Inline styles ---
+        # --- Inline styles (flush 없이 pop만 — 텍스트는 블록 태그에서 처리) ---
         if tag in ("strong", "b", "em", "i", "u", "s", "strike", "del"):
-            text = self._text_buf.strip()
-            self._text_buf = ""
-            if text:
-                self._emit_text(text)
             self._pop_style()
             return
 
         if tag == "span":
-            text = self._text_buf.strip()
-            self._text_buf = ""
-            if text:
-                self._emit_text(text)
             self._pop_style()
             return
 

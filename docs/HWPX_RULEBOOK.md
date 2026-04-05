@@ -774,3 +774,21 @@ cd = int(pp.get('condense', '0'))
 if cd:
     info['condense'] = cd
 ```
+
+## 28. HTML→HWPX 변환 시 하이퍼링크(`<a>`) 제거 필수
+
+HTML의 `<a href>` 태그가 HWPX의 `fieldBegin/fieldEnd` 구조로 변환되면
+Whale에서 파일이 열리지 않는 에러 발생.
+
+```python
+# ❌ 에러 — <a> 태그 포함 HTML 변환 시 Whale 렌더링 실패
+convert_html_to_hwpx(doc, html_with_links)
+
+# ✅ 정상 — <a> 태그를 텍스트로 치환 후 변환
+import re
+html_clean = re.sub(r'<a\b[^>]*>(.*?)</a>', r'\1', html, flags=re.DOTALL)
+convert_html_to_hwpx(doc, html_clean)
+```
+
+**원인**: `fieldBegin/fieldEnd` 쌍이 올바르게 매칭되지 않거나, Whale 파서가 특정 field 구조를 처리 못함.
+**발견**: 2026-04-05 NVDA 블로그 HTML 변환 시 — 35000자까지 OK, `<a href="#">` 포함 시 에러.
