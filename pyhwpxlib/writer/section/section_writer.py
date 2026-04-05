@@ -20,9 +20,13 @@ from pyhwpxlib.object_type import ObjectType
 from pyhwpxlib.objects.section.section_xml_file import SectionXMLFile, SubList
 from pyhwpxlib.writer.xml_builder import XMLStringBuilder
 
-# Minimal namespaces matching python-hwpx reference output
+# Full namespaces matching Java hwpxlib output
 _SECTION_NAMESPACES = [
-    Namespaces.hp, Namespaces.hs, Namespaces.hc,
+    Namespaces.ha, Namespaces.hp, Namespaces.hp10,
+    Namespaces.hs, Namespaces.hc, Namespaces.hh,
+    Namespaces.hhs, Namespaces.hm, Namespaces.hpf,
+    Namespaces.dc, Namespaces.opf, Namespaces.ooxmlchart,
+    Namespaces.hwpunitchar, Namespaces.epub, Namespaces.config,
 ]
 
 
