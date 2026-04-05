@@ -18,6 +18,13 @@ _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
 
+# OWPML 기본값 상수 (1/7200 inch 단위)
+PAGE_WIDTH = 59528       # A4 가로
+PAGE_HEIGHT = 84188      # A4 세로
+CELL_MARGIN = 141        # 셀 기본 마진
+ROW_HEIGHT = 3600        # 행 기본 높이
+NESTED_OUT_MARGIN = 283  # 중첩 표 바깥 마진
+
 
 # ============================================================
 # EXTRACT: HWPX/OWPML → JSON
@@ -69,7 +76,7 @@ def extract_form(path):
         '_raw_borderFills': raw_borderFills,
         '_raw_paraProperties': raw_paraProperties,
         '_raw_header_xml': raw_header_xml,
-        # 하위 호환: 기존 필드도 유지
+        # deprecated: paragraphs 모델로 통합됨. 테스트 호환용으로 유지.
         'tables': _extract_tables(sroot, hroot),
         'before_table_text': _extract_before_table_text(sroot),
         'p_count': len(paragraphs),
@@ -85,7 +92,7 @@ def _extract_page(sroot):
     margin = pp.find(f'{_HP}margin') if pp is not None else None
     return {
         'width': int(pp.get('width', 59528)),
-        'height': int(pp.get('height', 84188)),
+        'height': int(pp.get('height', PAGE_HEIGHT)),
         'landscape': pp.get('landscape', 'WIDELY'),
         'margin': {
             'left': int(margin.get('left', 8504)),
@@ -427,7 +434,7 @@ def _extract_cell(tc, ppr_map):
     vert_align = sub.get('vertAlign', 'CENTER') if sub is not None else 'CENTER'
     bf = tc.get('borderFillIDRef', '1')
     has_margin = tc.get('hasMargin', '0')
-    cell_margin = int(cm.get('left', 141)) if cm is not None else 141
+    cell_margin = int(cm.get('left', CELL_MARGIN)) if cm is not None else CELL_MARGIN
 
     # 줄별 정보 (paraPr + charPr + text + 중첩 표)
     # 중첩 표는 해당 line에 포함 (순서 보존)
@@ -696,18 +703,10 @@ def generate_form(form_data, output_path):
     # 5. p 단위 생성 (paragraphs 기반)
     paragraphs = form_data.get('paragraphs', [])
 
-    if paragraphs:
-        _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
-                                  get_or_create_paraPr, form_data)
-    else:
-        # 하위 호환: 기존 tables + before_table_text 방식
-        before_texts = form_data.get('before_table_text', [])
-        if before_texts:
-            default_cpr = cpr_map.get('4', cpr_map.get('0', 0))
-            for text in before_texts:
-                doc.add_paragraph(text, char_pr_id_ref=default_cpr)
-        for tbl_data in form_data['tables']:
-            _generate_table(doc, tbl_data, cpr_map, bf_map, get_or_create_paraPr)
+    if not paragraphs:
+        raise ValueError("paragraphs 데이터가 없습니다. extract_form()으로 추출한 데이터를 사용하세요.")
+    _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
+                              get_or_create_paraPr, form_data)
 
     # paraPr itemCnt 업데이트
     pp_container.set("itemCnt", str(len(pp_container)))
@@ -717,32 +716,32 @@ def generate_form(form_data, output_path):
     # save_to_path가 header를 재생성하므로, fontfaces/charProperties/borderFills만 원본으로 교체
     if _use_raw_header:
         import shutil, tempfile
-        tmp = tempfile.mktemp(suffix='.hwpx')
-        shutil.copy2(output_path, tmp)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = os.path.join(tmpdir, 'temp.hwpx')
+            shutil.copy2(output_path, tmp)
 
-        with zipfile.ZipFile(tmp, 'r') as zin:
-            saved_header = zin.read('Contents/header.xml').decode('utf-8')
+            with zipfile.ZipFile(tmp, 'r') as zin:
+                saved_header = zin.read('Contents/header.xml').decode('utf-8')
 
-        for tag_name, raw_xml in [('fontfaces', raw_ff), ('charProperties', raw_cp), ('borderFills', raw_bf)]:
-            pattern = r'<[^>]*?' + tag_name + r'[^>]*>.*?</[^>]*?' + tag_name + r'>'
-            match = re.search(pattern, saved_header, re.DOTALL)
-            if match:
-                saved_header = saved_header[:match.start()] + raw_xml + saved_header[match.end():]
+            for tag_name, raw_xml in [('fontfaces', raw_ff), ('charProperties', raw_cp), ('borderFills', raw_bf)]:
+                pattern = r'<[^>]*?' + tag_name + r'[^>]*>.*?</[^>]*?' + tag_name + r'>'
+                match = re.search(pattern, saved_header, re.DOTALL)
+                if match:
+                    saved_header = saved_header[:match.start()] + raw_xml + saved_header[match.end():]
 
-        # paraPr의 border borderFillIDRef를 "1"(NONE)로 변경 — 글자 박스 방지
-        saved_header = re.sub(
-            r'(<[^>]*?border[^>]*borderFillIDRef=")[^"]*(")',
-            r'\g<1>1\2',
-            saved_header
-        )
+            # paraPr의 border borderFillIDRef를 "1"(NONE)로 변경 — 글자 박스 방지
+            saved_header = re.sub(
+                r'(<[^>]*?border[^>]*borderFillIDRef=")[^"]*(")',
+                r'\g<1>1\2',
+                saved_header
+            )
 
-        with zipfile.ZipFile(tmp, 'r') as zin, zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
-            for item in zin.namelist():
-                if item == 'Contents/header.xml':
-                    zout.writestr(item, saved_header)
-                else:
-                    zout.writestr(item, zin.read(item))
-        os.remove(tmp)
+            with zipfile.ZipFile(tmp, 'r') as zin, zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.namelist():
+                    if item == 'Contents/header.xml':
+                        zout.writestr(item, saved_header)
+                    else:
+                        zout.writestr(item, zin.read(item))
 
     return output_path
 
@@ -882,6 +881,256 @@ def _generate_from_paragraphs(doc, sec, paragraphs, cpr_map, bf_map,
             first_para = False
 
 
+def _apply_merges(table, tbl, rows, cols):
+    """셀 병합 — 가로 먼저, 세로 나중 (빈 행 방지) + 병합 후 크기 재설정"""
+    h_merges = [m for m in tbl['merges'] if m['r1'] == m['r2'] and m['c1'] != m['c2']]
+    v_merges = [m for m in tbl['merges'] if m['r1'] != m['r2']]
+
+    for m in h_merges:
+        if m['r2'] >= rows or m['c2'] >= cols:
+            continue
+        try:
+            table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
+        except Exception as e:
+            logger.warning("Failed to merge cells horizontally [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
+    for m in v_merges:
+        if m['r2'] >= rows or m['c2'] >= cols:
+            continue
+        try:
+            table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
+        except Exception as e:
+            logger.warning("Failed to merge cells vertically [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
+
+    # 병합 후 cellSz를 원본 값으로 재설정
+    for cell_data in tbl['cells']:
+        r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
+        try:
+            cell = table.cell(r, c)
+            cell.set_size(width=cell_data['width'], height=cell_data['height'])
+        except Exception as e:
+            logger.warning("Failed to reset cell size after merge [row=%s, col=%s]: %s", r, c, e)
+
+
+def _apply_cell_alignment(table, tbl, rows, cols, get_or_create_paraPr):
+    """셀별 정렬 — 줄별 paraPr 적용"""
+    for cell_data in tbl['cells']:
+        r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
+        try:
+            cell = table.cell(r, c)
+            sub = cell.element.find(f"{_HP}subList")
+            if sub is None:
+                continue
+
+            sub.set("vertAlign", cell_data.get('vertAlign', 'CENTER'))
+
+            ps = sub.findall(f"{_HP}p")
+            for i, p in enumerate(ps):
+                if i < len(cell_data['lines']):
+                    line = cell_data['lines'][i]
+                    ppid = get_or_create_paraPr(
+                        line.get('horizontal', 'JUSTIFY'),
+                        line.get('lineSpacing', 0),
+                        line.get('margin_left', 0),
+                        line.get('margin_right', 0),
+                        line.get('margin_prev', 0),
+                        line.get('margin_next', 0),
+                    )
+                    p.set("paraPrIDRef", ppid)
+        except Exception as e:
+            logger.warning("Failed to apply paraPr alignment [row=%s, col=%s]: %s", r, c, e)
+
+
+def _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or_create_paraPr):
+    """중첩 표 생성 — 셀 안에 표 삽입 (재귀)"""
+    try:
+        from lxml import etree as LET2
+    except ImportError:
+        import xml.etree.ElementTree as LET2
+
+    for cell_data in tbl['cells']:
+        has_any_nested = any(
+            line.get('nested_tables', [])
+            for line in cell_data.get('lines', [])
+        )
+        if not has_any_nested and not cell_data.get('nested_tables', []):
+            continue
+        r, c = cell_data['row'], cell_data['col']
+        if r >= rows or c >= cols:
+            continue
+        try:
+            cell = table.cell(r, c)
+            sub = cell.element.find(f"{_HP}subList")
+            if sub is None:
+                continue
+
+            all_nested = []
+            for li, line in enumerate(cell_data.get('lines', [])):
+                for ntbl_data in line.get('nested_tables', []):
+                    all_nested.append((li, ntbl_data))
+            if not all_nested:
+                for ntbl_data in cell_data.get('nested_tables', []):
+                    all_nested.append((-1, ntbl_data))
+
+            for insert_after_line, ntbl_data in all_nested:
+                ntbl_rows = ntbl_data['rows']
+                ntbl_cols = ntbl_data['cols']
+                ntbl_w = ntbl_data['width']
+                ntbl_h = ntbl_data['height']
+
+                temp_tbl = doc.add_table(ntbl_rows, ntbl_cols, width=ntbl_w)
+
+                nsz = temp_tbl.element.find(f"{_HP}sz")
+                if nsz is not None:
+                    nsz.set("width", str(ntbl_w))
+                    nsz.set("height", str(ntbl_h))
+                else:
+                    logger.warning("sz element not found in nested table; skipping size (w=%s, h=%s)", ntbl_w, ntbl_h)
+
+                npos = temp_tbl.element.find(f"{_HP}pos")
+                if npos is not None and ntbl_data.get('pos'):
+                    for k, v in ntbl_data['pos'].items():
+                        npos.set(k, v)
+
+                n_om = ntbl_data.get('outMargin', NESTED_OUT_MARGIN)
+                n_im = ntbl_data.get('inMargin', 510)
+                nom_el = temp_tbl.element.find(f"{_HP}outMargin")
+                if nom_el is not None:
+                    for k in ["left","right","top","bottom"]:
+                        nom_el.set(k, str(n_om))
+                temp_tbl.set_in_margin(left=n_im, right=n_im, top=CELL_MARGIN, bottom=CELL_MARGIN)
+
+                ncol_widths = ntbl_data.get('col_widths', [])
+                nrow_heights = ntbl_data.get('row_heights', [])
+                for nr in range(ntbl_rows):
+                    for nc in range(ntbl_cols):
+                        try:
+                            ncell = temp_tbl.cell(nr, nc)
+                            cw = ncol_widths[nc] if nc < len(ncol_widths) and ncol_widths[nc] else ntbl_w // ntbl_cols
+                            rh = nrow_heights[nr] if nr < len(nrow_heights) and nrow_heights[nr] else ROW_HEIGHT
+                            ncell.set_size(width=cw, height=rh)
+                        except Exception as e:
+                            logger.warning("Failed to set nested cell size [row=%s, col=%s]: %s", nr, nc, e)
+
+                for ncell_data in ntbl_data.get('cells', []):
+                    nr, nc = ncell_data['row'], ncell_data['col']
+                    if nr >= ntbl_rows or nc >= ntbl_cols:
+                        continue
+                    text_parts = []
+                    for line in ncell_data.get('lines', []):
+                        line_text = ''.join(run['text'] for run in line.get('runs', []))
+                        text_parts.append(line_text)
+                    full_text = '\n'.join(text_parts)
+                    if full_text.strip():
+                        try:
+                            temp_tbl.set_cell_text(nr, nc, full_text)
+                        except Exception as e:
+                            logger.warning("Failed to set nested cell text [row=%s, col=%s]: %s", nr, nc, e)
+
+                    try:
+                        ncell = temp_tbl.cell(nr, nc)
+
+                        if ncell_data.get('lines'):
+                            first_runs = ncell_data['lines'][0].get('runs', [])
+                            if first_runs:
+                                orig_cpr = first_runs[0].get('charPr', '0')
+                                new_cpr = cpr_map.get(orig_cpr, 0)
+                                nsub = ncell.element.find(f"{_HP}subList")
+                                if nsub is not None:
+                                    for np in nsub.findall(f"{_HP}p"):
+                                        for nrun in np.findall(f"{_HP}run"):
+                                            nrun.set("charPrIDRef", str(new_cpr))
+
+                        orig_bf = ncell_data.get('borderFillIDRef', '1')
+                        new_bf = bf_map.get(orig_bf, '1')
+                        ncell.set_border_fill_id(new_bf)
+
+                        cm_el = ncell.element.find(f"{_HP}cellMargin")
+                        if cm_el is not None:
+                            cm_val = ncell_data.get('cellMargin', CELL_MARGIN)
+                            cm_el.set("left", str(cm_val)); cm_el.set("right", str(cm_val))
+                            cm_el.set("top", str(CELL_MARGIN)); cm_el.set("bottom", str(CELL_MARGIN))
+                        ncell.element.set("hasMargin", "0")
+
+                        nsub = ncell.element.find(f"{_HP}subList")
+                        if nsub is not None:
+                            nsub.set("vertAlign", ncell_data.get('vertAlign', 'CENTER'))
+                            nps = nsub.findall(f"{_HP}p")
+                            for ni, np in enumerate(nps):
+                                if ni < len(ncell_data.get('lines', [])):
+                                    line = ncell_data['lines'][ni]
+                                    ppid = get_or_create_paraPr(
+                                        line.get('horizontal', 'JUSTIFY'),
+                                        line.get('lineSpacing', 0),
+                                        line.get('margin_left', 0),
+                                        line.get('margin_right', 0),
+                                        line.get('margin_prev', 0),
+                                        line.get('margin_next', 0),
+                                    )
+                                    np.set("paraPrIDRef", ppid)
+                    except Exception as e:
+                        logger.warning("Failed to apply nested cell paraPr [row=%s, col=%s]: %s", nr, nc, e)
+
+                for ncell_data in ntbl_data.get('cells', []):
+                    nr, nc = ncell_data['row'], ncell_data['col']
+                    if nr >= ntbl_rows or nc >= ntbl_cols:
+                        continue
+                    try:
+                        ncell = temp_tbl.cell(nr, nc)
+                        ncell.set_size(width=ncell_data['width'], height=ncell_data['height'])
+                    except Exception as e:
+                        logger.warning("Failed to reset nested cell size [row=%s, col=%s]: %s", nr, nc, e)
+
+                for m in ntbl_data.get('merges', []):
+                    if m['r2'] < ntbl_rows and m['c2'] < ntbl_cols:
+                        try:
+                            temp_tbl.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
+                        except Exception as e:
+                            logger.warning("Failed to merge nested cells [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
+
+                section_el = doc.sections[0].element if hasattr(doc.sections[0], 'element') else doc.sections[0]._element
+                for sp in list(section_el.findall(f'{_HP}p')):
+                    tbl_el = sp.find(f'.//{_HP}tbl')
+                    if tbl_el is not None and tbl_el is temp_tbl.element:
+                        new_p = LET2.Element(f'{_HP}p')
+                        new_p.set('id', '0')
+                        new_p.set('paraPrIDRef', '0')
+                        new_p.set('styleIDRef', '0')
+                        new_p.set('pageBreak', '0')
+                        new_p.set('columnBreak', '0')
+                        new_p.set('merged', '0')
+                        new_run = LET2.SubElement(new_p, f'{_HP}run')
+                        new_run.set('charPrIDRef', '0')
+                        for run in sp.findall(f'{_HP}run'):
+                            for ch in list(run):
+                                tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
+                                if tag == 'tbl':
+                                    run.remove(ch)
+                                    new_run.append(ch)
+                        marker_found = False
+                        for mp in list(sub.findall(f'{_HP}p')):
+                            if mp.get('_nested_marker') == '1':
+                                idx = list(sub).index(mp)
+                                sub.remove(mp)
+                                sub.insert(idx, new_p)
+                                marker_found = True
+                                break
+                        if not marker_found:
+                            existing_ps = list(sub.findall(f'{_HP}p'))
+                            if insert_after_line >= 0 and insert_after_line < len(existing_ps):
+                                insert_idx = list(sub).index(existing_ps[insert_after_line]) + 1
+                                sub.insert(insert_idx, new_p)
+                            else:
+                                sub.append(new_p)
+                        section_el.remove(sp)
+                        break
+        except Exception as e:
+            logger.warning("Failed to insert nested table into cell [row=%s, col=%s]: %s", r, c, e)
+
+
 def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
     """단일 표 생성"""
     rows = tbl['rows']
@@ -924,9 +1173,9 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             try:
                 cell = table.cell(r, c)
                 cw = col_widths[c] if c < len(col_widths) and col_widths[c] is not None else tw // cols
-                rh = row_heights[r] if r < len(row_heights) and row_heights[r] is not None else 3600
+                rh = row_heights[r] if r < len(row_heights) and row_heights[r] is not None else ROW_HEIGHT
                 cell.set_size(width=cw, height=rh)
-                cm = tbl['cells'][0].get('cellMargin', 141) if tbl['cells'] else 141
+                cm = tbl['cells'][0].get('cellMargin', CELL_MARGIN) if tbl['cells'] else CELL_MARGIN
                 cell.set_margin(left=cm, right=cm, top=cm, bottom=cm)
             except Exception as e:
                 logger.warning("Failed to set cell size/margin [row=%s, col=%s]: %s", r, c, e)
@@ -1000,7 +1249,7 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             if full_text.strip():
                 try:
                     table.set_cell_text(r, c, full_text)
-                except (IndexError, Exception):
+                except (IndexError, AttributeError, ValueError):
                     continue
 
         try:
@@ -1026,270 +1275,10 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         except Exception as e:
             logger.warning("Failed to apply cell style [row=%s, col=%s]: %s", r, c, e)
 
-    # 병합 — 가로 먼저, 세로 나중 (빈 행 방지)
-    h_merges = [m for m in tbl['merges'] if m['r1'] == m['r2'] and m['c1'] != m['c2']]
-    v_merges = [m for m in tbl['merges'] if m['r1'] != m['r2']]
-    hv_merges = [m for m in tbl['merges'] if m['r1'] != m['r2'] and m['c1'] != m['c2']]
+    _apply_merges(table, tbl, rows, cols)
+    _apply_cell_alignment(table, tbl, rows, cols, get_or_create_paraPr)
 
-    for m in h_merges:
-        if m['r2'] >= rows or m['c2'] >= cols:
-            continue
-        try:
-            table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-        except Exception as e:
-            logger.warning("Failed to merge cells horizontally [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
-    for m in v_merges:
-        if m['r2'] >= rows or m['c2'] >= cols:
-            continue
-        try:
-            table.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-        except Exception as e:
-            logger.warning("Failed to merge cells vertically [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
-
-    # 병합 후 cellSz를 원본 값으로 재설정 (병합이 크기를 바꿀 수 있음)
-    for cell_data in tbl['cells']:
-        r, c = cell_data['row'], cell_data['col']
-        if r >= rows or c >= cols:
-            continue
-        try:
-            cell = table.cell(r, c)
-            cell.set_size(width=cell_data['width'], height=cell_data['height'])
-        except Exception as e:
-            logger.warning("Failed to reset cell size after merge [row=%s, col=%s]: %s", r, c, e)
-
-    # 정렬 — 줄별 paraPr 적용
-    for cell_data in tbl['cells']:
-        r, c = cell_data['row'], cell_data['col']
-        if r >= rows or c >= cols:
-            continue
-        try:
-            cell = table.cell(r, c)
-            sub = cell.element.find(f"{_HP}subList")
-            if sub is None:
-                continue
-
-            sub.set("vertAlign", cell_data.get('vertAlign', 'CENTER'))
-
-            ps = sub.findall(f"{_HP}p")
-            for i, p in enumerate(ps):
-                if i < len(cell_data['lines']):
-                    line = cell_data['lines'][i]
-                    ppid = get_or_create_paraPr(
-                        line.get('horizontal', 'JUSTIFY'),
-                        line.get('lineSpacing', 0),
-                        line.get('margin_left', 0),
-                        line.get('margin_right', 0),
-                        line.get('margin_prev', 0),
-                        line.get('margin_next', 0),
-                    )
-                    p.set("paraPrIDRef", ppid)
-        except Exception as e:
-            logger.warning("Failed to apply paraPr alignment [row=%s, col=%s]: %s", r, c, e)
-
-    # 중첩 표 생성 — 셀 안에 표 삽입 (재귀)
-    try:
-        from lxml import etree as LET2
-    except ImportError:
-        import xml.etree.ElementTree as LET2
-
-    for cell_data in tbl['cells']:
-        # line별 중첩 표 확인
-        has_any_nested = any(
-            line.get('nested_tables', [])
-            for line in cell_data.get('lines', [])
-        )
-        # 하위호환: 기존 nested_tables도 확인
-        if not has_any_nested and not cell_data.get('nested_tables', []):
-            continue
-        r, c = cell_data['row'], cell_data['col']
-        if r >= rows or c >= cols:
-            continue
-        try:
-            cell = table.cell(r, c)
-            sub = cell.element.find(f"{_HP}subList")
-            if sub is None:
-                continue
-
-            # line별 중첩 표 수집 (순서 보존)
-            all_nested = []
-            for li, line in enumerate(cell_data.get('lines', [])):
-                for ntbl_data in line.get('nested_tables', []):
-                    all_nested.append((li, ntbl_data))
-            # 하위호환
-            if not all_nested:
-                for ntbl_data in cell_data.get('nested_tables', []):
-                    all_nested.append((-1, ntbl_data))
-
-            for insert_after_line, ntbl_data in all_nested:
-                # 중첩 표를 위한 새 p > run > tbl 구조 생성
-                # 임시로 doc.add_table 사용 후 표 element를 셀 안으로 이동
-                ntbl_rows = ntbl_data['rows']
-                ntbl_cols = ntbl_data['cols']
-                ntbl_w = ntbl_data['width']
-                ntbl_h = ntbl_data['height']
-
-                # 임시 표 생성
-                temp_tbl = doc.add_table(ntbl_rows, ntbl_cols, width=ntbl_w)
-
-                # 표 크기 설정
-                nsz = temp_tbl.element.find(f"{_HP}sz")
-                if nsz is not None:
-                    nsz.set("width", str(ntbl_w))
-                    nsz.set("height", str(ntbl_h))
-                else:
-                    logger.warning("sz element not found in nested table; skipping size (w=%s, h=%s)", ntbl_w, ntbl_h)
-
-                # pos 복원
-                npos = temp_tbl.element.find(f"{_HP}pos")
-                if npos is not None and ntbl_data.get('pos'):
-                    for k, v in ntbl_data['pos'].items():
-                        npos.set(k, v)
-
-                # outMargin + inMargin 원본값 복원
-                n_om = ntbl_data.get('outMargin', 283)
-                n_im = ntbl_data.get('inMargin', 510)
-                nom_el = temp_tbl.element.find(f"{_HP}outMargin")
-                if nom_el is not None:
-                    for k in ["left","right","top","bottom"]:
-                        nom_el.set(k, str(n_om))
-                temp_tbl.set_in_margin(left=n_im, right=n_im, top=141, bottom=141)
-
-                # 셀 크기 + 텍스트
-                ncol_widths = ntbl_data.get('col_widths', [])
-                nrow_heights = ntbl_data.get('row_heights', [])
-                for nr in range(ntbl_rows):
-                    for nc in range(ntbl_cols):
-                        try:
-                            ncell = temp_tbl.cell(nr, nc)
-                            cw = ncol_widths[nc] if nc < len(ncol_widths) and ncol_widths[nc] else ntbl_w // ntbl_cols
-                            rh = nrow_heights[nr] if nr < len(nrow_heights) and nrow_heights[nr] else 3600
-                            ncell.set_size(width=cw, height=rh)
-                        except Exception as e:
-                            logger.warning("Failed to set nested cell size [row=%s, col=%s]: %s", nr, nc, e)
-
-                # 셀 텍스트 + charPr + borderFill + lineSpacing
-                for ncell_data in ntbl_data.get('cells', []):
-                    nr, nc = ncell_data['row'], ncell_data['col']
-                    if nr >= ntbl_rows or nc >= ntbl_cols:
-                        continue
-                    text_parts = []
-                    for line in ncell_data.get('lines', []):
-                        line_text = ''.join(run['text'] for run in line.get('runs', []))
-                        text_parts.append(line_text)
-                    full_text = '\n'.join(text_parts)
-                    if full_text.strip():
-                        try:
-                            temp_tbl.set_cell_text(nr, nc, full_text)
-                        except Exception as e:
-                            logger.warning("Failed to set nested cell text [row=%s, col=%s]: %s", nr, nc, e)
-
-                    try:
-                        ncell = temp_tbl.cell(nr, nc)
-
-                        # charPr 적용
-                        if ncell_data.get('lines'):
-                            first_runs = ncell_data['lines'][0].get('runs', [])
-                            if first_runs:
-                                orig_cpr = first_runs[0].get('charPr', '0')
-                                new_cpr = cpr_map.get(orig_cpr, 0)
-                                nsub = ncell.element.find(f"{_HP}subList")
-                                if nsub is not None:
-                                    for np in nsub.findall(f"{_HP}p"):
-                                        for nrun in np.findall(f"{_HP}run"):
-                                            nrun.set("charPrIDRef", str(new_cpr))
-
-                        # borderFill 적용
-                        orig_bf = ncell_data.get('borderFillIDRef', '1')
-                        new_bf = bf_map.get(orig_bf, '1')
-                        ncell.set_border_fill_id(new_bf)
-
-                        # cellMargin — hasMargin=0 유지 (원본 패턴)
-                        cm_el = ncell.element.find(f"{_HP}cellMargin")
-                        if cm_el is not None:
-                            cm_val = ncell_data.get('cellMargin', 141)
-                            cm_el.set("left", str(cm_val)); cm_el.set("right", str(cm_val))
-                            cm_el.set("top", "141"); cm_el.set("bottom", "141")
-                        ncell.element.set("hasMargin", "0")
-
-                        # lineSpacing — 줄별 paraPr 적용
-                        nsub = ncell.element.find(f"{_HP}subList")
-                        if nsub is not None:
-                            nsub.set("vertAlign", ncell_data.get('vertAlign', 'CENTER'))
-                            nps = nsub.findall(f"{_HP}p")
-                            for ni, np in enumerate(nps):
-                                if ni < len(ncell_data.get('lines', [])):
-                                    line = ncell_data['lines'][ni]
-                                    ppid = get_or_create_paraPr(
-                                        line.get('horizontal', 'JUSTIFY'),
-                                        line.get('lineSpacing', 0),
-                                        line.get('margin_left', 0),
-                                        line.get('margin_right', 0),
-                                        line.get('margin_prev', 0),
-                                        line.get('margin_next', 0),
-                                    )
-                                    np.set("paraPrIDRef", ppid)
-                    except Exception as e:
-                        logger.warning("Failed to apply nested cell paraPr [row=%s, col=%s]: %s", nr, nc, e)
-
-                # cellSz 재설정 (병합 후 변경 대비)
-                for ncell_data in ntbl_data.get('cells', []):
-                    nr, nc = ncell_data['row'], ncell_data['col']
-                    if nr >= ntbl_rows or nc >= ntbl_cols:
-                        continue
-                    try:
-                        ncell = temp_tbl.cell(nr, nc)
-                        ncell.set_size(width=ncell_data['width'], height=ncell_data['height'])
-                    except Exception as e:
-                        logger.warning("Failed to reset nested cell size [row=%s, col=%s]: %s", nr, nc, e)
-
-                # 병합
-                for m in ntbl_data.get('merges', []):
-                    if m['r2'] < ntbl_rows and m['c2'] < ntbl_cols:
-                        try:
-                            temp_tbl.merge_cells(m['r1'], m['c1'], m['r2'], m['c2'])
-                        except Exception as e:
-                            logger.warning("Failed to merge nested cells [(%s,%s)-(%s,%s)]: %s", m['r1'], m['c1'], m['r2'], m['c2'], e)
-
-                # 생성된 표 element를 셀의 subList 안으로 이동 (올바른 위치에)
-                section_el = doc.sections[0].element if hasattr(doc.sections[0], 'element') else doc.sections[0]._element
-                for sp in list(section_el.findall(f'{_HP}p')):
-                    tbl_el = sp.find(f'.//{_HP}tbl')
-                    if tbl_el is not None and tbl_el is temp_tbl.element:
-                        new_p = LET2.Element(f'{_HP}p')
-                        new_p.set('id', '0')
-                        new_p.set('paraPrIDRef', '0')
-                        new_p.set('styleIDRef', '0')
-                        new_p.set('pageBreak', '0')
-                        new_p.set('columnBreak', '0')
-                        new_p.set('merged', '0')
-                        new_run = LET2.SubElement(new_p, f'{_HP}run')
-                        new_run.set('charPrIDRef', '0')
-                        for run in sp.findall(f'{_HP}run'):
-                            for ch in list(run):
-                                tag = ch.tag.split('}')[1] if '}' in ch.tag else ch.tag
-                                if tag == 'tbl':
-                                    run.remove(ch)
-                                    new_run.append(ch)
-                        # 마커 p를 찾아서 교체, 없으면 line index로 삽입
-                        marker_found = False
-                        for mp in list(sub.findall(f'{_HP}p')):
-                            if mp.get('_nested_marker') == '1':
-                                idx = list(sub).index(mp)
-                                sub.remove(mp)
-                                sub.insert(idx, new_p)
-                                marker_found = True
-                                break
-                        if not marker_found:
-                            existing_ps = list(sub.findall(f'{_HP}p'))
-                            if insert_after_line >= 0 and insert_after_line < len(existing_ps):
-                                insert_idx = list(sub).index(existing_ps[insert_after_line]) + 1
-                                sub.insert(insert_idx, new_p)
-                            else:
-                                sub.append(new_p)
-                        section_el.remove(sp)
-                        break
-        except Exception as e:
-            logger.warning("Failed to insert nested table into cell [row=%s, col=%s]: %s", r, c, e)
+    _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or_create_paraPr)
 
 
 # ============================================================

@@ -23,6 +23,16 @@ from .hwpx_file import HWPXFile
 from .objects.section.paragraph import Para, Run, T
 
 
+def _init_para(para, para_pr_id_ref="0", style_id_ref="0", page_break=False):
+    """Initialize common paragraph attributes."""
+    para.id = str(_random.randint(1000000000, 4294967295))
+    para.para_pr_id_ref = para_pr_id_ref
+    para.style_id_ref = style_id_ref
+    para.page_break = page_break
+    para.column_break = False
+    para.merged = False
+
+
 def create_document() -> HWPXFile:
     """Create a new blank HWPX document ready for content."""
     from .tools.blank_file_maker import BlankFileMaker
@@ -88,12 +98,7 @@ def add_table(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_table_xml(
         rows, cols, data, width,
         merge_info=merge_info,
@@ -249,12 +254,7 @@ def add_rectangle(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_rectangle_xml(
         width, height, line_color, line_width, fill_color,
         text=text, caption=caption, shadow_type=shadow_type,
@@ -289,12 +289,7 @@ def add_ellipse(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_ellipse_xml(
         width, height, line_color, line_width, fill_color,
         text=text, caption=caption, shadow_type=shadow_type,
@@ -329,12 +324,7 @@ def add_line(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_line_xml(
         x1, y1, x2, y2, line_color, line_width,
         head_style=head_style, tail_style=tail_style,
@@ -366,12 +356,7 @@ def add_arc(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_arc_xml(
         center_x, center_y, ax1_x, ax1_y, ax2_x, ax2_y,
         arc_type=arc_type, line_color=line_color, line_width=line_width,
@@ -398,12 +383,7 @@ def add_polygon(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_polygon_xml(
         points, line_color=line_color, line_width=line_width,
         fill_color=fill_color,
@@ -429,12 +409,7 @@ def add_curve(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_curve_xml(
         segments, line_color=line_color, line_width=line_width,
     )
@@ -456,12 +431,7 @@ def add_connect_line(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_connect_line_xml(
         start_x, start_y, end_x, end_y,
         line_color=line_color, line_width=line_width,
@@ -486,12 +456,7 @@ def add_paragraph(
     section = hwpx_file.section_xml_file_list.get(section_index)
 
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = para_pr_id_ref
-    para.style_id_ref = style_id_ref
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para, para_pr_id_ref=para_pr_id_ref, style_id_ref=style_id_ref)
 
     run = para.add_new_run()
     run.char_pr_id_ref = char_pr_id_ref
@@ -516,12 +481,7 @@ def _new_raw_para(hwpx_file: HWPXFile, section_index: int = 0) -> Para:
     """Create and return a new blank paragraph attached to the section."""
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     return para
 
 
@@ -827,12 +787,7 @@ def add_header(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = Para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_header_xml(
         _sanitize_text(text), char_pr_id_ref,
     )
@@ -859,12 +814,7 @@ def add_footer(
 
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = Para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = False
-    para.column_break = False
-    para.merged = False
+    _init_para(para)
     para.raw_xml_content = build_footer_xml(
         _sanitize_text(text), char_pr_id_ref,
     )
@@ -2012,12 +1962,7 @@ def _add_page_break(hwpx_file: HWPXFile, section_index: int = 0) -> Para:
     """Insert a paragraph that forces a page break."""
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
-    para.id = str(_random.randint(1000000000, 4294967295))
-    para.para_pr_id_ref = "0"
-    para.style_id_ref = "0"
-    para.page_break = True
-    para.column_break = False
-    para.merged = False
+    _init_para(para, page_break=True)
     run = para.add_new_run()
     run.char_pr_id_ref = "0"
     t = run.add_new_t()
