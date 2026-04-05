@@ -824,11 +824,13 @@ def _build_hwpx(hwp: _HWPDocument) -> Any:
     # Start from a blank file for proper structure
     hwpx = BlankFileMaker.make()
 
-    # Build bin_data_id_map: HWP binDataID -> HWPX href string
-    # Use "imageN" naming to match Java hwp2hwpx output convention.
-    # Store on hwp so all builders can access it without extra params.
+    # Build bin_data_id_map: HWP binDataID -> HWPX item ID (e.g. "image1")
+    # Also build bin_data_path_map for ZIP paths (e.g. "BinData/image1.png")
+    hwp.bin_data_path_map = {}
     for bin_id, ext in hwp.bin_data_ids.items():
-        hwp.bin_data_id_map[bin_id] = f"BinData/image{bin_id}.{ext}"
+        item_id = f"image{bin_id}"
+        hwp.bin_data_id_map[bin_id] = item_id
+        hwp.bin_data_path_map[bin_id] = f"BinData/{item_id}.{ext}"
 
     # Overwrite with HWP data
     _build_version(hwpx, hwp)
@@ -843,7 +845,7 @@ def _build_hwpx(hwp: _HWPDocument) -> Any:
         bin_bytes = hwp.read_bin_data_bytes()
         attachments: Dict[str, bytes] = {}
         for bin_id, data in bin_bytes.items():
-            path = hwp.bin_data_id_map.get(bin_id)
+            path = hwp.bin_data_path_map.get(bin_id)
             if path:
                 attachments[f"Contents/{path}"] = data
         hwpx._binary_attachments = attachments
@@ -2200,18 +2202,151 @@ def _is_gso_ctrl(rec_data: bytes) -> bool:
 
 def _build_picture_object(sub_records: List[dict], ctrl_rec: dict,
                            hwp: '_HWPDocument',
-                           bin_data_id_map: Dict[int, str]) -> Any:
-    """Build a Picture object from a GSO CTRL_HEADER + sub-records.
+                           bin_data_id_map: Dict[int, str]) -> Optional[str]:
+    """Build a Picture raw XML string from a GSO CTRL_HEADER + sub-records.
 
-    Returns a Picture object ready to add to a Run, or None if the GSO
-    is not a picture type.
+    Returns a raw XML string for the picture, or None if not a picture.
     """
     try:
-        return _build_picture_object_inner(
-            sub_records, ctrl_rec, hwp, bin_data_id_map)
+        return _build_picture_xml(sub_records, ctrl_rec, hwp, bin_data_id_map)
     except Exception as e:
         logger.debug("Error building picture object: %s", e)
         return None
+
+
+def _build_picture_xml(sub_records: List[dict], ctrl_rec: dict,
+                        hwp: '_HWPDocument',
+                        bin_data_id_map: Dict[int, str]) -> Optional[str]:
+    """Build picture as raw XML matching Java hwp2hwpx output order."""
+    from .value_convertor import color_from_int
+
+    # Check for SHAPE_COMPONENT_PICTURE record
+    pic_rec = None
+    shape_comp_rec = None
+    for rec in sub_records:
+        if rec['tag'] == _TAG_SHAPE_COMPONENT_PICTURE:
+            pic_rec = rec
+        elif rec['tag'] == _TAG_SHAPE_COMPONENT:
+            shape_comp_rec = rec
+    if pic_rec is None:
+        return None
+
+    # Parse CTRL_HEADER
+    cd = ctrl_rec['data']
+    if len(cd) < 28:
+        return None
+    prop = struct.unpack_from('<I', cd, 4)[0]
+    y_off = struct.unpack_from('<i', cd, 8)[0]
+    x_off = struct.unpack_from('<i', cd, 12)[0]
+    width = struct.unpack_from('<I', cd, 16)[0]
+    height = struct.unpack_from('<I', cd, 20)[0]
+    z_order = struct.unpack_from('<i', cd, 24)[0]
+    treat_as_char = bool(prop & 0x01)
+    instance_id = struct.unpack_from('<I', cd, 36)[0] if len(cd) >= 40 else 0
+    om = [0, 0, 0, 0]
+    if len(cd) >= 36:
+        om = [struct.unpack_from('<H', cd, 28+i*2)[0] for i in range(4)]
+
+    # Parse SHAPE_COMPONENT_PICTURE
+    pd = pic_rec['data']
+    # border(12) + corners(32) + crop(16) + inMargins(8) + pictureInfo
+    corners = [0]*8
+    crop = [0]*4
+    in_margins = [0]*4
+    bright = contrast = effect_val = 0
+    bin_item_id = 0
+    dim_width = dim_height = 0
+
+    if len(pd) >= 12 + 32:
+        for i in range(8):
+            corners[i] = struct.unpack_from('<i', pd, 12 + i*4)[0]
+    if len(pd) >= 12 + 32 + 16:
+        for i in range(4):
+            crop[i] = struct.unpack_from('<i', pd, 44 + i*4)[0]
+    if len(pd) >= 12 + 32 + 16 + 8:
+        for i in range(4):
+            in_margins[i] = struct.unpack_from('<H', pd, 60 + i*2)[0]
+    if len(pd) >= 71:
+        bright = pd[68]
+        contrast = pd[69]
+        effect_val = pd[70]
+    if len(pd) >= 73:
+        bin_item_id = struct.unpack_from('<H', pd, 71)[0]
+
+    # Resolve image reference
+    img_ref = bin_data_id_map.get(bin_item_id, "")
+    if not img_ref:
+        return None
+
+    # orgSz from corners (original image size)
+    org_w = abs(corners[2] - corners[0]) if corners[2] != corners[0] else abs(corners[4] - corners[0])
+    org_h = abs(corners[5] - corners[1]) if corners[5] != corners[1] else abs(corners[7] - corners[1])
+    if org_w == 0: org_w = width
+    if org_h == 0: org_h = height
+
+    # imgDim from crop
+    dim_width = crop[2] if crop[2] > 0 else org_w
+    dim_height = crop[3] if crop[3] > 0 else org_h
+
+    effect_map = {0: "REAL_PIC", 1: "GRAY_SCALE", 2: "BLACK_WHITE"}
+    effect_str = effect_map.get(effect_val, "REAL_PIC")
+
+    # Build XML in Java order
+    xml = f'<hp:pic id="{instance_id}" zOrder="{z_order}" numberingType="PICTURE"'
+    xml += f' textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0"'
+    xml += f' dropcapstyle="None" href="" groupLevel="0" instid="{instance_id}" reverse="0">'
+
+    # Shape component children (Java order)
+    xml += f'<hp:offset x="0" y="0"/>'
+    xml += f'<hp:orgSz width="{org_w}" height="{org_h}"/>'
+    xml += f'<hp:curSz width="{width}" height="{height}"/>'
+    xml += f'<hp:flip horizontal="0" vertical="0"/>'
+    cx = width // 2
+    cy = height // 2
+    xml += f'<hp:rotationInfo angle="0" centerX="{cx}" centerY="{cy}" rotateimage="1"/>'
+
+    # renderingInfo (scale matrix = curSz / orgSz)
+    sca_x = width / org_w if org_w > 0 else 1.0
+    sca_y = height / org_h if org_h > 0 else 1.0
+    xml += f'<hp:renderingInfo>'
+    xml += f'<hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+    xml += f'<hc:scaMatrix e1="{sca_x:.6f}" e2="0" e3="0" e4="0" e5="{sca_y:.6f}" e6="0"/>'
+    xml += f'<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+    xml += f'</hp:renderingInfo>'
+
+    # imgRect (use original size)
+    xml += f'<hp:imgRect>'
+    xml += f'<hc:pt0 x="0" y="0"/>'
+    xml += f'<hc:pt1 x="{org_w}" y="0"/>'
+    xml += f'<hc:pt2 x="{org_w}" y="{org_h}"/>'
+    xml += f'<hc:pt3 x="0" y="{org_h}"/>'
+    xml += f'</hp:imgRect>'
+
+    # imgClip
+    xml += f'<hp:imgClip left="{crop[0]}" right="{crop[2]}" top="{crop[1]}" bottom="{crop[3]}"/>'
+
+    # inMargin
+    xml += f'<hp:inMargin left="{in_margins[0]}" right="{in_margins[1]}" top="{in_margins[2]}" bottom="{in_margins[3]}"/>'
+
+    # imgDim
+    xml += f'<hp:imgDim dimwidth="{dim_width}" dimheight="{dim_height}"/>'
+
+    # img reference
+    xml += f'<hc:img binaryItemIDRef="{img_ref}" bright="{bright}" contrast="{contrast}" effect="{effect_str}" alpha="0"/>'
+
+    # effects (empty placeholder)
+    xml += f'<hp:effects/>'
+
+    # sz, pos, outMargin (after image data, matching Java order)
+    xml += f'<hp:sz width="{width}" widthRelTo="ABSOLUTE" height="{height}" heightRelTo="ABSOLUTE" protect="0"/>'
+    xml += f'<hp:pos treatAsChar="{1 if treat_as_char else 0}" affectLSpacing="0"'
+    xml += f' flowWithText="{1 if treat_as_char else 0}" allowOverlap="0" holdAnchorAndSO="0"'
+    xml += f' vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT"'
+    xml += f' vertOffset="{y_off}" horzOffset="{x_off}"/>'
+    xml += f'<hp:outMargin left="{om[0]}" right="{om[1]}" top="{om[2]}" bottom="{om[3]}"/>'
+
+    xml += f'</hp:pic>'
+    return xml
 
 
 def _build_picture_object_inner(sub_records: List[dict], ctrl_rec: dict,
@@ -2397,47 +2532,47 @@ def _build_picture_object_inner(sub_records: List[dict], ctrl_rec: dict,
     om.bottom = om_bottom
 
     offset_pt = pic.create_offset()
-    offset_pt.x = sc_offset_x
-    offset_pt.y = sc_offset_y
+    offset_pt.x = 0
+    offset_pt.y = 0
 
     org_sz = pic.create_org_sz()
-    org_sz.width = sc_org_w
-    org_sz.height = sc_org_h
+    org_sz.width = width
+    org_sz.height = height
 
     cur_sz = pic.create_cur_sz()
-    cur_sz.width = sc_cur_w
-    cur_sz.height = sc_cur_h
+    cur_sz.width = width
+    cur_sz.height = height
 
     flip_obj = pic.create_flip()
-    flip_obj.horizontal = sc_flip_h
-    flip_obj.vertical = sc_flip_v
+    flip_obj.horizontal = False
+    flip_obj.vertical = False
 
     rot = pic.create_rotation_info()
-    rot.angle = sc_angle
-    rot.center_x = sc_center_x
-    rot.center_y = sc_center_y
-    rot.rotate_image = False
+    rot.angle = 0
+    rot.center_x = 0
+    rot.center_y = 0
+    rot.rotate_image = True
 
+    # imgRect: use safe rectangle based on width/height from CTRL_HEADER
     img_rect = pic.create_img_rect()
     pt0 = img_rect.create_pt0()
-    pt0.x = corners[0]
-    pt0.y = corners[1]
+    pt0.x = 0
+    pt0.y = 0
     pt1 = img_rect.create_pt1()
-    pt1.x = corners[2]
-    pt1.y = corners[3]
+    pt1.x = width
+    pt1.y = 0
     pt2 = img_rect.create_pt2()
-    pt2.x = corners[4]
-    pt2.y = corners[5]
+    pt2.x = width
+    pt2.y = height
     pt3 = img_rect.create_pt3()
-    pt3.x = corners[6]
-    pt3.y = corners[7]
+    pt3.x = 0
+    pt3.y = height
 
     img_clip = pic.create_img_clip()
-    # crop binary order: left, top, right, bottom
-    img_clip.left = crop[0]
-    img_clip.right = crop[2]
-    img_clip.top = crop[1]
-    img_clip.bottom = crop[3]
+    img_clip.left = 0
+    img_clip.right = 0
+    img_clip.top = 0
+    img_clip.bottom = 0
 
     in_margin = pic.create_in_margin()
     in_margin.left = in_margins[0]
@@ -2742,11 +2877,14 @@ def _handle_gso_ctrl(para, sub_recs: List[dict], ctrl_rec: dict,
     """
     if bin_data_id_map is None:
         bin_data_id_map = getattr(hwp, 'bin_data_id_map', {})
-    pic = _build_picture_object(sub_recs, ctrl_rec, hwp, bin_data_id_map)
-    if pic is not None:
+    pic_xml = _build_picture_object(sub_recs, ctrl_rec, hwp, bin_data_id_map)
+    if pic_xml is not None:
         run = para.add_new_run()
         run.char_pr_id_ref = char_pr
-        run._item_list.append(pic)
+        # Store raw XML string to be injected during serialization
+        if not hasattr(run, '_raw_xml_items'):
+            run._raw_xml_items = []
+        run._raw_xml_items.append(pic_xml)
         return
 
     # Not a picture GSO (could be line, rect, etc.) - skip

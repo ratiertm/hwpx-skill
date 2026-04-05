@@ -91,6 +91,12 @@ def _write_run(xsb: XMLStringBuilder, run: Any) -> None:
     if sec_pr is not None:
         _write_sec_pr(xsb, sec_pr)
 
+    # Raw XML items (e.g. picture elements built as raw XML strings)
+    raw_xml_items = getattr(run, "_raw_xml_items", None)
+    if raw_xml_items:
+        for raw_xml in raw_xml_items:
+            xsb.raw(raw_xml)
+
     # Run items
     run_items = getattr(run, "runItems", getattr(run, "run_items", None))
     if run_items is not None:

@@ -55,6 +55,17 @@ class XMLStringBuilder:
     # Element lifecycle
     # ------------------------------------------------------------------
 
+    def raw(self, xml_string: str) -> XMLStringBuilder:
+        """Append raw XML string without escaping."""
+        if self._stack:
+            current = self._stack[-1]
+            if not current.has_child():
+                self._parts.append(">")
+            current.had_child()
+            current.increase_child_index()
+        self._parts.append(xml_string)
+        return self
+
     def open_element(self, name: str) -> XMLStringBuilder:
         if self._stack:
             current = self._stack[-1]
