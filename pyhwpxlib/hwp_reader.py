@@ -275,8 +275,15 @@ def hwp_to_hwpx(hwp_path: str, hwpx_path: str, max_paragraphs: int = 0) -> str:
     count = 0
     for para in doc_data['paragraphs']:
         if para['text']:
-            add_paragraph(hwpx, para['text'])
-            count += 1
+            # 줄바꿈을 별도 단락으로 분리
+            lines = para['text'].split('\n')
+            for line in lines:
+                line = line.strip()
+                if line:
+                    add_paragraph(hwpx, line)
+                    count += 1
+                    if max_paragraphs and count >= max_paragraphs:
+                        break
             if max_paragraphs and count >= max_paragraphs:
                 break
 
