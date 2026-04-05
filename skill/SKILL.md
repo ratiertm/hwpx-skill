@@ -1,6 +1,6 @@
 ---
 name: hwpx
-description: "Use this skill whenever the user wants to create, read, edit, or manipulate Hangul/Korean word processor documents (.hwpx, .hwp, .owpml files). Triggers include: any mention of 'hwpx', 'hwp', '한글 파일', '한글 문서', '한컴', 'OWPML', or requests to produce Korean government forms, fill templates, clone forms, or convert documents. Also use when extracting text from .hwpx files, filling form fields, checking/unchecking boxes, generating multiple filled documents, or converting HTML/Markdown to .hwpx format. If the user asks for a Korean document, government form, or template automation, use this skill. Do NOT use for .docx Word documents, PDFs, or spreadsheets."
+description: "Use this skill whenever the user wants to create, read, edit, or manipulate Hangul/Korean word processor documents (.hwpx, .hwp, .owpml files). Triggers include: any mention of 'hwpx', 'hwp', '한글 파일', '한글 문서', '한컴', 'OWPML', or requests to produce Korean government forms, fill templates, clone forms, or convert documents. Also use when converting HWP to HWPX (hwp2hwpx), extracting text from .hwpx files, filling form fields, checking/unchecking boxes, generating multiple filled documents, or converting HTML/Markdown to .hwpx format. If the user asks for a Korean document, government form, template automation, or HWP file conversion, use this skill. Do NOT use for .docx Word documents, PDFs, or spreadsheets."
 ---
 
 # HWPX creation, editing, and form automation
@@ -150,6 +150,7 @@ doc.add_bullet_list(['항목1', '항목2', '항목3'])
 | Batch generate | `fill_template_batch()` — multiple files from one template |
 | Convert MD → HWPX | `pyhwpxlib md2hwpx input.md -o output.hwpx` |
 | Convert HTML → HWPX | `convert_html_file_to_hwpx(html_path, hwpx_path)` |
+| **Convert HWP → HWPX** | `pyhwpxlib.hwp2hwpx.convert(hwp_path, hwpx_path)` |
 | Read HWP 5.x binary | `pyhwpxlib.hwp_reader.read_hwp()` |
 | Analyze form fields | `extract_schema()` + `analyze_schema_with_llm()` |
 
@@ -423,6 +424,30 @@ Checks: ZIP validity, required files, mimetype, XML parsing, namespaces.
 ---
 
 ## Converting Documents
+
+### HWP → HWPX (한글 5.x 바이너리 변환)
+```python
+from pyhwpxlib.hwp2hwpx import convert
+
+convert("input.hwp", "output.hwpx")
+# HWP 5.x 바이너리 → HWPX(ZIP/XML) 변환
+# 표, 스타일, 병합, 머리말/꼬리말, 각주, 이미지 등 지원
+```
+
+```python
+# 폴더 내 전체 HWP 파일 일괄 변환
+import os
+from pyhwpxlib.hwp2hwpx import convert
+
+src_dir = "hwp_samples"
+dst_dir = "hwpx_converted"
+os.makedirs(dst_dir, exist_ok=True)
+
+for f in os.listdir(src_dir):
+    if f.endswith(".hwp"):
+        convert(os.path.join(src_dir, f),
+                os.path.join(dst_dir, f.replace(".hwp", ".hwpx")))
+```
 
 ### Markdown → HWPX
 ```bash
