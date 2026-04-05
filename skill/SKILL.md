@@ -41,6 +41,95 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 ---
 
+## Document Design Principles (문서 디자인 원칙)
+
+**LLM은 템플릿 복붙 머신이 아니다. 문서 디자이너다.**
+
+매 문서마다 동일한 레이아웃을 반복하지 않는다. 내용을 읽고, 그 문서에 가장 적합한 구성을 판단하여 컴포넌트를 조합한다.
+
+**금지 패턴**:
+- 매번 같은 표지 (빈줄 5개 → 카테고리 → 대제목 → 부제 → 하이라이트 박스 → 날짜 → 구분선)
+- 모든 문서에 "EQUITY RESEARCH", "CONFIDENTIAL" 같은 라벨 붙이기
+- 내용과 무관하게 7개 섹션 + 목차 + 표지를 기계적으로 생성
+- 원문을 요약·재작성하여 자기 말로 바꾸기
+- 모든 섹션마다 page_break를 넣어 1섹션=1페이지 강제하기
+
+**해야 하는 것**:
+- 내용을 먼저 읽고, 문서의 성격(리서치/제안서/공문/안내문/분석)을 파악
+- 그 성격에 맞는 레이아웃과 컴포넌트를 선택
+- 표지가 필요한 문서인지, 목차가 필요한 분량인지 판단
+- 표/박스/구분선/이미지를 어디에 배치하면 효과적인지 판단
+- 원문 텍스트는 그대로 사용하되, 시각적 배치와 강조는 LLM이 디자인
+- page_break는 내용 흐름에 맞게 적절히 사용 (자연스럽게 넘치면 자동 넘김, 주제 전환 시만 명시적 삽입)
+
+**페이지 나누기 판단 기준**:
+- 표지 → 본문: page_break 필요
+- 목차 → 본문: page_break 필요
+- 같은 주제 내 소제목 전환: page_break 불필요 (자연스럽게 이어짐)
+- 큰 주제 전환 (예: "분석" → "결론"): 내용량에 따라 판단
+- 짧은 문서 (3~4페이지): page_break 최소화 — 내용이 자연스럽게 흐르게
+- 긴 문서 (10페이지+): 장(chapter) 단위에서만 page_break
+
+**컴포넌트 조합 판단 기준**:
+
+| 내용 특성 | 적합한 컴포넌트 |
+|----------|----------------|
+| 핵심 수치/요약 | 하이라이트 박스 (#d8e2ff) |
+| 인용문/참고사항 | 콜아웃 박스 (#e2dbfd) |
+| 비교 데이터 | 표 (헤더 + 줄무늬) |
+| 순서/절차 | 번호 목록 + 들여쓰기 |
+| 강조/경고 | error 색상 (#9f403d) 텍스트 |
+| 부연/메타 정보 | 정보 박스 (#cbe7f5) 또는 작은 회색 텍스트 |
+| 시각적 구분 | 텍스트 구분선 (━), 페이지 나누기 |
+| 장문 본문 | 소제목(primary 색상) + 들여쓰기 단락 |
+
+**stitch 레퍼런스 (skill/stitch/ hwpx_1~5)**:
+5가지 서로 다른 레이아웃 패턴이 있다. 매번 같은 걸 쓰지 말고, 내용에 맞는 패턴을 참고한다.
+
+### 확정된 스타일 규칙 (세션 테스트 완료)
+
+**폰트 크기 체계** — 점진적 축소 (heading API 대신 add_paragraph로 직접 제어):
+```
+대제목: 18pt bold CENTER (문서 타이틀)
+섹션 제목: 14pt bold primary색 (1. 2. 3. 번호 포함)
+본문: 11pt on-surface색 (2칸 들여쓰기)
+부제/캡션: 10pt on-surface-variant색
+참고/미주: 8pt outline-variant색
+```
+- heading API(24/18/16/14pt)는 크기 점프가 커서 균형이 안 맞음
+- add_paragraph(bold, font_size, text_color)로 직접 제어 권장
+
+**섹션 구성 패턴**:
+```python
+# 섹션 제목 — 번호 포함, primary 색상
+doc.add_paragraph('1. 섹션 제목', bold=True, font_size=14, text_color='#395da2')
+# 본문 — 바로 아래 (빈 줄 없음), 2칸 들여쓰기
+doc.add_paragraph('  본문 텍스트...', font_size=11, text_color='#2b3437')
+```
+- 섹션 제목과 본문 사이에 빈 줄 넣지 않음 (스페이싱 최소)
+- 본문 첫 줄에 `  ` (2칸) 들여쓰기
+
+**블릿 목록** — 텍스트 방식 (네이티브 블릿은 Whale에서 문자 무시됨):
+```python
+doc.add_bullet_list(['항목1', '항목2', '항목3'])
+# → "    - 항목1" 형태로 출력 (4칸 들여쓰기 + '-' 문자)
+# 블릿 문자 순서: '-' (기본), '•', '◦'
+# 본문보다 들여써서 계층 구분
+```
+
+**표 규칙**:
+- 데이터 행: CENTER 정렬 (프리셋 자동)
+- 헤더 행: CENTER + 볼드 + primary 배경 + 흰 텍스트 (프리셋 자동)
+- 짝수 행: 줄무늬 #f1f4f6 (프리셋 자동)
+- col_widths: 텍스트 길이에 맞게 LLM이 판단 (합계=42520)
+  - 짧은 컬럼(라벨 2~3글자): 7000~9000
+  - 긴 컬럼(설명 20글자+): 20000~30000
+- row_heights: 한 줄이면 2000, 여러 줄이면 3000~4000
+
+**페이지 나누기**: 표지→본문, 목차→본문에서만. 짧은 문서는 자연스럽게 흐르게.
+
+---
+
 ## Interactive Workflow (대화형 문서 생성)
 
 사용자가 "한글 문서 만들어줘"라고 요청하면, 아래 단계를 순서대로 진행합니다.
@@ -218,35 +307,343 @@ doc.save("output.hwpx")
 python scripts/validate.py output.hwpx
 ```
 
-### HwpxBuilder API
+### HwpxBuilder API — 전체 레퍼런스
 
 ```python
-doc = HwpxBuilder()
+from scripts.create import HwpxBuilder, DS, TABLE_PRESETS
+```
 
-# 제목 (level 1~4)
-doc.add_heading("제목", level=1)      # 20pt 볼드
-doc.add_heading("소제목", level=2)    # 16pt 볼드
+**생성자**:
+```python
+doc = HwpxBuilder(table_preset='corporate')
+# table_preset: 'corporate' | 'government' | 'academic' | 'default'
+# 프리셋이 표의 헤더색, 패딩, 행높이, 정렬, 줄무늬를 자동 적용
+```
 
-# 일반 단락
+**제목** — `add_heading(text, level, alignment)`:
+```python
+doc.add_heading("제목", level=1)                    # 24pt 볼드
+doc.add_heading("중제목", level=2)                  # 18pt 볼드
+doc.add_heading("소제목", level=3)                  # 16pt 볼드
+doc.add_heading("소소제목", level=4)                # 14pt 볼드
+doc.add_heading("가운데 제목", level=1, alignment='CENTER')
+```
+
+**단락** — `add_paragraph(text, bold, italic, font_size, text_color, alignment)`:
+```python
 doc.add_paragraph("본문 텍스트")
-doc.add_paragraph("")  # 빈 줄 (간격용)
+doc.add_paragraph("")                               # 빈 줄 (간격)
+doc.add_paragraph("강조", bold=True, text_color="#395da2")
+doc.add_paragraph("작은 글씨", font_size=9, text_color="#586064")
+doc.add_paragraph("가운데 정렬", alignment='CENTER')
+# alignment: 'JUSTIFY'(기본) | 'CENTER' | 'LEFT' | 'RIGHT'
+```
 
-# 스타일 단락
-doc.add_paragraph("강조 텍스트", bold=True, text_color="#FF0000")
-doc.add_paragraph("작은 텍스트", font_size=9, text_color="#888888")
-
-# 표
+**표** — `add_table(data, ...)` — 프리셋 자동 적용:
+```python
+# 기본 사용 — 프리셋이 헤더색/패딩/정렬/줄무늬 자동 적용
 doc.add_table([
     ["헤더1", "헤더2", "헤더3"],
     ["값1", "값2", "값3"],
 ])
 
-# 구분선
-doc.add_line()
+# 전체 파라미터
+doc.add_table(
+    data,                          # list[list[str]] — 필수
+    header_bg='#395da2',           # 헤더 배경색. None=프리셋, ''=없음
+    cell_colors={(1,0): '#d8e2ff'},# {(row,col): '#hex'} 셀별 배경색
+    cell_margin=(283,283,200,200), # (L,R,T,B) 셀 패딩. None=프리셋
+    col_widths=[12000, 30520],     # 컬럼별 너비. None=균등분할
+    row_heights=[2400, 2000],      # 행별 높이. None=프리셋
+    merge_info=[(0,0,0,2)],        # [(r1,c1,r2,c2)] 병합
+    cell_aligns={(1,2): 'RIGHT'},  # {(row,col): 'CENTER'|'LEFT'|'RIGHT'}
+    cell_styles={(0,0): {'text_color':'#f7f7ff','bold':True,'font_size':12}},
+    cell_gradients={(0,0): {'start':'#FF0000','end':'#0000FF'}},
+    width=42520,                   # 표 전체 너비 (기본 A4 content width)
+    use_preset=False,              # False면 프리셋 자동 적용 안 함
+)
+```
 
-# 저장
+**프리셋 자동 적용 항목** (use_preset=True일 때):
+- `header_bg`: 프리셋 색상 (corporate=#395da2)
+- `cell_margin`: 프리셋 패딩
+- `row_heights`: 헤더 2400 + 데이터 2000
+- `cell_aligns`: 헤더 행 CENTER, **데이터 행도 CENTER** (기본)
+- `cell_styles`: 헤더 행 흰색(#f7f7ff) 볼드
+- `stripe_color`: 짝수행 줄무늬 (#f1f4f6)
+- 명시적 파라미터는 프리셋보다 우선
+
+**표 셀 너비/높이 — LLM이 내용에 맞게 조정해야 하는 항목**:
+- `col_widths`: 내용이 긴 컬럼은 넓게, 짧은 컬럼은 좁게 (합계 = 42520)
+  - 텍스트 길이 기반 비율 계산: `내용 평균 글자수 × CJK 가중치(2)` 비율로 분배
+  - 예: ['항목'(2글자), '설명'(20글자)] → col_widths=[8000, 34520]
+- `row_heights`: 셀 내 텍스트가 한 줄이면 2000, 여러 줄이면 3000~4000
+  - 줄바꿈(\n)이 있는 셀은 높이를 늘려야 함
+  - 헤더 행은 항상 데이터 행보다 크거나 같게
+
+**키-값 표** (라벨+값, 헤더 없음):
+```python
+doc.add_table([
+    ['설립', '1969년'],
+    ['본사', '수원시'],
+], col_widths=[10000, 32520], header_bg='',
+    cell_styles={(r,0): {'bold': True, 'text_color': '#395da2'} for r in range(2)})
+```
+
+**이미지** — `add_image(path, width, height)` / `add_image_from_url(url, ...)`:
+```python
+# 로컬 파일
+doc.add_image("photo.png", width=21260, height=15000)
+
+# URL에서 다운로드 후 삽입
+doc.add_image_from_url(
+    "https://example.com/image.png",
+    filename="my_image.png",
+    width=42520,        # 전체 너비
+    height=21260,
+)
+# → /tmp/hwpx_images/ 에 자동 다운로드
+```
+
+**페이지 나누기** — `add_page_break()`:
+```python
+doc.add_page_break()  # 다음 내용을 새 페이지에서 시작
+```
+
+**구분선** — `add_line()`:
+```python
+doc.add_line()  # ─ × 40 문자
+# 또는 텍스트 구분선 (더 얇고 세련됨)
+doc.add_paragraph('━' * 50, font_size=6, text_color='#abb3b7')
+```
+
+**디자인 컴포넌트 — 표를 활용한 박스**:
+```python
+# 하이라이트 박스 (연한 라벤더블루)
+doc.add_table([['핵심 요약 내용']],
+    cell_colors={(0,0): '#d8e2ff'}, row_heights=[2400],
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#2a5094'}}, use_preset=False)
+
+# 콜아웃 박스 (연보라 — 인용, 주의)
+doc.add_table([['인용문 또는 경고']],
+    cell_colors={(0,0): '#e2dbfd'}, row_heights=[2000],
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#514d68'}}, use_preset=False)
+
+# 정보 박스 (연시안 — 참고)
+doc.add_table([['참고 정보']],
+    cell_colors={(0,0): '#cbe7f5'}, row_heights=[2000],
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#3c5561'}}, use_preset=False)
+```
+
+**저장**:
+```python
+doc.save("output.hwpx")  # 파일 경로 반환
+```
+
+**디자인 시스템 색상 상수** (`DS` dict):
+```python
+from scripts.create import DS
+DS['primary']           # '#395da2' — 헤더, 소제목
+DS['on_primary']        # '#f7f7ff' — primary 위 텍스트
+DS['on_surface']        # '#2b3437' — 본문 (순검정 금지)
+DS['on_surface_var']    # '#586064' — 메타, 캡션
+DS['primary_container'] # '#d8e2ff' — 하이라이트 박스
+DS['tertiary_container']# '#e2dbfd' — 콜아웃 박스
+DS['surface_low']       # '#f1f4f6' — 줄무늬, 2차 배경
+DS['outline_var']       # '#abb3b7' — 구분선
+DS['error']             # '#9f403d' — 경고
+```
+
+### pyhwpxlib 전체 함수 레퍼런스
+
+HwpxBuilder는 내부적으로 pyhwpxlib API를 호출합니다.
+HwpxBuilder에 없는 기능은 pyhwpxlib를 직접 사용합니다.
+
+```python
+from pyhwpxlib.api import (
+    create_document, save, add_paragraph, add_styled_paragraph,
+    add_heading, add_table, add_image,
+    add_bullet_list, add_numbered_list,
+    add_nested_bullet_list, add_nested_numbered_list,
+    add_header, add_footer, add_page_number,
+    add_footnote, add_equation, add_hyperlink, add_highlight, add_bookmark,
+    add_rectangle, add_ellipse, add_line,
+    set_columns, extract_text, merge_documents,
+    fill_template, fill_template_checkbox, fill_template_batch,
+    convert_html_file_to_hwpx, convert_hwpx_to_html,
+)
+from pyhwpxlib.style_manager import ensure_para_style, ensure_char_style, font_size_to_height
+```
+
+**글머리 기호 목록** — `add_bullet_list(doc, items, bullet_char)`:
+```python
+doc = create_document()
+add_bullet_list(doc, ["첫 번째", "두 번째", "세 번째"])
+# bullet_char: 기본 '●', 변경 가능 ('◦','▪','‣' 등)
+# 주의: 유니코드 bullet(•,▪) 직접 텍스트로 쓰면 안 됨 → 반드시 이 API 사용
+```
+
+**번호 목록** — `add_numbered_list(doc, items, format_string)`:
+```python
+add_numbered_list(doc, ["항목 1", "항목 2", "항목 3"])
+# format_string: 기본 "^1." → "1. 2. 3."
+# "^1)" → "1) 2) 3)"
+# "(^1)" → "(1) (2) (3)"
+```
+
+**중첩 글머리 목록** — `add_nested_bullet_list(doc, items)`:
+```python
+add_nested_bullet_list(doc, [
+    (0, "1단계 항목"),
+    (1, "2단계 하위"),
+    (2, "3단계 세부"),
+    (0, "다시 1단계"),
+])
+# level 0~6, 들여쓰기 자동 적용
+```
+
+**중첩 번호 목록** — `add_nested_numbered_list(doc, items)`:
+```python
+add_nested_numbered_list(doc, [
+    (0, "1. 대항목"),
+    (1, "1.1 중항목"),
+    (1, "1.2 중항목"),
+    (0, "2. 대항목"),
+    (1, "2.1 중항목"),
+])
+```
+
+**들여쓰기** — `ensure_para_style` + `add_paragraph`:
+```python
+# 들여쓰기된 단락 생성
+para_id = ensure_para_style(doc, indent=-2800, margin_left=2800)
+add_paragraph(doc, "들여쓰기된 텍스트", para_pr_id_ref=para_id)
+
+# ensure_para_style 파라미터:
+#   align: 'JUSTIFY'|'CENTER'|'LEFT'|'RIGHT'
+#   line_spacing_value: 160 (%)
+#   indent: 음수=내어쓰기 (첫 줄 왼쪽으로)
+#   margin_left: 전체 단락 왼쪽 여백
+```
+
+**공문서 들여쓰기 체계**:
+```python
+# 조: 제1조(목적)
+p1 = ensure_para_style(doc, indent=-2800, margin_left=2800)
+add_paragraph(doc, "제1조(목적) 이 규정은...", para_pr_id_ref=p1)
+
+# 호: 1. 항목
+p2 = ensure_para_style(doc, indent=-4880, margin_left=4880)
+add_paragraph(doc, "1. 항목 내용", para_pr_id_ref=p2)
+
+# 목: 가. 세부
+p3 = ensure_para_style(doc, indent=-7680, margin_left=7680)
+add_paragraph(doc, "가. 세부 항목", para_pr_id_ref=p3)
+```
+
+**머리말/꼬리말/페이지번호**:
+```python
+add_header(doc, "문서 제목 — 대외비")
+add_footer(doc, "© 2026 회사명")
+add_page_number(doc)
+# pos: 'BOTTOM_CENTER'(기본), 'BOTTOM_RIGHT', 'TOP_CENTER', 'TOP_RIGHT'
+# format_type: 'DIGIT'(기본), 'CIRCLE', 'HANGUL'
+```
+
+**각주**:
+```python
+add_footnote(doc, "출처: 삼성전자 2024년 사업보고서", number=1)
+```
+
+**수식**:
+```python
+add_equation(doc, "x = {-b +- sqrt {b^2 - 4ac}} over {2a}")
+```
+
+**하이퍼링크** (주의: Whale 에러 가능):
+```python
+add_hyperlink(doc, "네이버", "https://www.naver.com")
+# Whale에서 fieldBegin/fieldEnd 에러 발생 가능 — 필요시만 사용
+```
+
+**텍스트 강조 (하이라이트)**:
+```python
+add_highlight(doc, "강조 텍스트", color="#FFFF00")
+```
+
+**북마크**:
+```python
+add_bookmark(doc, "section_1")
+```
+
+**도형**:
+```python
+add_rectangle(doc, width=14000, height=7000, line_color="#395da2", line_width=283)
+add_ellipse(doc, width=10000, height=8000)
+add_line(doc, x1=0, y1=0, x2=42520, y2=0, line_color="#abb3b7", line_width=71)
+```
+
+**다단 레이아웃**:
+```python
+set_columns(doc, col_count=2, same_gap=1200, separator_type="SOLID")
+```
+
+**문서 병합**:
+```python
+merge_documents(["doc1.hwpx", "doc2.hwpx"], "merged.hwpx")
+```
+
+**텍스트 추출**:
+```python
+text = extract_text("document.hwpx")
+```
+
+**HwpxBuilder로 모든 기능 사용 가능** — pyhwpxlib 직접 호출 불필요:
+
+```python
+doc = HwpxBuilder(table_preset='corporate')
+
+# 제목 + 본문 + 표 + 목록 + 머리말 + 각주를 한 객체로
+doc.add_heading("제목", level=1)
+doc.add_paragraph("본문")
+doc.add_table([["A", "B"], ["1", "2"]])
+doc.add_bullet_list(["항목1", "항목2"])
+doc.add_numbered_list(["가.", "나."])
+doc.add_header("문서 제목")
+doc.add_footer("© 2026")
+doc.add_page_number()
+doc.add_footnote("출처 정보")
+doc.add_image_from_url("https://...", width=21260)
 doc.save("output.hwpx")
 ```
+
+**HwpxBuilder 전체 메서드 목록**:
+
+| 메서드 | 용도 |
+|--------|------|
+| `add_heading(text, level, alignment)` | 제목 (1~4) |
+| `add_paragraph(text, bold, italic, font_size, text_color, alignment)` | 단락 |
+| `add_table(data, header_bg, cell_colors, cell_margin, ...)` | 표 (프리셋 자동) |
+| `add_bullet_list(items, bullet_char)` | 글머리 기호 목록 |
+| `add_numbered_list(items, format_string)` | 번호 목록 |
+| `add_nested_bullet_list(items)` | 중첩 글머리 [(level, text), ...] |
+| `add_nested_numbered_list(items)` | 중첩 번호 [(level, text), ...] |
+| `add_image(path, width, height)` | 로컬 이미지 |
+| `add_image_from_url(url, filename, width, height)` | URL 이미지 다운로드 |
+| `add_page_break()` | 페이지 나누기 |
+| `add_line()` | 구분선 |
+| `add_header(text)` | 머리말 |
+| `add_footer(text)` | 꼬리말 |
+| `add_page_number(pos)` | 페이지 번호 |
+| `add_footnote(text, number)` | 각주 |
+| `add_equation(script)` | 수식 |
+| `add_highlight(text, color)` | 텍스트 하이라이트 |
+| `add_rectangle(width, height, line_color)` | 사각형 도형 |
+| `add_draw_line(x1, y1, x2, y2, line_color)` | 직선 도형 |
+| `save(path)` | 저장 |
 
 ### Page Size (OWPML 단위: 1/7200 inch)
 
@@ -373,18 +770,35 @@ doc.save("report.hwpx")
 
 **서체 대체 순서**: 함초롬바탕 → 바탕 → 나눔명조 / 함초롬돋움 → 돋움 → 나눔고딕
 
-**색상 팔레트 (한국 공문서 스타일)**:
+**색상 팔레트 (Administrative Slate 디자인 시스템)**:
 
-| 용도 | 색상 | 코드 |
-|------|------|------|
-| 본문 | 검정 | #000000 |
-| 부제목/날짜 | 회색 | #888888 |
-| 강조 (긍정) | 녹색 | #2E7D32 |
-| 강조 (경고) | 빨강 | #E74C3C |
-| 링크/참조 | 파랑 | #1565C0 |
-| 주석/미주 | 연회색 | #999999 |
-| 표 헤더 배경 | 연파랑 | #D5E8F0 |
-| 표 교차행 배경 | 연회색 | #F5F5F5 |
+"The Digital Archivist" — 권위적이고 세련된 에디토리얼 톤.
+순검정(#000000) 사용 금지. 모든 텍스트는 on-surface(#2b3437) 사용.
+
+| 역할 | 이름 | 코드 | 용도 |
+|------|------|------|------|
+| **기본** | on-surface | #2b3437 | 본문 텍스트 (순검정 금지!) |
+| **보조** | on-surface-variant | #586064 | 메타데이터, 캡션, 날짜 |
+| **연한보조** | outline-variant | #abb3b7 | 구분선, 미주 |
+| **주 강조** | primary | #395da2 | 표 헤더, 섹션 제목, 악센트 |
+| **주 강조 위** | on-primary | #f7f7ff | primary 배경 위 텍스트 |
+| **하이라이트** | primary-container | #d8e2ff | 요약 박스, 핵심 정보 배경 |
+| **정보** | secondary-container | #cbe7f5 | 상태 칩, 정보 박스 |
+| **콜아웃** | tertiary-container | #e2dbfd | 인용, 편집자 주, 참고 |
+| **경고** | error | #9f403d | 기한, 경고, 중요 표시 |
+| **배경** | surface | #f8f9fa | 페이지 배경 (off-white) |
+| **2차 배경** | surface-container-low | #f1f4f6 | 표 교차행, 사이드 영역 |
+| **강조 배경** | surface-container-high | #e3e9ec | 강조 배경 |
+| **표 헤더** | primary | #395da2 | 표 헤더 배경 + on-primary 텍스트 |
+| **표 교차행** | surface-container-low | #f1f4f6 | 짝수행 줄무늬 |
+
+**색상 사용 원칙**:
+- 구분선: 테두리 대신 배경색 전환으로 영역 구분 (No-Line Rule)
+- 표 헤더: primary(#395da2) 배경 + on-primary(#f7f7ff) 흰색 볼드 텍스트
+- 하이라이트: primary-container(#d8e2ff) 연한 라벤더블루 배경
+- 콜아웃/인용: tertiary-container(#e2dbfd) 연보라 배경
+- 일정/기한: error(#9f403d) 강조
+- 단조로운 파란색 일색 금지 — 용도별로 primary/secondary/tertiary/error 구분 사용
 
 ### Document Structure Guide (문서 구성 가이드)
 
@@ -404,15 +818,15 @@ doc.save("report.hwpx")
 
 **제목별 스타일**:
 
-| 구분 | 폰트 크기 | 볼드 | 정렬 | 줄간격 | 상하 간격 |
-|------|----------|------|------|--------|----------|
-| 대제목 | 20pt | O | CENTER | 200 | 위 400, 아래 200 |
-| 중제목 | 16pt | O | LEFT | 160 | 위 300, 아래 150 |
-| 소제목 | 14pt | O | LEFT | 160 | 위 200, 아래 100 |
-| 본문 | 10pt | X | JUSTIFY | 160 | 위 0, 아래 0 |
-| 캡션 | 9pt | X | CENTER | 130 | 위 50, 아래 100 |
-| 주석 | 9pt | X | LEFT | 130 | 위 0, 아래 0 |
-| 꼬리말 | 8pt | X | LEFT | 130 | - |
+| 구분 | 크기 | 볼드 | 색상 | 정렬 | 줄간격 |
+|------|------|------|------|------|--------|
+| 대제목 | 24pt | O | on-surface (#2b3437) | CENTER | 200 |
+| 중제목 | 18pt | O | on-surface (#2b3437) | LEFT | 160 |
+| 소제목 | 16pt | O | primary (#395da2) | LEFT | 160 |
+| 본문 | 10pt | X | on-surface (#2b3437) | JUSTIFY | 160 |
+| 캡션/표제목 | 10pt | O | on-surface (#2b3437) | LEFT | 130 |
+| 메타/날짜 | 9pt | X | on-surface-variant (#586064) | LEFT | 130 |
+| 면책/미주 | 8pt | X | outline-variant (#abb3b7) | LEFT | 130 |
 
 **정렬 규칙**:
 
@@ -422,7 +836,7 @@ doc.save("report.hwpx")
 | 중/소제목 | LEFT | 읽기 흐름 |
 | 본문 | JUSTIFY | 한국 공문서 기본 (condense 25% 필요) |
 | 표 헤더 | CENTER | 열 제목 강조 |
-| 표 데이터 (텍스트) | LEFT | 가독성 |
+| 표 데이터 (텍스트) | CENTER | 가독성 |
 | 표 데이터 (숫자) | RIGHT | 자릿수 정렬 |
 | 날짜/작성자 | RIGHT | 관례 |
 
@@ -533,22 +947,34 @@ col_widths = [content_width * r // total for r in ratios]
 **행 높이**:
 | 유형 | height | 사용 |
 |------|--------|------|
-| 기본 | 1200 | 일반 데이터 행 |
-| 헤더 | 1500 | 표 제목 행 |
-| 넓음 | 2000 | 여러 줄 텍스트 |
-| 좁음 | 800 | 밀집 데이터 |
+| 헤더 | 2400 | 표 제목 행 |
+| 기본 | 2000 | 일반 데이터 행 |
+| 넓음 | 3200 | 여러 줄 텍스트 |
+| 좁음 | 1200 | 밀집 데이터 |
 
 **셀 패딩 (cellMargin)**:
 ```xml
-<hp:cellMargin left="141" right="141" top="0" bottom="0" />
+<hp:cellMargin left="283" right="283" top="200" bottom="200" />
 ```
 
 | 패딩 | left/right | top/bottom | 사용 |
 |------|-----------|------------|------|
-| 기본 | 141 | 0 | 일반 셀 |
-| 넓은 여백 | 283 | 141 | 제목 셀, 가독성 |
-| 좁은 여백 | 70 | 0 | 밀집 표 |
-| 양식 셀 | 510 | 141 | 입력 칸 (넓은 여백) |
+| 기본 | 283 | 200 | 일반 셀 (여유 있는 패딩 기본) |
+| 넓은 여백 | 425 | 283 | 정부 양식, 가독성 |
+| 좁은 여백 | 141 | 70 | 밀집 표 |
+| 양식 셀 | 510 | 200 | 입력 칸 |
+
+**표 스타일 기본값 (Administrative Slate)**:
+- 헤더 행: primary(#395da2) 배경 + on-primary(#f7f7ff) 흰색 볼드 텍스트 + CENTER 정렬
+- 데이터 행 (텍스트): CENTER 정렬
+- 데이터 행 (숫자): RIGHT 정렬
+- 짝수 행: surface-container-low(#f1f4f6) 줄무늬 배경
+- 각 표 위에 캡션: `[ 표 N ] 표 제목` (10pt 볼드)
+
+**표에서 사용할 수 있는 강조 패턴**:
+- 하이라이트 행: primary-container(#d8e2ff) 배경 — 요약, 합계
+- 경고 행: error(#9f403d) 텍스트 — 기한 초과, 위험
+- 정보 행: secondary-container(#cbe7f5) 배경 — 참고 정보
 
 **표 마진 (표 바깥 여백)**:
 ```xml
@@ -615,8 +1041,15 @@ table.set_cell_background(row, col, "#D5E8F0")
 |----------|--------|--------|------|
 | `width` | 42520 | 42520 (전체너비) | HWPUNIT |
 | `col_widths` | 균등분할 | 내용에 맞게 | HWPUNIT 리스트 |
-| `row_heights` | 3600 전체 | 본문 1200, 헤더 1500 | HWPUNIT 리스트 |
-| `cell_margin` | None (141,141,0,0) | (141,141,70,70) | (L,R,T,B) |
+| `row_heights` | 프리셋 자동 | 헤더 2400, 데이터 2000 | HWPUNIT 리스트 |
+| `cell_margin` | 프리셋 자동 | (283,283,200,200) | (L,R,T,B) |
+| `header_bg` | 프리셋 자동 | #395da2 (primary) | 헤더 배경색 |
+| `cell_aligns` | 프리셋 자동 | 헤더 CENTER, 텍스트 CENTER, 숫자 RIGHT | 정렬 |
+| `cell_styles` | 프리셋 자동 | 헤더 {text_color: #f7f7ff, bold: True} | 글자 스타일 |
+| `cell_colors` | 프리셋 자동 | 짝수행 #f1f4f6 줄무늬 | 배경색 |
+
+**프리셋**: `HwpxBuilder(table_preset='corporate')` 사용 시 위 값들이 자동 적용됨.
+명시적으로 파라미터를 넘기면 프리셋보다 우선.
 
 **표 생성 실전 예시**:
 ```python
@@ -684,6 +1117,58 @@ doc.add_table([
     ["가격", "1,000", "1,200", "+20%"],
 ])
 ```
+
+### Design Components (디자인 컴포넌트 가이드)
+
+문서 작성 시 아래 컴포넌트를 상황에 맞게 조합합니다.
+디자인 레퍼런스: `skill/stitch/` 폴더의 hwpx_1~5 스크린샷 참조.
+
+**구분선**: 테두리 표 대신 텍스트 구분선 사용
+```python
+doc.add_paragraph('━' * 50, font_size=6, text_color='#abb3b7')
+```
+
+**섹션 제목**: 표/박스 없이 텍스트로
+```python
+doc.add_paragraph('섹션 제목', bold=True, font_size=13, text_color='#395da2')
+```
+
+**하이라이트 박스**: primary-container 배경 표
+```python
+doc.add_table([['핵심 요약 내용']],
+    cell_colors={(0,0): '#d8e2ff'},
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#2a5094'}},
+    use_preset=False)
+```
+
+**콜아웃/인용 박스**: tertiary-container 배경
+```python
+doc.add_table([['인용문 또는 편집자 주']],
+    cell_colors={(0,0): '#e2dbfd'},
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#514d68'}},
+    use_preset=False)
+```
+
+**정보 박스**: secondary-container 배경
+```python
+doc.add_table([['참고 정보']],
+    cell_colors={(0,0): '#cbe7f5'},
+    cell_margin=(400,400,300,300), header_bg='',
+    cell_styles={(0,0): {'text_color': '#3c5561'}},
+    use_preset=False)
+```
+
+**문서 유형별 컴포넌트 조합 (stitch 레퍼런스)**:
+
+| 유형 | 핵심 컴포넌트 | stitch 참조 |
+|------|-------------|------------|
+| 기안서/기획안 | 번호(01,02,03) + 들여쓰기 본문 + 하이라이트 박스 | hwpx_1 |
+| 회의록 | 메타 그리드(표) + 안건 테이블 + 콜아웃 박스 | hwpx_2 |
+| 사업 보고서 | 표지 + 요약 표 + 섹션별 표/통계 | hwpx_3 |
+| 공문서 | 수신/참조/제목(표) + 가.나. 계층 들여쓰기 + 구분선 | hwpx_4 |
+| 안내문/협조문 | 히어로 박스(primary-container) + 과제 목록 + 일정 표 | hwpx_5 |
 
 ### Indent Guide (들여쓰기 상세)
 
@@ -921,18 +1406,34 @@ add_nested_numbered_list(doc, [
 
 ### Images (이미지 삽입)
 
+**HwpxBuilder API (권장)**:
+```python
+doc = HwpxBuilder()
+
+# 로컬 이미지 삽입
+doc.add_image("photo.png", width=21260, height=15000)
+
+# URL에서 다운로드 후 삽입
+doc.add_image_from_url(
+    "https://example.com/image.png",
+    filename="my_image.png",   # 저장 파일명 (생략 시 URL에서 추출)
+    width=21260,               # 표시 너비 (HWPX 단위)
+    height=15000,              # 표시 높이
+)
+# → /tmp/hwpx_images/ 에 자동 다운로드 후 문서에 삽입
+```
+
+**pyhwpxlib 직접 사용**:
 ```python
 from pyhwpxlib.api import add_image
-
-# 파일에서 이미지 삽입
 add_image(doc, "photo.png", width=20000, height=15000)
-# width/height: HWPUNIT (1/7200 inch)
-# 20000 ≈ 70mm, 15000 ≈ 53mm
+```
 
-# 크기 변환 참고
-# mm → HWPUNIT: mm * 283.46
-# inch → HWPUNIT: inch * 7200
-# px (96dpi) → HWPUNIT: px * 75
+**크기 변환**:
+```
+mm → HWPUNIT: mm * 283.46
+inch → HWPUNIT: inch * 7200
+px (96dpi) → HWPUNIT: px * 75
 ```
 
 **이미지 크기 가이드**:
@@ -941,8 +1442,26 @@ add_image(doc, "photo.png", width=20000, height=15000)
 |------|-------|--------|------|
 | 전체 너비 | 42520 | 비율 자동 | 본문 영역 전체 |
 | 반 너비 | 21260 | 비율 자동 | 2단 배치용 |
+| 1/3 너비 | 14173 | 비율 자동 | 3단 배치용 |
 | 증명사진 | 8504 | 11339 | 3×4cm |
 | 썸네일 | 7087 | 7087 | 25×25mm |
+
+**문서 생성 시 이미지 활용 패턴**:
+```python
+doc = HwpxBuilder(table_preset='corporate')
+doc.add_heading("보고서 제목", level=1, alignment='CENTER')
+doc.add_paragraph("")
+
+# 관련 이미지 삽입 (웹에서 다운로드)
+doc.add_image_from_url("https://...", width=42520)  # 전체 너비
+doc.add_paragraph("[ 그림 1 ] 이미지 캡션", font_size=9,
+                   text_color='#586064', alignment='CENTER')
+doc.add_paragraph("")
+
+doc.add_heading("1. 본문", level=2)
+doc.add_paragraph("내용...")
+doc.save("output.hwpx")
+```
 
 ### Page Breaks (페이지 나누기)
 
@@ -1190,6 +1709,31 @@ python -m pyhwpxlib.cli md2hwpx input.md -o output.hwpx -s github
 ```
 Styles: `github`, `vscode`, `minimal`, `academic`
 
+**md2hwpx 표 스타일 (자동 적용)**:
+- 헤더 행: 배경색 + 볼드 + CENTER 정렬
+- 데이터 행 (텍스트): CENTER 정렬
+- 데이터 행 (숫자): RIGHT 자동 판별
+- 행 높이: 헤더 2400, 데이터 2000
+- 셀 패딩: 스타일별 설정값 (github 기본 975/450)
+
+**md 파일 → HWPX 변환 방법 2가지**:
+
+| 방법 | 장점 | 단점 | 사용 시점 |
+|------|------|------|----------|
+| `md2hwpx` CLI | 빠름, 일관됨 | 단순 규칙 변환, 디자인 제한 | 단순 변환, 대량 처리 |
+| LLM + HwpxBuilder | 문맥 이해, 디자인 적용 가능 | 느림 | 디자인 중요한 문서 |
+
+**LLM이 md를 HwpxBuilder로 변환할 때 원칙**:
+- 원문 텍스트를 그대로 사용한다 — 요약·재작성·생략 금지
+- md의 구조(제목 계층, 표, 인용 등)를 보존한다
+- 스타일링은 LLM이 주도적으로 판단하여 적용한다 (색상, 박스, 정렬 등)
+  - 인용문 `>` → 콜아웃 박스(#e2dbfd) 가능
+  - 핵심 문장 → 하이라이트 박스(#d8e2ff) 가능
+  - 표 숫자 → RIGHT 정렬 자동 적용
+- 문서 유형에 맞지 않는 양식을 억지로 씌우지 않는다
+  - 리서치 분석문에 "EQUITY RESEARCH" 표지를 붙이지 않음
+  - 원문의 성격(학술/분석/보고서/안내문)에 맞는 스타일 적용
+
 ### HTML → HWPX
 ```python
 from pyhwpxlib.api import convert_html_file_to_hwpx
@@ -1312,6 +1856,10 @@ height: 1000=10pt, 1600=16pt, 2000=20pt
 | 6 | styleIDRef 보존 | 들여쓰기 유지 |
 | 7 | mimetype STORED | OPC 규격 필수 |
 | 8 | `<a href>` 제거 | fieldBegin/fieldEnd Whale 에러 |
+| 12 | header/footer/page_number는 SecPr 뒤에 삽입 | HwpxBuilder가 자동 처리 (deferred) |
+| 9 | 원문 텍스트 보존 — 요약·재작성·생략 금지 | 원문 왜곡 방지 |
+| 10 | 원문 성격에 맞지 않는 양식 강제 금지 | 리서치문에 기업보고서 표지 등 |
+| 11 | LLM은 스타일링은 자유롭게, 내용은 충실하게 | 디자인은 판단, 텍스트는 보존 |
 
 ---
 

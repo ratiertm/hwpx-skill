@@ -173,6 +173,8 @@ def build_table_xml(
     col_widths: Optional[List[int]] = None,
     row_heights: Optional[List[int]] = None,
     cell_margin: Optional[Tuple[int, int, int, int]] = None,
+    cell_para_pr_ids: Optional[dict] = None,
+    cell_char_pr_ids: Optional[dict] = None,
 ) -> str:
     """Build a complete ``<hp:run>`` containing an ``<hp:tbl>`` element.
 
@@ -274,6 +276,15 @@ def build_table_xml(
                 f' vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0"'
                 f' textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             )
+            # Per-cell paragraph style (for text alignment)
+            cell_ppr = "0"
+            if cell_para_pr_ids and (r, c) in cell_para_pr_ids:
+                cell_ppr = cell_para_pr_ids[(r, c)]
+            # Per-cell character style (for text color, bold, etc.)
+            cell_cpr = "0"
+            if cell_char_pr_ids and (r, c) in cell_char_pr_ids:
+                cell_cpr = cell_char_pr_ids[(r, c)]
+
             for line in lines:
                 escaped_line = (
                     line.replace("&", "&amp;")
@@ -282,11 +293,11 @@ def build_table_xml(
                 )
                 p_id = _id()
                 parts.append(
-                    f'<hp:p paraPrIDRef="0" styleIDRef="0" pageBreak="0"'
+                    f'<hp:p paraPrIDRef="{cell_ppr}" styleIDRef="0" pageBreak="0"'
                     f' columnBreak="0" merged="0" id="{p_id}">'
                 )
                 parts.append(
-                    f'<hp:run charPrIDRef="0"><hp:t>{escaped_line}</hp:t></hp:run>'
+                    f'<hp:run charPrIDRef="{cell_cpr}"><hp:t>{escaped_line}</hp:t></hp:run>'
                 )
                 parts.append('</hp:p>')
             parts.append('</hp:subList>')

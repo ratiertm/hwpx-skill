@@ -376,15 +376,40 @@ def _handle_table(
     pad_v, pad_h = pad[0], pad[1]
     cell_margin = (pad_h, pad_h, pad_v, pad_v)  # left, right, top, bottom
 
+    # Row heights: header taller than data rows
+    num_rows = len(clean_data)
+    row_heights = [2400] + [2000] * (num_rows - 1) if num_rows > 0 else None
+
+    # Cell alignment: header CENTER, data CENTER (numbers detected as RIGHT by preset)
+    import re as _re
+    cell_aligns: dict[tuple[int, int], str] = {}
+    for c_idx in range(max_cols):
+        cell_aligns[(0, c_idx)] = "CENTER"  # header row
+    for r_idx in range(1, num_rows):
+        for c_idx in range(max_cols):
+            val = clean_data[r_idx][c_idx] if c_idx < len(clean_data[r_idx]) else ""
+            if _re.search(r'[\d]', val) and _re.search(r'[\d%억원만조달러배개명\+\-\.,/~]', val):
+                cell_aligns[(r_idx, c_idx)] = "RIGHT"
+            else:
+                cell_aligns[(r_idx, c_idx)] = "CENTER"
+
+    # Header text style: bold
+    cell_styles: dict[tuple[int, int], dict] = {}
+    for c_idx in range(max_cols):
+        cell_styles[(0, c_idx)] = {"bold": True}
+
     add_table(
         hwpx_file,
-        len(rows),
+        num_rows,
         max_cols,
         data=clean_data,
         width=_PAGE_WIDTH,
         col_widths=col_widths,
         cell_colors=cell_colors,
         cell_margin=cell_margin,
+        row_heights=row_heights,
+        cell_aligns=cell_aligns,
+        cell_styles=cell_styles,
     )
     add_paragraph(hwpx_file, "")
     return 1

@@ -57,6 +57,8 @@ def add_table(
     row_heights: list[int] | None = None,
     cell_margin: tuple[int, int, int, int] | None = None,
     cell_gradients: dict[tuple[int, int], dict] | None = None,
+    cell_aligns: dict[tuple[int, int], str] | None = None,
+    cell_styles: dict[tuple[int, int], dict] | None = None,
     section_index: int = 0,
 ) -> Para:
     """Add a table to the document.
@@ -66,6 +68,10 @@ def add_table(
     *cell_margin* is (left, right, top, bottom) in HWPX units.
     *cell_gradients* maps ``(row, col)`` to gradient config dicts with keys:
         ``start``, ``end``, ``type`` (default ``"LINEAR"``), ``angle`` (default 0).
+    *cell_aligns* maps ``(row, col)`` to alignment string
+        (``"CENTER"``, ``"LEFT"``, ``"RIGHT"``).
+    *cell_styles* maps ``(row, col)`` to char style dict with keys:
+        ``bold``, ``text_color``, ``font_size``.
     """
     from .writer.shape_writer import build_table_xml
     from .style_manager import ensure_border_fill, ensure_gradient_border_fill
@@ -96,6 +102,27 @@ def add_table(
             )
             cell_border_fill_ids[(r, c)] = bf_id
 
+    # cell_aligns → cell_para_pr_ids
+    cell_para_pr_ids: dict[tuple[int, int], str] | None = None
+    if cell_aligns:
+        from .style_manager import ensure_para_style
+        cell_para_pr_ids = {}
+        for (r, c), align in cell_aligns.items():
+            cell_para_pr_ids[(r, c)] = ensure_para_style(hwpx_file, align=align)
+
+    # cell_styles → cell_char_pr_ids
+    cell_char_pr_ids: dict[tuple[int, int], str] | None = None
+    if cell_styles:
+        from .style_manager import ensure_char_style, font_size_to_height
+        cell_char_pr_ids = {}
+        for (r, c), style in cell_styles.items():
+            cell_char_pr_ids[(r, c)] = ensure_char_style(
+                hwpx_file,
+                bold=style.get('bold', False),
+                text_color=style.get('text_color'),
+                height=font_size_to_height(style.get('font_size')),
+            )
+
     section = hwpx_file.section_xml_file_list.get(section_index)
     para = section.add_new_para()
     _init_para(para)
@@ -106,6 +133,8 @@ def add_table(
         col_widths=col_widths,
         row_heights=row_heights,
         cell_margin=cell_margin,
+        cell_para_pr_ids=cell_para_pr_ids,
+        cell_char_pr_ids=cell_char_pr_ids,
     )
     return para
 
@@ -494,6 +523,7 @@ def add_bullet_list(
     items: List[str],
     bullet_char: str = "\u25cf",
     char_pr_id_ref: str = "0",
+    margin_left: int = 0,
     section_index: int = 0,
 ) -> List[Para]:
     """Add a bullet list to the document using native HWPX bullet definitions.
@@ -502,6 +532,8 @@ def add_bullet_list(
     in the header.  The bullet character is rendered automatically by
     the word processor -- no text prefix is inserted.
 
+    *margin_left* adds left margin (indent) to the bullet paragraphs.
+
     Returns the list of created :class:`Para` objects.
     """
     from .style_manager import ensure_bullet, ensure_heading_para_style
@@ -509,6 +541,7 @@ def add_bullet_list(
     bullet_id = ensure_bullet(hwpx_file, char=bullet_char)
     para_pr_id = ensure_heading_para_style(
         hwpx_file, heading_type="BULLET", heading_id_ref=bullet_id,
+        margin_left=margin_left,
     )
 
     paras: list[Para] = []
@@ -942,8 +975,8 @@ def add_bookmark(
 _HEADING_STYLES: dict[int, tuple[int, bool]] = {
     1: (2400, True),
     2: (1800, True),
-    3: (1400, True),
-    4: (1200, True),
+    3: (1600, True),
+    4: (1400, True),
 }
 
 
