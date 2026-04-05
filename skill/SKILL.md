@@ -1149,13 +1149,28 @@ python template_builder.py template.hwpx --port 8081
 
 ### Checkbox Patterns
 
-```python
-# [  ] → [√] 패턴
-data = {"민간기업 [  ]": "민간기업 [√]"}
+**주의: 체크박스에 2가지 형태가 있음**
+- `[  ]` 패턴 — data로 직접 교체 (checks 파라미터 미지원)
+- `□` 패턴 — checks 파라미터 사용
 
-# □ → ■ 패턴 (checks 파라미터 사용)
+```python
+# [  ] → [√] 패턴 — data로 직접 교체해야 함
+data = {"공공기관(공기업) [  ]": "공공기관(공기업) [√]"}
+
+# □ → ■ 패턴 — checks 파라미터 사용
 checks = ["__ALL__"]  # 전체 □ → ■
 checks = ["민간기업"]  # 해당 라벨 뒤 □만 ■로
+
+# 혼합 사용 예시
+fill_template_checkbox(
+    "template.hwpx",
+    data={
+        ">성 명<": ">성 명  홍길동<",
+        "민간기업 [  ]": "민간기업 [√]",      # [  ] → [√]
+    },
+    checks=["동의함"],                         # □ → ■
+    output_path="filled.hwpx",
+)
 ```
 
 ### Critical Rules for Form Automation
