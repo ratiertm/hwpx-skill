@@ -41,6 +41,103 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 ---
 
+## Interactive Workflow (대화형 문서 생성)
+
+사용자가 "한글 문서 만들어줘"라고 요청하면, 아래 단계를 순서대로 진행합니다.
+**AskUserQuestion 도구를 사용**하여 각 단계에서 사용자 선택을 받습니다.
+
+### Step 1: 문서 유형 선택
+
+```
+"어떤 유형의 문서를 만드시겠어요?"
+
+1. 정부 양식 — 신청서, 계약서, 허가서 (바탕 11pt, 160%)
+2. 공문서 — 기관 공문, 협조전, 통보서 (바탕 12pt, 160%)
+3. 기업 보고서 — 분석, 제안서, 실적 보고 (돋움 제목, 170%)
+4. 세무/법무 — 소장, 세금계산서, 등기 (바탕 12pt, 200%)
+5. 학술 논문 — 학위 논문, 학회 발표 (바탕 11pt, 170%)
+6. 자유 형식 — 직접 지정
+```
+
+→ 선택에 따라 Document Type Specifications의 스타일 자동 적용
+
+### Step 2: 양식/템플릿 선택
+
+```
+"어떤 양식을 사용하시겠어요?"
+
+1. 기본 템플릿으로 새로 만들기 — HwpxBuilder로 생성
+2. 기존 hwpx 파일 업로드 — 텍스트 교체 방식 (서식 100% 보존)
+3. 샘플에서 선택 — 미리 만든 양식 중 선택
+```
+
+→ 2번 선택 시: 파일 경로 입력 → extract_schema → 필드 분류
+
+### Step 3: 내용 입력
+
+**새로 만들기 (1번)**:
+```
+"문서 내용을 알려주세요."
+→ 제목, 본문 주제, 포함할 데이터 등을 자유롭게 입력
+→ 대화를 통해 내용 구성
+```
+
+**기존 양식 편집 (2번)**:
+```
+"다음 필드에 데이터를 입력해주세요:"
+→ schema에서 input_fields 목록 표시
+→ 각 필드별 값 입력 (또는 JSON/CSV로 일괄 입력)
+→ 체크박스 선택 항목 확인
+```
+
+### Step 4: 파일 생성
+
+```
+"파일명을 지정해주세요. (기본: {주제}_{날짜}.hwpx)"
+→ 사용자 확인 후 hwpx 생성
+→ 생성 완료 메시지 + 파일 경로 안내
+→ "Whale/한컴오피스로 열어볼까요?" 확인
+```
+
+### Step 5: 수정/반복 (선택)
+
+```
+"수정할 부분이 있으면 알려주세요."
+→ 텍스트 수정: unpack → edit → pack
+→ 추가 생성: 같은 양식으로 다건 생성 (batch)
+→ 만족: 완료
+```
+
+### Workflow 구현 예시
+
+```python
+# Step 1: 유형 선택 → 스타일 결정
+doc_type = ask_user("문서 유형?", options=["정부양식", "공문서", "기업보고서", "세무법무", "학술논문"])
+
+# Step 2: 양식 선택
+template = ask_user("양식?", options=["새로 만들기", "기존 파일 업로드"])
+
+if template == "새로 만들기":
+    # Step 3: 내용 수집 → HwpxBuilder로 생성
+    doc = HwpxBuilder()
+    # doc_type에 맞는 스타일 자동 적용
+    doc.add_heading(title, level=1)
+    doc.add_paragraph(body)
+    doc.save(output_path)
+
+elif template == "기존 파일 업로드":
+    # Step 3: 필드 채우기
+    schema = extract_schema(uploaded_file)
+    analyzed = analyze_schema_with_llm(schema)
+    # 사용자에게 input_fields 보여주고 값 입력받기
+    fill_template_checkbox(uploaded_file, data, checks, output_path)
+
+# Step 4: 파일 열기
+open_in_whale(output_path)
+```
+
+---
+
 ## Overview
 
 A .hwpx file is a ZIP archive (OPC format) containing XML files following the OWPML (Open Word-Processor Markup Language) standard by Hancom. The key files are `Contents/header.xml` (styles) and `Contents/section0.xml` (body content).
