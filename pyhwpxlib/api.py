@@ -2060,3 +2060,238 @@ def fill_template(
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf_out:
         for name in names:
             zf_out.writestr(name, file_data[name])
+
+
+def fill_template_checkbox(
+    template_path: str,
+    data: dict[str, str],
+    checks: list[str] | None = None,
+    output_path: str = "",
+) -> str:
+    """Fill a template HWPX with data and checkbox marks.
+
+    Combines text replacement with checkbox marking (□→■).
+
+    Parameters
+    ----------
+    template_path : str
+        Path to the template .hwpx file.
+    data : dict of str to str
+        Text replacements. e.g. ``{"성 명": "성 명  홍길동"}``
+    checks : list of str, optional
+        Checkbox labels to mark. Finds ``□`` after each label
+        and replaces with ``■``. e.g. ``["민간기업"]``
+        Use ``"__ALL__"`` to mark all checkboxes.
+    output_path : str
+        Path for output. If empty, adds ``_filled`` suffix.
+
+    Returns
+    -------
+    str
+        Path to the created file.
+    """
+    import shutil
+    import zipfile
+
+    if not output_path:
+        base, ext = _pathlib.Path(template_path).stem, _pathlib.Path(template_path).suffix
+        output_path = str(_pathlib.Path(template_path).parent / f"{base}_filled{ext}")
+
+    shutil.copy2(template_path, output_path)
+
+    with zipfile.ZipFile(output_path, "r") as zf:
+        all_files = {name: zf.read(name) for name in zf.namelist()}
+
+    # Find section files
+    section_names = [n for n in all_files if 'section' in n and n.endswith('.xml')]
+
+    for sec_name in section_names:
+        text = all_files[sec_name].decode("utf-8")
+
+        # 1. Text replacements
+        if data:
+            for old, new in data.items():
+                text = text.replace(old, new, 1)
+
+        # 2. Checkbox marks
+        if checks:
+            if "__ALL__" in checks:
+                text = text.replace("□", "■")
+            else:
+                for label in checks:
+                    # Find label, then replace next □ after it
+                    pos = text.find(label)
+                    if pos >= 0:
+                        box_pos = text.find("□", pos)
+                        if box_pos >= 0:
+                            text = text[:box_pos] + "■" + text[box_pos + 1:]
+
+        all_files[sec_name] = text.encode("utf-8")
+
+    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, content in all_files.items():
+            zf.writestr(name, content)
+
+    return output_path
+
+
+def fill_template_batch(
+    template_path: str,
+    records: list[dict],
+    output_dir: str = "",
+    filename_field: str = "",
+) -> list[str]:
+    """Generate multiple filled documents from one template.
+
+    Parameters
+    ----------
+    template_path : str
+        Path to the template .hwpx file.
+    records : list of dict
+        Each dict has ``"data"`` (text replacements),
+        optional ``"checks"`` (checkbox labels),
+        optional ``"filename"`` (output filename).
+    output_dir : str
+        Directory for output files. Defaults to template's directory.
+    filename_field : str
+        Key in ``data`` to use for filename. e.g. ``"성 명"``
+
+    Returns
+    -------
+    list of str
+        Paths to all created files.
+    """
+    import os
+
+    if not output_dir:
+        output_dir = str(_pathlib.Path(template_path).parent)
+    os.makedirs(output_dir, exist_ok=True)
+
+    stem = _pathlib.Path(template_path).stem
+    outputs = []
+
+    for i, record in enumerate(records):
+        data = record.get("data", {})
+        checks = record.get("checks", [])
+        fname = record.get("filename", "")
+
+        if not fname and filename_field and filename_field in data:
+            # Extract value from data (e.g. "성 명  홍길동" → "홍길동")
+            val = data[filename_field]
+            # Take the part after the label
+            parts = val.split()
+            fname = parts[-1] if len(parts) > 1 else parts[0]
+
+        if not fname:
+            fname = f"{i + 1}"
+
+        out_path = os.path.join(output_dir, f"{stem}_{fname}.hwpx")
+        fill_template_checkbox(template_path, data, checks, out_path)
+        outputs.append(out_path)
+
+    return outputs
+
+
+def extract_schema(
+    template_path: str,
+) -> dict:
+    """Extract fillable field schema from a HWPX/OWPML template.
+
+    Analyzes table cells to detect labels, input fields, and checkboxes.
+    Returns a JSON-serializable schema that describes what can be filled.
+
+    Parameters
+    ----------
+    template_path : str
+        Path to the template .hwpx or .owpml file.
+
+    Returns
+    -------
+    dict
+        Schema with ``title``, ``fields`` (label fields),
+        ``checkboxes`` (checkbox groups), and ``format_info``.
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    _hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+
+    with zipfile.ZipFile(template_path) as z:
+        section = z.read("Contents/section0.xml").decode("utf-8")
+    root = ET.fromstring(section)
+
+    tables = root.findall(f".//{_hp}tbl")
+    title = ""
+    fields = []
+    checkboxes = []
+
+    # Body text 제목 탐지
+    for p in root.findall(f"{_hp}p"):
+        texts = []
+        for run in p.findall(f"{_hp}run"):
+            t = run.find(f"{_hp}t")
+            if t is not None and t.text:
+                texts.append(t.text.strip())
+        combined = " ".join(texts).strip()
+        if combined and not title:
+            title = combined
+            break
+
+    for ti, tbl in enumerate(tables):
+        rows_attr = tbl.get("rowCnt", "0")
+        cols_attr = tbl.get("colCnt", "0")
+
+        for tc in tbl.findall(f".//{_hp}tc"):
+            t_elements = tc.findall(f".//{_hp}t")
+            texts = [t.text for t in t_elements if t.text]
+            cell_text = "".join(texts).strip()
+            if not cell_text:
+                continue
+
+            # 체크박스 탐지: □ 또는 [  ] 포함
+            has_checkbox = "□" in cell_text or "[  ]" in cell_text
+            if has_checkbox:
+                # 개별 체크 옵션 추출
+                options = []
+                import re
+                # "국가 [  ] (공무원 [  ] ...), 민간기업 [  ]" 패턴
+                for m in re.finditer(r"([\w()]+)\s*\[  \]", cell_text):
+                    options.append(m.group(1))
+                for m in re.finditer(r"([\w()]+)\s*□", cell_text):
+                    options.append(m.group(1))
+                if options:
+                    checkboxes.append({
+                        "table": ti,
+                        "type": "checkbox",
+                        "options": options,
+                        "raw_text": cell_text[:80],
+                    })
+                continue
+
+            # 라벨 필드 탐지: 짧은 텍스트 (2~20자)
+            if 2 <= len(cell_text) <= 20:
+                # 제목, 고정 텍스트 제외
+                skip_words = ["접수번호", "접수일", "처리기간", "처리절차",
+                              "첨부서류", "수수료", "신청인", "사업주동의",
+                              "서명 또는 인", "귀하"]
+                if any(w in cell_text for w in skip_words):
+                    continue
+                # 숫자만 있는 셀 제외
+                if cell_text.replace(" ", "").isdigit():
+                    continue
+
+                fields.append({
+                    "table": ti,
+                    "type": "text",
+                    "label": cell_text,
+                    "fill_pattern": f">{cell_text}<",
+                    "fill_example": f">{cell_text}  [값 입력]<",
+                })
+
+    return {
+        "title": title,
+        "source": str(_pathlib.Path(template_path).name),
+        "tables": len(tables),
+        "fields": fields,
+        "checkboxes": checkboxes,
+    }
