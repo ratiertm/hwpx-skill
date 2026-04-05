@@ -162,6 +162,125 @@ doc.save("report.hwpx")
 | 표 헤더 배경 | 연파랑 | #D5E8F0 |
 | 표 교차행 배경 | 연회색 | #F5F5F5 |
 
+### Document Structure Guide (문서 구성 가이드)
+
+**문서 계층 구조**:
+```
+대제목 (level 1) — 문서 타이틀, 1개만
+├── 중제목 (level 2) — 섹션 구분 (1. 개요, 2. 분석, 3. 결론)
+│   ├── 소제목 (level 3) — 하위 항목 (1.1, 1.2)
+│   │   └── 본문 텍스트 — 일반 단락
+│   └── 소제목 (level 3)
+│       ├── 본문 텍스트
+│       └── 표/그림
+├── 중제목 (level 2)
+│   └── ...
+└── 부록/참고 — 작은 폰트, 회색
+```
+
+**제목별 스타일**:
+
+| 구분 | 폰트 크기 | 볼드 | 정렬 | 줄간격 | 상하 간격 |
+|------|----------|------|------|--------|----------|
+| 대제목 | 20pt | O | CENTER | 200 | 위 400, 아래 200 |
+| 중제목 | 16pt | O | LEFT | 160 | 위 300, 아래 150 |
+| 소제목 | 14pt | O | LEFT | 160 | 위 200, 아래 100 |
+| 본문 | 10pt | X | JUSTIFY | 160 | 위 0, 아래 0 |
+| 캡션 | 9pt | X | CENTER | 130 | 위 50, 아래 100 |
+| 주석 | 9pt | X | LEFT | 130 | 위 0, 아래 0 |
+| 꼬리말 | 8pt | X | LEFT | 130 | - |
+
+**정렬 규칙**:
+
+| 요소 | 정렬 | 이유 |
+|------|------|------|
+| 대제목 | CENTER | 문서 시각적 중심 |
+| 중/소제목 | LEFT | 읽기 흐름 |
+| 본문 | JUSTIFY | 한국 공문서 기본 (condense 25% 필요) |
+| 표 헤더 | CENTER | 열 제목 강조 |
+| 표 데이터 (텍스트) | LEFT | 가독성 |
+| 표 데이터 (숫자) | RIGHT | 자릿수 정렬 |
+| 날짜/작성자 | RIGHT | 관례 |
+
+**문단 간격 패턴**:
+```python
+# 제목 뒤 — 빈 줄 1개
+doc.add_heading("제목", level=1)
+doc.add_paragraph("")
+
+# 섹션 전환 — 빈 줄 1개 또는 구분선
+doc.add_paragraph("")
+doc.add_heading("다음 섹션", level=2)
+
+# 표 전후 — 빈 줄 1개씩
+doc.add_paragraph("")
+doc.add_table([...])
+doc.add_paragraph("")
+
+# 본문 연속 — 빈 줄 없이 연결
+doc.add_paragraph("첫 번째 문단")
+doc.add_paragraph("두 번째 문단")
+
+# 문서 끝 주석 — 빈 줄 2개 후
+doc.add_paragraph("")
+doc.add_paragraph("")
+doc.add_paragraph("본 문서는...", font_size=9, text_color="#999999")
+```
+
+**구분선 패턴**:
+```python
+# 가벼운 구분 — 짧은 선
+doc.add_paragraph("───────────────", text_color="#CCCCCC")
+
+# 강한 구분 — 전체 너비 선
+doc.add_line()
+
+# 섹션 구분 — 빈 줄 + 제목
+doc.add_paragraph("")
+doc.add_heading("새 섹션", level=2)
+```
+
+**들여쓰기 패턴 (paraPr margin)**:
+
+| 구분 | intent 값 | 사용 |
+|------|----------|------|
+| 기본 | 0 | 일반 본문 |
+| 1단 들여쓰기 | -2800 | 조항 번호 뒤 본문 |
+| 2단 들여쓰기 | -4880 | 하위 항목 |
+| 3단 들여쓰기 | -7680 | 세부 항목 |
+| 좌측 여백 | left 4000 | 인용문, 참고 |
+
+**번호 매기기 패턴**:
+```
+제1조(목적)          ← 조 (condense 25%, intent -2800)
+  1. 항목             ← 호 (intent -4880)
+    가. 세부항목       ← 목 (intent -7680)
+      1) 세부세부      ← 세목
+```
+
+**한국 공문서 기본 설정**:
+```python
+# A4 용지
+page_width = 59528    # 210mm
+page_height = 84188   # 297mm
+
+# 여백 (한국 공문서 기본)
+margin_left = 8504    # 30mm
+margin_right = 8504   # 30mm
+margin_top = 5668     # 20mm
+margin_bottom = 4252  # 15mm
+
+# 기본 폰트
+font = "함초롬돋움"    # 한컴 기본
+font_size = 10        # pt (height 1000)
+
+# 줄간격
+line_spacing = 160    # 160% (한국 공문서 기본)
+
+# 정렬
+alignment = "JUSTIFY" # 양쪽 정렬 + condense 25%
+```
+
 ### Critical Rules for HwpxBuilder
 
 - **pyhwpxlib 기반** — header.xml은 pyhwpxlib가 생성, section만 HwpxBuilder가 구성
