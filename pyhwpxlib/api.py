@@ -2192,6 +2192,152 @@ def fill_template_batch(
     return outputs
 
 
+def analyze_schema_with_llm(
+    schema: dict,
+    llm_call=None,
+) -> dict:
+    """LLM을 사용하여 서식 필드를 자동 분류.
+
+    extract_schema() 결과를 LLM에 보내서 각 필드를
+    'input'(사용자 입력), 'fixed'(고정 텍스트), 'header'(제목/섹션)로 분류.
+
+    Parameters
+    ----------
+    schema : dict
+        extract_schema()의 반환값
+    llm_call : callable, optional
+        LLM 호출 함수. ``llm_call(prompt) -> str`` 형태.
+        None이면 규칙 기반 분류 사용.
+
+    Returns
+    -------
+    dict
+        ``template_schema`` — 분류된 필드 + 체크박스 + 메타데이터
+    """
+    fields = schema.get('fields', [])
+    checkboxes = schema.get('checkboxes', [])
+
+    if llm_call is not None:
+        # LLM 기반 분류
+        labels = [f['label'] for f in fields]
+        checks = [c['raw_text'][:60] for c in checkboxes]
+
+        prompt = f"""다음은 한국 정부/기업 서식(양식)에서 추출한 텍스트 라벨 목록입니다.
+각 라벨을 다음 3가지로 분류해주세요:
+
+- input: 사용자가 직접 데이터를 입력하는 필드 (이름, 주소, 날짜 등)
+- fixed: 고정 텍스트로 변경하면 안 되는 것 (제목, 안내문, 처리기관 등)
+- header: 섹션 제목이나 구분선 역할 (큰 제목, 섹션명 등)
+
+JSON 배열로 응답해주세요. 각 항목은 {{"label": "...", "type": "input|fixed|header"}} 형식.
+
+라벨 목록:
+{labels}
+
+체크박스 목록 (이건 모두 "checkbox" 타입):
+{checks}
+
+JSON만 응답:"""
+
+        try:
+            response = llm_call(prompt)
+            import json
+            # JSON 배열 추출
+            start = response.find('[')
+            end = response.rfind(']') + 1
+            if start >= 0 and end > start:
+                classified = json.loads(response[start:end])
+                return _build_template_schema(schema, classified, checkboxes)
+        except Exception as e:
+            logger.warning("LLM classification failed, falling back to rules: %s", e)
+
+    # 규칙 기반 분류 (fallback)
+    return _classify_fields_by_rules(schema)
+
+
+def _classify_fields_by_rules(schema: dict) -> dict:
+    """규칙 기반 필드 분류 (LLM 없을 때 fallback)"""
+    # 입력 필드 패턴
+    input_patterns = {
+        '성 명', '주민등록번호', '주 소', '장애유형', '사업체명', '대표자',
+        '소재지', '담당자명', '연락처', '사업자등록번호', '상시근로자 수',
+        '장애인 근로자 수', '업종(주된 생산품)', '현 직장 취업일자', '기기명',
+        '외국인등록번호', '보유기간',
+    }
+    # 고정 텍스트 패턴
+    fixed_patterns = {
+        '14일', '수수료', '신청서 작성', '접 수', '검 토', '결 재', '결정 통지',
+        '처 리 기 관', '준영구', '동의함',
+    }
+    # 제목 패턴
+    header_patterns = {
+        '서비스 신청서', '서비스 신청 내용', '서비스 필요영역', '서비스 희망기간',
+        '서비스 요청사항', '행정정보', '개인정보',
+    }
+
+    input_fields = []
+    fixed_fields = []
+    header_fields = []
+
+    for f in schema.get('fields', []):
+        label = f['label']
+        if label in input_patterns or any(p in label for p in ['취득', '기간', '내용', '직무']):
+            f['field_type'] = 'input'
+            input_fields.append(f)
+        elif label in fixed_patterns or any(p in label for p in fixed_patterns):
+            f['field_type'] = 'fixed'
+            fixed_fields.append(f)
+        elif any(p in label for p in header_patterns):
+            f['field_type'] = 'header'
+            header_fields.append(f)
+        elif len(label) <= 5:
+            f['field_type'] = 'input'
+            input_fields.append(f)
+        else:
+            f['field_type'] = 'fixed'
+            fixed_fields.append(f)
+
+    return {
+        'title': schema.get('title', ''),
+        'source': schema.get('source', ''),
+        'input_fields': input_fields,
+        'fixed_fields': fixed_fields,
+        'header_fields': header_fields,
+        'checkboxes': schema.get('checkboxes', []),
+    }
+
+
+def _build_template_schema(schema, classified, checkboxes):
+    """LLM 분류 결과를 template_schema로 변환"""
+    field_map = {f['label']: f for f in schema.get('fields', [])}
+
+    input_fields = []
+    fixed_fields = []
+    header_fields = []
+
+    for item in classified:
+        label = item.get('label', '')
+        field_type = item.get('type', 'fixed')
+        f = field_map.get(label, {'label': label, 'type': 'text'})
+        f['field_type'] = field_type
+
+        if field_type == 'input':
+            input_fields.append(f)
+        elif field_type == 'header':
+            header_fields.append(f)
+        else:
+            fixed_fields.append(f)
+
+    return {
+        'title': schema.get('title', ''),
+        'source': schema.get('source', ''),
+        'input_fields': input_fields,
+        'fixed_fields': fixed_fields,
+        'header_fields': header_fields,
+        'checkboxes': checkboxes,
+    }
+
+
 def extract_schema(
     template_path: str,
 ) -> dict:
