@@ -83,6 +83,85 @@ doc.save("output.hwpx")
 | B5 | 51,592 | 72,848 |
 | Letter | 61,200 | 79,200 |
 
+### Document Templates & Style Guide
+
+**기본 폰트**: 함초롬돋움 (한컴 기본), 맑은 고딕 (Windows 호환), 나눔고딕 (웹 호환)
+
+**폰트 크기 체계 (height 단위)**:
+
+| 용도 | pt | height | 사용 |
+|------|-----|--------|------|
+| 대제목 | 20pt | 2000 | 문서 타이틀 |
+| 중제목 | 16pt | 1600 | 섹션 헤딩 |
+| 소제목 | 14pt | 1400 | 하위 섹션 |
+| 본문 | 10pt | 1000 | 기본 텍스트 |
+| 주석/캡션 | 9pt | 900 | 부가 정보, 출처 |
+| 미주/각주 | 8pt | 800 | 법적 고지 |
+
+**줄간격 (lineSpacing)**:
+
+| 유형 | value | 사용 |
+|------|-------|------|
+| 넓음 | 200 | 보고서, 공문서 |
+| 표준 | 160 | 일반 문서 |
+| 좁음 | 130 | 표 안, 양식 |
+
+**표 스타일**:
+
+| 스타일 | 설명 | 코드 |
+|--------|------|------|
+| 기본 표 | 테두리만 | borderFillIDRef="1" |
+| 헤더 강조 | 첫 행 배경색 | set_cell_background(row=0, color) |
+| 줄무늬 | 짝수행 배경 | 행별 borderFill 교체 |
+
+**보고서 템플릿 패턴**:
+```python
+doc = HwpxBuilder()
+doc.add_heading("보고서 제목", level=1)
+doc.add_paragraph("2026년 4월 5일", font_size=10, text_color="#888888")
+doc.add_paragraph("")
+
+doc.add_table([
+    ["항목", "값", "비고"],
+    ["데이터1", "100", "정상"],
+])
+doc.add_paragraph("")
+
+doc.add_heading("1. 개요", level=2)
+doc.add_paragraph("본문 내용...")
+doc.add_paragraph("")
+
+doc.add_heading("2. 분석", level=2)
+doc.add_paragraph("분석 내용...")
+doc.add_paragraph("")
+
+doc.add_paragraph("본 문서는 정보 제공 목적으로 작성되었습니다.",
+                   font_size=9, text_color="#999999")
+doc.save("report.hwpx")
+```
+
+**서식(양식) 템플릿 패턴**:
+```python
+# 1. 원본 서식 hwpx 업로드
+# 2. extract_schema()로 필드 탐지
+# 3. template_builder.py로 입력 필드 지정 → schema.json 저장
+# 4. fill_template_checkbox()로 데이터 채우기
+# → 원본 서식의 스타일이 100% 보존됨
+```
+
+**색상 팔레트 (한국 공문서 스타일)**:
+
+| 용도 | 색상 | 코드 |
+|------|------|------|
+| 본문 | 검정 | #000000 |
+| 부제목/날짜 | 회색 | #888888 |
+| 강조 (긍정) | 녹색 | #2E7D32 |
+| 강조 (경고) | 빨강 | #E74C3C |
+| 링크/참조 | 파랑 | #1565C0 |
+| 주석/미주 | 연회색 | #999999 |
+| 표 헤더 배경 | 연파랑 | #D5E8F0 |
+| 표 교차행 배경 | 연회색 | #F5F5F5 |
+
 ### Critical Rules for HwpxBuilder
 
 - **pyhwpxlib 기반** — header.xml은 pyhwpxlib가 생성, section만 HwpxBuilder가 구성
