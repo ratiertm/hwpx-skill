@@ -46,16 +46,19 @@ _TAG_FOOTNOTE_SHAPE = 74   # 16 + 58
 _TAG_PAGE_BORDER_FILL = 75 # 16 + 59
 _TAG_SHAPE_COMPONENT = 76  # 16 + 60
 _TAG_TABLE = 77            # 16 + 61
+_TAG_SHAPE_COMPONENT_PICTURE = 85  # 16 + 69
 
 # HWP control character codes (in PARA_TEXT as uint16)
 _CH_SECTION_DEF = 2
 _CH_COLUMN_DEF = 3
 _CH_FIELD_END = 4
 _CH_FIELD_BEGIN = 5
-_CH_TABLE = 11     # also GSO, button, etc.
+_CH_TABLE = 11     # also GSO, button, equation, picture, etc.
 _CH_TAB = 9
 _CH_LINE_BREAK = 10
 _CH_PARA_END = 13
+_CH_HEADER_FOOTER = 16  # header or footer control
+_CH_FOOTNOTE_ENDNOTE = 17  # footnote or endnote control
 _CH_NBSPACE = 30
 _CH_FWSPACE = 31
 _CH_HYPHEN = 24
@@ -264,6 +267,9 @@ class _HWPDocument:
 
         # Streams list
         self.streams = ['/'.join(s) for s in self.ole.listdir()]
+
+        # bin_data_id_map: set during conversion (HWP binDataID -> HWPX href)
+        self.bin_data_id_map: Dict[int, str] = {}
 
     def close(self):
         self.ole.close()
@@ -677,7 +683,11 @@ class _HWPDocument:
         return results
 
     def _read_bin_data_entries(self) -> Dict[int, str]:
-        """Read HWPTAG_BIN_DATA entries, map ID -> extension."""
+        """Read HWPTAG_BIN_DATA entries, map ID -> extension.
+
+        BIN_DATA record layout for EMBEDDING type:
+          prop(uint16) + binDataID(uint16) + ext_len(uint16) + ext(wchars)
+        """
         result = {}
         idx = 0
         for rec in self.docinfo_records:
@@ -686,18 +696,48 @@ class _HWPDocument:
                 if len(d) >= 2:
                     prop = struct.unpack_from('<H', d, 0)[0]
                     data_type = prop & 0x0F
-                    # For embedded: prop has extension info
                     ext = 'png'  # default
                     if data_type == 0:  # LINK
-                        # absolute path follows
                         pass
                     elif data_type == 1:  # EMBEDDING
-                        if len(d) >= 4:
-                            ext_len = struct.unpack_from('<H', d, 2)[0]
-                            if 4 + ext_len * 2 <= len(d):
-                                ext = d[4:4 + ext_len * 2].decode('utf-16-le', errors='replace').lower()
+                        # offset 2: binDataID (uint16)
+                        # offset 4: ext_len (uint16) + ext chars (wchars)
+                        if len(d) >= 6:
+                            ext_len = struct.unpack_from('<H', d, 4)[0]
+                            if 6 + ext_len * 2 <= len(d):
+                                ext = d[6:6 + ext_len * 2].decode(
+                                    'utf-16-le', errors='replace').lower()
                 idx += 1
                 result[idx] = ext
+        return result
+
+    def read_bin_data_bytes(self) -> Dict[int, bytes]:
+        """Read actual binary data bytes from the OLE BinData/ storage.
+
+        Returns a dict mapping binDataID (1-based) to the raw image bytes.
+        """
+        result: Dict[int, bytes] = {}
+        for bin_id, ext in self.bin_data_ids.items():
+            hex_id = f"BIN{bin_id:04X}"
+            # HWP stores embedded binary data in BinData/ with the hex name
+            stream_name = f"BinData/{hex_id}.{ext}"
+            try:
+                if self.ole.exists(stream_name):
+                    raw = self.ole.openstream(stream_name).read()
+                    # Binary data in BinData/ storage may be compressed
+                    result[bin_id] = self._decompress(raw)
+                    continue
+            except Exception:
+                pass
+            # Try without extension (some HWP files use just the hex name)
+            try:
+                if self.ole.exists(f"BinData/{hex_id}"):
+                    raw = self.ole.openstream(f"BinData/{hex_id}").read()
+                    result[bin_id] = self._decompress(raw)
+                    continue
+            except Exception:
+                pass
+            logger.debug("BinData stream not found for bin_id=%d (%s)", bin_id, stream_name)
         return result
 
     def _read_summary(self) -> dict:
@@ -784,6 +824,12 @@ def _build_hwpx(hwp: _HWPDocument) -> Any:
     # Start from a blank file for proper structure
     hwpx = BlankFileMaker.make()
 
+    # Build bin_data_id_map: HWP binDataID -> HWPX href string
+    # Use "imageN" naming to match Java hwp2hwpx output convention.
+    # Store on hwp so all builders can access it without extra params.
+    for bin_id, ext in hwp.bin_data_ids.items():
+        hwp.bin_data_id_map[bin_id] = f"BinData/image{bin_id}.{ext}"
+
     # Overwrite with HWP data
     _build_version(hwpx, hwp)
     _build_container(hwpx, hwp)
@@ -791,6 +837,19 @@ def _build_hwpx(hwp: _HWPDocument) -> Any:
     _build_header(hwpx, hwp)
     _build_sections(hwpx, hwp)
     _build_settings(hwpx, hwp)
+
+    # Attach binary data (images, OLE) to the hwpx file for ZIP writing
+    try:
+        bin_bytes = hwp.read_bin_data_bytes()
+        attachments: Dict[str, bytes] = {}
+        for bin_id, data in bin_bytes.items():
+            path = hwp.bin_data_id_map.get(bin_id)
+            if path:
+                attachments[f"Contents/{path}"] = data
+        hwpx._binary_attachments = attachments
+    except Exception as e:
+        logger.warning("Failed to read binary data from HWP: %s", e)
+        hwpx._binary_attachments = {}
 
     hwp.close()
     return hwpx
@@ -881,17 +940,14 @@ def _build_content_hpf(hwpx, hwp: _HWPDocument):
     item.href = "settings.xml"
     item.media_type = "application/xml"
 
-    # Binary data items
-    bin_data_id_map = {}
+    # Binary data items (use "imageN" naming to match Java hwp2hwpx convention)
     for bin_id, ext in hwp.bin_data_ids.items():
-        hex_id = f"BIN{bin_id:04X}"
-        item_id = f"bindata{bin_id}"
-        href = f"BinData/{hex_id}.{ext}"
+        item_id = f"image{bin_id}"
+        href = f"BinData/image{bin_id}.{ext}"
         item = manifest.add_new()
         item.id = item_id
         item.href = href
         item.media_type = _media_type(ext)
-        bin_data_id_map[bin_id] = item_id
 
     # Spine
     spine = hpf.create_spine()
@@ -1549,7 +1605,13 @@ def _group_paragraphs(records: List[dict]) -> List[List[dict]]:
 # Control type ID for table in control records (first 4 bytes of data).
 # In HWP 5.x binary, extended controls (section def, column def, table, etc.)
 # use tag 71 (LIST_HEADER) with a 4-byte control ID at the start of the data.
-_CTRL_ID_TABLE = 0x74626C20  # bytes ' lbt' read as uint32-LE
+_CTRL_ID_TABLE = 0x74626C20  # bytes ' lbt' read as uint32-LE -> 'tbl '
+_CTRL_ID_GSO = 0x67736F20    # bytes ' osg' read as uint32-LE  (GSO drawing object)
+_CTRL_ID_HEADER = 0x68656164  # 'head'
+_CTRL_ID_FOOTER = 0x666F6F74  # 'foot'
+_CTRL_ID_FOOTNOTE = 0x666E2020  # 'fn  '
+_CTRL_ID_ENDNOTE = 0x656E2020  # 'en  '
+_CTRL_ID_EQUATION = 0x65716564  # 'eqed'
 
 # Tag used for extended control records (section/column/table/etc.) in actual HWP files.
 # CTRL_HEADER (tag 71) records whose first 4 bytes identify the control type.
@@ -1560,6 +1622,9 @@ _TAG_TABLE_PROPS = 77  # HWPTAG_BEGIN + 61
 
 # Tag used for cell LIST_HEADER records (cell addr, span, size, margins)
 _TAG_CELL_LIST_HEADER = 72  # HWPTAG_BEGIN + 56
+
+# Tag for equation edit record (HWPTAG_EQEDIT = HWPTAG_BEGIN + 72 = 88)
+_TAG_EQEDIT = 88
 
 
 def _find_ctrl_headers_in_group(pg: List[dict]) -> List[int]:
@@ -1581,12 +1646,16 @@ def _find_ctrl_headers_in_group(pg: List[dict]) -> List[int]:
     return indices
 
 
+def _get_ctrl_id(rec_data: bytes) -> int:
+    """Read the 4-byte control type ID from a CTRL_HEADER record's data."""
+    if len(rec_data) < 4:
+        return 0
+    return struct.unpack_from('<I', rec_data, 0)[0]
+
+
 def _is_table_ctrl(rec_data: bytes) -> bool:
     """Check whether an extended control record is for a table."""
-    if len(rec_data) < 4:
-        return False
-    ctrl_id = struct.unpack_from('<I', rec_data, 0)[0]
-    return ctrl_id == _CTRL_ID_TABLE
+    return _get_ctrl_id(rec_data) == _CTRL_ID_TABLE
 
 
 def _collect_sub_records(pg: List[dict], ctrl_idx: int) -> List[dict]:
@@ -1603,6 +1672,238 @@ def _collect_sub_records(pg: List[dict], ctrl_idx: int) -> List[dict]:
         else:
             break
     return result
+
+
+# ============================================================
+# Header / Footer builder
+# ============================================================
+
+def _build_header_footer_ctrl(sub_records: List[dict], ctrl_rec: dict,
+                               hwp: '_HWPDocument', is_header: bool) -> Any:
+    """Build a Header or Footer ctrl object from CTRL_HEADER + sub-records.
+
+    The CTRL_HEADER data for 'head'/'foot' contains:
+      ctrl_id(4) + property(4) + ...
+    The property uint32 encodes the apply-page-type in bits 0-1:
+      0=BOTH, 1=EVEN, 2=ODD
+    Sub-records contain a LIST_HEADER followed by paragraphs.
+    """
+    from .objects.section.ctrl import Header, Footer
+    from .objects.section.enum_types import (
+        ApplyPageType, TextDirection, LineWrapMethod, VerticalAlign2,
+    )
+
+    cd = ctrl_rec['data']
+    # Parse apply-page-type from property (offset 4)
+    prop = struct.unpack_from('<I', cd, 4)[0] if len(cd) >= 8 else 0
+    apply_val = prop & 0x03
+    apply_map = {0: ApplyPageType.BOTH, 1: ApplyPageType.EVEN, 2: ApplyPageType.ODD}
+    apply_type = apply_map.get(apply_val, ApplyPageType.BOTH)
+
+    if is_header:
+        obj = Header()
+    else:
+        obj = Footer()
+    obj.id = ""
+    obj.apply_page_type = apply_type
+
+    # Build SubList with paragraphs from sub-records
+    # Find the LIST_HEADER record (tag 72) at the correct level
+    ctrl_level = ctrl_rec.get('level', 0)
+    list_header_idx = None
+    for i, rec in enumerate(sub_records):
+        if rec['tag'] == _TAG_LIST_HEADER and rec.get('level', 0) == ctrl_level + 1:
+            list_header_idx = i
+            break
+
+    # Paragraphs follow the LIST_HEADER
+    if list_header_idx is not None:
+        para_records = sub_records[list_header_idx + 1:]
+    else:
+        para_records = sub_records
+
+    sl = obj.create_sub_list()
+    sl.id = ""
+    sl.text_direction = TextDirection.HORIZONTAL
+    sl.line_wrap = LineWrapMethod.BREAK
+    sl.vert_align = VerticalAlign2.TOP
+    sl.link_list_id_ref = "0"
+    sl.link_list_next_id_ref = "0"
+    sl.text_width = 0
+    sl.text_height = 0
+    sl.has_text_ref = False
+    sl.has_num_ref = False
+
+    # Build paragraphs inside the sublist
+    _build_cell_paragraphs(sl, para_records, hwp)
+
+    return obj
+
+
+# ============================================================
+# Footnote / Endnote builder
+# ============================================================
+
+def _build_footnote_endnote_ctrl(sub_records: List[dict], ctrl_rec: dict,
+                                  hwp: '_HWPDocument', is_footnote: bool) -> Any:
+    """Build a FootNote or EndNote ctrl object from CTRL_HEADER + sub-records.
+
+    The CTRL_HEADER data for 'fn  '/'en  ' contains:
+      ctrl_id(4) + property(4) + ...
+    Sub-records contain a LIST_HEADER followed by paragraphs.
+    """
+    from .objects.section.ctrl import FootNote, EndNote
+    from .objects.section.enum_types import (
+        TextDirection, LineWrapMethod, VerticalAlign2,
+    )
+
+    cd = ctrl_rec['data']
+
+    # Parse footnote/endnote number from CTRL_HEADER
+    # After ctrl_id(4) + property(4), the number is at offset 8 as uint16
+    number = 0
+    if len(cd) >= 10:
+        number = struct.unpack_from('<H', cd, 8)[0]
+
+    if is_footnote:
+        obj = FootNote()
+    else:
+        obj = EndNote()
+    obj.number = number
+    obj.inst_id = ""
+
+    # Build SubList with paragraphs from sub-records
+    ctrl_level = ctrl_rec.get('level', 0)
+    list_header_idx = None
+    for i, rec in enumerate(sub_records):
+        if rec['tag'] == _TAG_LIST_HEADER and rec.get('level', 0) == ctrl_level + 1:
+            list_header_idx = i
+            break
+
+    if list_header_idx is not None:
+        para_records = sub_records[list_header_idx + 1:]
+    else:
+        para_records = sub_records
+
+    sl = obj.create_sub_list()
+    sl.id = ""
+    sl.text_direction = TextDirection.HORIZONTAL
+    sl.line_wrap = LineWrapMethod.BREAK
+    sl.vert_align = VerticalAlign2.TOP
+    sl.link_list_id_ref = "0"
+    sl.link_list_next_id_ref = "0"
+    sl.text_width = 0
+    sl.text_height = 0
+    sl.has_text_ref = False
+    sl.has_num_ref = False
+
+    _build_cell_paragraphs(sl, para_records, hwp)
+
+    return obj
+
+
+# ============================================================
+# Equation builder
+# ============================================================
+
+def _build_equation_object(sub_records: List[dict], ctrl_rec: dict,
+                           hwp: '_HWPDocument') -> Any:
+    """Build an Equation object from CTRL_HEADER + sub-records.
+
+    The CTRL_HEADER data for 'eqed' follows the standard shape object layout.
+    The EQEDIT record (tag 88) in sub_records contains the equation script text.
+    """
+    from .objects.section.objects.equation import Equation
+    from .objects.section.objects.drawing_object import ShapeSize, ShapePosition
+    from .objects.section.enum_types import (
+        NumberingType, WidthRelTo, HeightRelTo, EquationLineMode,
+    )
+
+    eq = Equation()
+
+    # --- Parse CTRL_HEADER for position/size ---
+    cd = ctrl_rec['data']
+    if len(cd) >= 28:
+        prop = struct.unpack_from('<I', cd, 4)[0]
+        y_off = struct.unpack_from('<i', cd, 8)[0]
+        x_off = struct.unpack_from('<i', cd, 12)[0]
+        width = struct.unpack_from('<I', cd, 16)[0]
+        height = struct.unpack_from('<I', cd, 20)[0]
+        z_order = struct.unpack_from('<i', cd, 24)[0]
+
+        instance_id = 0
+        if len(cd) >= 40:
+            instance_id = struct.unpack_from('<I', cd, 36)[0]
+
+        eq.so_id = str(instance_id) if instance_id else ""
+        eq.z_order = z_order
+        eq.numbering_type = NumberingType.EQUATION
+        eq.lock = False
+
+        treat_as_char = bool(prop & 0x01)
+        eq.text_wrap = "TOP_AND_BOTTOM"
+        eq.text_flow = "BOTH_SIDES"
+
+        sz = eq.create_sz()
+        sz.width = width
+        sz.height = height
+        sz.width_rel_to = WidthRelTo.ABSOLUTE
+        sz.height_rel_to = HeightRelTo.ABSOLUTE
+        sz.protect = False
+
+        pos = eq.create_pos()
+        pos.treat_as_char = treat_as_char
+        pos.affect_line_spacing = False
+        pos.flow_with_text = treat_as_char
+        pos.allow_overlap = False
+        pos.hold_anchor_and_so = False
+        pos.vert_rel_to = "PARA"
+        pos.horz_rel_to = "PARA"
+        pos.vert_align = "TOP"
+        pos.horz_align = "LEFT"
+        pos.vert_offset = y_off
+        pos.horz_offset = x_off
+
+        if len(cd) >= 36:
+            om_left = struct.unpack_from('<H', cd, 28)[0]
+            om_right = struct.unpack_from('<H', cd, 30)[0]
+            om_top = struct.unpack_from('<H', cd, 32)[0]
+            om_bottom = struct.unpack_from('<H', cd, 34)[0]
+            om = eq.create_out_margin()
+            om.left = om_left
+            om.right = om_right
+            om.top = om_top
+            om.bottom = om_bottom
+
+    # --- Find EQEDIT record (tag 88) and extract script text ---
+    script_text = ""
+    for rec in sub_records:
+        if rec['tag'] == _TAG_EQEDIT:
+            eqd = rec['data']
+            # EQEDIT layout:
+            # property(4) + script_len(2) + script(script_len*2 UTF-16LE)
+            # Some versions: skip to find the string
+            if len(eqd) >= 6:
+                eq_prop = struct.unpack_from('<I', eqd, 0)[0]
+                scr_len = struct.unpack_from('<H', eqd, 4)[0]
+                scr_start = 6
+                if scr_start + scr_len * 2 <= len(eqd):
+                    script_text = eqd[scr_start:scr_start + scr_len * 2].decode(
+                        'utf-16-le', errors='replace')
+            break
+
+    eq.version = ""
+    eq.base_line = 0
+    eq.text_color = "#000000"
+    eq.base_unit = 1000
+    eq.line_mode = EquationLineMode.LINE
+    eq.font = ""
+
+    if script_text:
+        scr = eq.create_script()
+        scr.add_text(script_text)
+
+    return eq
 
 
 def _build_table_object(sub_records: List[dict], ctrl_rec: dict,
@@ -1884,6 +2185,286 @@ def _build_table_object(sub_records: List[dict], ctrl_rec: dict,
     return tbl
 
 
+
+# ============================================================
+# GSO / Picture builder
+# ============================================================
+
+def _is_gso_ctrl(rec_data: bytes) -> bool:
+    """Check whether an extended control record is for a GSO drawing object."""
+    if len(rec_data) < 4:
+        return False
+    ctrl_id = struct.unpack_from('<I', rec_data, 0)[0]
+    return ctrl_id == _CTRL_ID_GSO
+
+
+def _build_picture_object(sub_records: List[dict], ctrl_rec: dict,
+                           hwp: '_HWPDocument',
+                           bin_data_id_map: Dict[int, str]) -> Any:
+    """Build a Picture object from a GSO CTRL_HEADER + sub-records.
+
+    Returns a Picture object ready to add to a Run, or None if the GSO
+    is not a picture type.
+    """
+    try:
+        return _build_picture_object_inner(
+            sub_records, ctrl_rec, hwp, bin_data_id_map)
+    except Exception as e:
+        logger.debug("Error building picture object: %s", e)
+        return None
+
+
+def _build_picture_object_inner(sub_records: List[dict], ctrl_rec: dict,
+                                 hwp: '_HWPDocument',
+                                 bin_data_id_map: Dict[int, str]) -> Any:
+    """Inner implementation for building a Picture from GSO records."""
+    from .objects.section.objects.picture import Picture, ImageRect, ImageDim
+    from .objects.section.objects.drawing_object import ShapeSize, ShapePosition
+    from .objects.common.base_objects import LeftRightTopBottom
+    from .objects.header.references.border_fill import Image
+    from .objects.header.enum_types import ImageEffect
+    from .objects.section.enum_types import (
+        NumberingType, WidthRelTo, HeightRelTo,
+    )
+    from .object_type import ObjectType
+
+    cd = ctrl_rec['data']
+    if len(cd) < 30:
+        return None
+
+    prop = struct.unpack_from('<I', cd, 4)[0]
+    y_off = struct.unpack_from('<i', cd, 8)[0]
+    x_off = struct.unpack_from('<i', cd, 12)[0]
+    width = struct.unpack_from('<I', cd, 16)[0]
+    height = struct.unpack_from('<I', cd, 20)[0]
+    z_order = struct.unpack_from('<i', cd, 24)[0]
+    treat_as_char = bool(prop & 0x01)
+
+    instance_id = 0
+    if len(cd) >= 40:
+        instance_id = struct.unpack_from('<I', cd, 36)[0]
+
+    om_left = om_right = om_top = om_bottom = 0
+    if len(cd) >= 36:
+        om_left = struct.unpack_from('<H', cd, 28)[0]
+        om_right = struct.unpack_from('<H', cd, 30)[0]
+        om_top = struct.unpack_from('<H', cd, 32)[0]
+        om_bottom = struct.unpack_from('<H', cd, 34)[0]
+
+    # Find SHAPE_COMPONENT (tag 76) and SHAPE_COMPONENT_PICTURE (tag 85)
+    shape_comp_rec = None
+    pic_rec = None
+    for rec in sub_records:
+        if rec['tag'] == _TAG_SHAPE_COMPONENT:
+            shape_comp_rec = rec
+        elif rec['tag'] == _TAG_SHAPE_COMPONENT_PICTURE:
+            pic_rec = rec
+
+    if pic_rec is None:
+        return None
+
+    pd = pic_rec['data']
+    if len(pd) < 12:
+        return None
+
+    # borderColor(4) + borderThickness(4) + borderProperty(4)
+    pos_offset = 12
+
+    # 4 corner points (8 x int32 = 32 bytes)
+    corners = [0] * 8
+    if pos_offset + 32 <= len(pd):
+        for i in range(8):
+            corners[i] = struct.unpack_from('<i', pd, pos_offset + i * 4)[0]
+        pos_offset += 32
+
+    # crop left/top/right/bottom (4 x int32 = 16 bytes)
+    # Binary order: left, top, right, bottom
+    crop = [0, 0, 0, 0]
+    if pos_offset + 16 <= len(pd):
+        for i in range(4):
+            crop[i] = struct.unpack_from('<i', pd, pos_offset + i * 4)[0]
+        pos_offset += 16
+
+    # inner margins left/right/top/bottom (4 x uint16 = 8 bytes)
+    in_margins = [0, 0, 0, 0]
+    if pos_offset + 8 <= len(pd):
+        for i in range(4):
+            in_margins[i] = struct.unpack_from('<H', pd, pos_offset + i * 2)[0]
+        pos_offset += 8
+
+    # pictureInfo: bright(1) + contrast(1) + effect(1) + binItemID(2)
+    bright = 0
+    contrast = 0
+    effect_val = 0
+    bin_item_id = 0
+    if pos_offset + 5 <= len(pd):
+        bright = struct.unpack_from('<b', pd, pos_offset)[0]
+        contrast = struct.unpack_from('<b', pd, pos_offset + 1)[0]
+        effect_val = pd[pos_offset + 2]
+        bin_item_id = struct.unpack_from('<H', pd, pos_offset + 3)[0]
+        pos_offset += 5
+
+    # Alpha: the byte after pictureInfo is not reliably the alpha value
+    # in all HWP record sizes.  Default to 0 for compatibility.
+    alpha = 0
+
+    # Image dimensions: derive from crop (clip) values
+    # crop order: left, top, right, bottom
+    dim_width = crop[2] if crop[2] > 0 else width
+    dim_height = crop[3] if crop[3] > 0 else height
+
+    # Map binItemID to HWPX binaryItemIDRef (use "imageN" naming)
+    binary_item_id_ref = ""
+    if bin_item_id in bin_data_id_map:
+        # Extract the item ID from the map (e.g., "image1")
+        href = bin_data_id_map[bin_item_id]
+        parts = href.replace('\\', '/').split('/')
+        fname = parts[-1] if parts else href
+        binary_item_id_ref = (
+            fname.rsplit('.', 1)[0] if '.' in fname else fname)
+    elif bin_item_id > 0:
+        binary_item_id_ref = f"image{bin_item_id}"
+        logger.debug(
+            "binItemID %d not in bin_data_id_map, using default ref: %s",
+            bin_item_id, binary_item_id_ref)
+
+    # Parse SHAPE_COMPONENT (tag 76) for transform info
+    sc_offset_x = sc_offset_y = 0
+    sc_org_w = sc_cur_w = width
+    sc_org_h = sc_cur_h = height
+    sc_flip_h = sc_flip_v = False
+    sc_angle = sc_center_x = sc_center_y = 0
+
+    if shape_comp_rec and len(shape_comp_rec['data']) >= 28:
+        sd = shape_comp_rec['data']
+        sc_p = 8  # skip gsoId(4) + id2(4)
+        if sc_p + 8 <= len(sd):
+            sc_offset_x = struct.unpack_from('<i', sd, sc_p)[0]
+            sc_offset_y = struct.unpack_from('<i', sd, sc_p + 4)[0]
+            sc_p += 8
+        if sc_p + 8 <= len(sd):
+            sc_org_w = struct.unpack_from('<I', sd, sc_p)[0]
+            sc_org_h = struct.unpack_from('<I', sd, sc_p + 4)[0]
+            sc_p += 8
+        if sc_p + 8 <= len(sd):
+            sc_cur_w = struct.unpack_from('<I', sd, sc_p)[0]
+            sc_cur_h = struct.unpack_from('<I', sd, sc_p + 4)[0]
+            sc_p += 8
+        if sc_p + 4 <= len(sd):
+            flip_bits = struct.unpack_from('<I', sd, sc_p)[0]
+            sc_flip_h = bool(flip_bits & 0x01)
+            sc_flip_v = bool(flip_bits & 0x02)
+            sc_p += 4
+        if sc_p + 12 <= len(sd):
+            sc_angle = struct.unpack_from('<i', sd, sc_p)[0]
+            sc_center_x = struct.unpack_from('<i', sd, sc_p + 4)[0]
+            sc_center_y = struct.unpack_from('<i', sd, sc_p + 8)[0]
+
+    # Build Picture object
+    pic = Picture()
+    pic.so_id = str(instance_id) if instance_id else ""
+    pic.z_order = z_order
+    pic.numbering_type = NumberingType.PICTURE
+    pic.text_wrap = "TOP_AND_BOTTOM"
+    pic.text_flow = "BOTH_SIDES"
+    pic.lock = False
+    pic.reverse = False
+
+    sz = pic.create_sz()
+    sz.width = width
+    sz.height = height
+    sz.width_rel_to = WidthRelTo.ABSOLUTE
+    sz.height_rel_to = HeightRelTo.ABSOLUTE
+    sz.protect = False
+
+    pos_obj = pic.create_pos()
+    pos_obj.treat_as_char = treat_as_char
+    pos_obj.affect_line_spacing = False
+    pos_obj.flow_with_text = treat_as_char
+    pos_obj.allow_overlap = False
+    pos_obj.hold_anchor_and_so = False
+    pos_obj.vert_rel_to = "PARA"
+    pos_obj.horz_rel_to = "PARA"
+    pos_obj.vert_align = "TOP"
+    pos_obj.horz_align = "LEFT"
+    pos_obj.vert_offset = y_off
+    pos_obj.horz_offset = x_off
+
+    om = pic.create_out_margin()
+    om.left = om_left
+    om.right = om_right
+    om.top = om_top
+    om.bottom = om_bottom
+
+    offset_pt = pic.create_offset()
+    offset_pt.x = sc_offset_x
+    offset_pt.y = sc_offset_y
+
+    org_sz = pic.create_org_sz()
+    org_sz.width = sc_org_w
+    org_sz.height = sc_org_h
+
+    cur_sz = pic.create_cur_sz()
+    cur_sz.width = sc_cur_w
+    cur_sz.height = sc_cur_h
+
+    flip_obj = pic.create_flip()
+    flip_obj.horizontal = sc_flip_h
+    flip_obj.vertical = sc_flip_v
+
+    rot = pic.create_rotation_info()
+    rot.angle = sc_angle
+    rot.center_x = sc_center_x
+    rot.center_y = sc_center_y
+    rot.rotate_image = False
+
+    img_rect = pic.create_img_rect()
+    pt0 = img_rect.create_pt0()
+    pt0.x = corners[0]
+    pt0.y = corners[1]
+    pt1 = img_rect.create_pt1()
+    pt1.x = corners[2]
+    pt1.y = corners[3]
+    pt2 = img_rect.create_pt2()
+    pt2.x = corners[4]
+    pt2.y = corners[5]
+    pt3 = img_rect.create_pt3()
+    pt3.x = corners[6]
+    pt3.y = corners[7]
+
+    img_clip = pic.create_img_clip()
+    # crop binary order: left, top, right, bottom
+    img_clip.left = crop[0]
+    img_clip.right = crop[2]
+    img_clip.top = crop[1]
+    img_clip.bottom = crop[3]
+
+    in_margin = pic.create_in_margin()
+    in_margin.left = in_margins[0]
+    in_margin.right = in_margins[1]
+    in_margin.top = in_margins[2]
+    in_margin.bottom = in_margins[3]
+
+    img_dim = pic.create_img_dim()
+    img_dim.dimwidth = dim_width
+    img_dim.dimheight = dim_height
+
+    img = Image()
+    img.binaryItemIDRef = binary_item_id_ref
+    img.bright = bright
+    img.contrast = contrast
+    effect_map = {
+        0: ImageEffect.REAL_PIC,
+        1: ImageEffect.GRAY_SCALE,
+        2: ImageEffect.BLACK_WHITE,
+    }
+    img.effect = effect_map.get(effect_val, ImageEffect.REAL_PIC)
+    img.alpha = alpha
+    pic.img = img
+
+    return pic
+
+
 def _build_cell_paragraphs(sub_list, cell_subs: List[dict],
                            hwp: '_HWPDocument'):
     """Build paragraphs for a single table cell and add them to *sub_list*.
@@ -1981,16 +2562,16 @@ def _build_cell_paragraph(sub_list, pg: List[dict], hwp: '_HWPDocument'):
                 i += 36
 
     if text_data is not None:
-        # Parse text into chars - handle table chars for nested tables
+        # Parse text into chars - handle extended control chars
         chars = []
         i = 0
         pos = 0
-        table_char_indices = []  # indices of ch=11 in chars list
+        has_ext_ctrl = False  # tracks ch=11 (table/GSO/eq), ch=16 (hdr/ftr), ch=17 (fn/en)
         while i < len(text_data) - 1:
             ch = struct.unpack_from('<H', text_data, i)[0]
             i += 2
-            if ch == _CH_TABLE:
-                table_char_indices.append(len(chars))
+            if ch in (_CH_TABLE, _CH_HEADER_FOOTER, _CH_FOOTNOTE_ENDNOTE):
+                has_ext_ctrl = True
             chars.append((pos, ch))
             if ch == _CH_PARA_END:
                 pos += 1
@@ -2001,8 +2582,8 @@ def _build_cell_paragraph(sub_list, pg: List[dict], hwp: '_HWPDocument'):
             else:
                 pos += 1
 
-        if table_char_indices:
-            # Cell has nested tables - build runs with table handling
+        if has_ext_ctrl:
+            # Cell has nested tables or other extended controls - use ctrl-aware builder
             ctrl_indices = _find_ctrl_headers_in_group(pg)
             _build_text_runs_with_tables(para, chars, char_shape_pairs,
                                           pg, ctrl_indices, hwp)
@@ -2021,12 +2602,13 @@ def _build_text_runs_with_tables(para, chars: List[Tuple[int, int]],
                                   char_shape_pairs: List[Tuple[int, int]],
                                   pg: List[dict],
                                   ctrl_indices: List[int],
-                                  hwp: '_HWPDocument'):
-    """Build text runs, inserting Table objects when ch=11 is encountered.
+                                  hwp: '_HWPDocument',
+                                  bin_data_id_map: Dict[int, str] = None):
+    """Build text runs, inserting Table/Header/Footer/Note/Equation objects
+    when extended control chars are encountered.
 
     Every extended control char (ch in 1-31 excluding tab/linebreak/paraend)
     corresponds to one control record in *ctrl_indices*, consumed in order.
-    Only ch=11 (table) triggers table building; others are skipped.
     """
     def get_char_pr_id(char_pos: int) -> str:
         result = "0"
@@ -2055,15 +2637,16 @@ def _build_text_runs_with_tables(para, chars: List[Tuple[int, int]],
             # Consume the corresponding control record
             ci = next(ctrl_iter, None)
 
-            if ci is not None and ch == _CH_TABLE:
+            if ci is not None:
                 ctrl_rec = pg[ci]
-                if _is_table_ctrl(ctrl_rec['data']):
-                    sub_recs = _collect_sub_records(pg, ci)
-                    tbl = _build_table_object(sub_recs, ctrl_rec, hwp)
-                    # Add table in its own run
-                    run = para.add_new_run()
-                    run.char_pr_id_ref = get_char_pr_id(char_pos)
-                    run._item_list.append(tbl)
+                ctrl_id = _get_ctrl_id(ctrl_rec['data'])
+                sub_recs = _collect_sub_records(pg, ci)
+                char_pr = get_char_pr_id(char_pos)
+
+                try:
+                    _handle_extended_ctrl(para, ctrl_id, ctrl_rec, sub_recs, hwp, char_pr, bin_data_id_map)
+                except Exception as e:
+                    logger.debug("Error handling extended ctrl 0x%08X: %s", ctrl_id, e)
 
             # Reset char_pr for next segment
             current_char_pr = get_char_pr_id(char_pos)
@@ -2086,6 +2669,88 @@ def _build_text_runs_with_tables(para, chars: List[Tuple[int, int]],
         run = para.add_new_run()
         run.char_pr_id_ref = "0"
         run.add_new_t()
+
+
+def _handle_extended_ctrl(para, ctrl_id: int, ctrl_rec: dict,
+                          sub_recs: List[dict], hwp: '_HWPDocument',
+                          char_pr: str,
+                          bin_data_id_map: Dict[int, str] = None):
+    """Dispatch an extended control by its ctrl_id and add the resulting
+    object to the paragraph.
+
+    Handles: table, header, footer, footnote, endnote, equation, GSO (picture).
+    Unknown ctrl_ids are silently skipped.
+    """
+    if ctrl_id == _CTRL_ID_TABLE:
+        tbl = _build_table_object(sub_recs, ctrl_rec, hwp)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        run._item_list.append(tbl)
+
+    elif ctrl_id == _CTRL_ID_HEADER:
+        obj = _build_header_footer_ctrl(sub_recs, ctrl_rec, hwp, is_header=True)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        ctrl = run.add_new_ctrl()
+        ctrl.add_ctrl_item(obj)
+
+    elif ctrl_id == _CTRL_ID_FOOTER:
+        obj = _build_header_footer_ctrl(sub_recs, ctrl_rec, hwp, is_header=False)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        ctrl = run.add_new_ctrl()
+        ctrl.add_ctrl_item(obj)
+
+    elif ctrl_id == _CTRL_ID_FOOTNOTE:
+        obj = _build_footnote_endnote_ctrl(sub_recs, ctrl_rec, hwp, is_footnote=True)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        ctrl = run.add_new_ctrl()
+        ctrl.add_ctrl_item(obj)
+
+    elif ctrl_id == _CTRL_ID_ENDNOTE:
+        obj = _build_footnote_endnote_ctrl(sub_recs, ctrl_rec, hwp, is_footnote=False)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        ctrl = run.add_new_ctrl()
+        ctrl.add_ctrl_item(obj)
+
+    elif ctrl_id == _CTRL_ID_EQUATION:
+        eq = _build_equation_object(sub_recs, ctrl_rec, hwp)
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        run._item_list.append(eq)
+
+    elif ctrl_id == _CTRL_ID_GSO:
+        # GSO (drawing shapes / pictures) - attempt to build picture
+        try:
+            _handle_gso_ctrl(para, sub_recs, ctrl_rec, hwp, char_pr, bin_data_id_map)
+        except Exception as e:
+            logger.debug("Skipping GSO control: %s", e)
+    else:
+        # Unknown control type - silently skip
+        pass
+
+
+def _handle_gso_ctrl(para, sub_recs: List[dict], ctrl_rec: dict,
+                     hwp: '_HWPDocument', char_pr: str,
+                     bin_data_id_map: Dict[int, str] = None):
+    """Handle a GSO (General Shape Object) control.
+
+    This delegates to the picture builder if the GSO is an image,
+    otherwise logs and skips.
+    """
+    if bin_data_id_map is None:
+        bin_data_id_map = getattr(hwp, 'bin_data_id_map', {})
+    pic = _build_picture_object(sub_recs, ctrl_rec, hwp, bin_data_id_map)
+    if pic is not None:
+        run = para.add_new_run()
+        run.char_pr_id_ref = char_pr
+        run._item_list.append(pic)
+        return
+
+    # Not a picture GSO (could be line, rect, etc.) - skip
+    logger.debug("Skipping GSO control (not a recognized shape type)")
 
 
 def _flush_run(para, char_pr_id: str, chars: List[Tuple[int, int]]):
@@ -2457,9 +3122,10 @@ def _build_paragraph_with_secpr(section, hwp: _HWPDocument, pg: List[dict],
                 line_segs.append(seg)
                 i += 36
 
-    # Check if this paragraph has section def control or table controls
+    # Check if this paragraph has section def control or extended controls
+    # (table, GSO, header/footer, footnote/endnote, equation, etc.)
     has_sec_def = False
-    has_table = False
+    has_table = False  # actually means "has any extended control needing ctrl-aware builder"
     if text_data:
         j = 0
         while j < len(text_data) - 1:
@@ -2467,7 +3133,7 @@ def _build_paragraph_with_secpr(section, hwp: _HWPDocument, pg: List[dict],
             j += 2
             if ch == _CH_SECTION_DEF:
                 has_sec_def = True
-            elif ch == _CH_TABLE:
+            elif ch in (_CH_TABLE, _CH_HEADER_FOOTER, _CH_FOOTNOTE_ENDNOTE):
                 has_table = True
             elif ch == _CH_PARA_END:
                 break
