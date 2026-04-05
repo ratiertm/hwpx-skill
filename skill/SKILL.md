@@ -5,6 +5,42 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 # HWPX creation, editing, and form automation
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Quick Reference](#quick-reference)
+3. [Creating New Documents](#creating-new-documents)
+   - HwpxBuilder API
+   - Page Size
+   - Document Templates & Style Guide
+   - Document Structure Guide
+   - Table Design Guide
+   - Indent Guide
+   - Critical Rules
+4. [Editing Existing Documents](#editing-existing-documents)
+   - Step 1: Unpack
+   - Step 2: Edit XML
+   - Step 3: Pack
+5. [Form Automation](#form-automation)
+   - Fill Template
+   - Batch Generate
+   - Schema Extraction
+   - Template Builder UI
+   - Checkbox Patterns
+6. [Converting Documents](#converting-documents)
+   - MD → HWPX
+   - HTML → HWPX
+   - HWPX → HTML
+   - HWP 5.x Reading
+7. [XML Reference](#xml-reference)
+   - Document Structure
+   - Namespaces
+   - Paragraph / Table / charPr / paraPr
+8. [Critical Rules Summary](#critical-rules-summary)
+9. [Dependencies](#dependencies)
+
+---
+
 ## Overview
 
 A .hwpx file is a ZIP archive (OPC format) containing XML files following the OWPML (Open Word-Processor Markup Language) standard by Hancom. The key files are `Contents/header.xml` (styles) and `Contents/section0.xml` (body content).
@@ -279,6 +315,169 @@ line_spacing = 160    # 160% (한국 공문서 기본)
 
 # 정렬
 alignment = "JUSTIFY" # 양쪽 정렬 + condense 25%
+```
+
+### Table Design Guide (표 만들기 가이드)
+
+**표 너비 계산 (DXA 아닌 HWPUNIT: 1/7200 inch)**:
+```
+A4 용지 너비:       59,528
+좌우 여백:         -8,504 × 2 = -17,008
+─────────────────────────
+본문 영역 너비:      42,520   ← 표 최대 너비
+```
+
+**열 너비 분배**:
+```python
+content_width = 42520
+
+# 균등 분할
+cols = 3
+col_width = content_width // cols  # 14,173
+
+# 비율 분할 (3:2:1)
+ratios = [3, 2, 1]
+total = sum(ratios)
+col_widths = [content_width * r // total for r in ratios]
+# → [21260, 14173, 7087]
+```
+
+**행 높이**:
+| 유형 | height | 사용 |
+|------|--------|------|
+| 기본 | 1200 | 일반 데이터 행 |
+| 헤더 | 1500 | 표 제목 행 |
+| 넓음 | 2000 | 여러 줄 텍스트 |
+| 좁음 | 800 | 밀집 데이터 |
+
+**셀 패딩 (cellMargin)**:
+```xml
+<hp:cellMargin left="141" right="141" top="0" bottom="0" />
+```
+
+| 패딩 | left/right | top/bottom | 사용 |
+|------|-----------|------------|------|
+| 기본 | 141 | 0 | 일반 셀 |
+| 넓은 여백 | 283 | 141 | 제목 셀, 가독성 |
+| 좁은 여백 | 70 | 0 | 밀집 표 |
+| 양식 셀 | 510 | 141 | 입력 칸 (넓은 여백) |
+
+**표 마진 (표 바깥 여백)**:
+```xml
+<hp:outMargin left="0" right="0" top="0" bottom="0" />
+<hp:inMargin left="141" right="141" top="141" bottom="141" />
+```
+
+| 속성 | 기본값 | 설명 |
+|------|--------|------|
+| outMargin | 0 | 표 바깥 여백 (본문과의 간격) |
+| inMargin | 141 | 표 안쪽 여백 (셀 기본 패딩) |
+| 중첩 표 outMargin | 283 | 중첩 표 바깥 여백 |
+| 중첩 표 inMargin | 510 | 중첩 표 안쪽 여백 |
+
+**표 테두리 (borderFill)**:
+```xml
+<!-- borderFill id="1" = 테두리 없음 (기본) -->
+<!-- borderFill id="2"+ = 커스텀 테두리 -->
+<hh:borderFill id="2" threeD="0" shadow="0">
+  <hh:leftBorder type="SOLID" width="0.12 mm" color="#000000" />
+  <hh:rightBorder type="SOLID" width="0.12 mm" color="#000000" />
+  <hh:topBorder type="SOLID" width="0.12 mm" color="#000000" />
+  <hh:bottomBorder type="SOLID" width="0.12 mm" color="#000000" />
+</hh:borderFill>
+```
+
+| type | 설명 |
+|------|------|
+| NONE | 테두리 없음 |
+| SOLID | 실선 |
+| DASH | 점선 |
+| DOT | 점 |
+| DOUBLE_SLIM | 이중선 |
+
+**셀 병합**:
+```xml
+<!-- 가로 병합: colSpan -->
+<hp:cellSpan colSpan="3" rowSpan="1" />
+
+<!-- 세로 병합: rowSpan -->
+<hp:cellSpan colSpan="1" rowSpan="2" />
+
+<!-- 가로+세로 동시 -->
+<hp:cellSpan colSpan="2" rowSpan="3" />
+```
+
+**셀 수직 정렬 (vertAlign)**:
+```xml
+<hp:subList vertAlign="CENTER">  <!-- TOP, CENTER, BOTTOM -->
+```
+
+**셀 배경색**:
+```python
+# pyhwpxlib API
+table.set_cell_background(row, col, "#D5E8F0")
+
+# XML 직접
+# borderFill에 winBrush 추가
+```
+
+**표 유형별 템플릿**:
+
+```python
+# 1. 데이터 표 (헤더 + 데이터)
+doc.add_table([
+    ["항목", "수량", "금액"],     # 헤더 (볼드, 배경색)
+    ["제품A", "100", "50,000"],
+    ["제품B", "200", "80,000"],
+    ["합계", "300", "130,000"],
+])
+
+# 2. 키-값 표 (라벨 + 입력칸)
+doc.add_table([
+    ["성 명", ""],
+    ["주민등록번호", ""],
+    ["주 소", ""],
+])
+
+# 3. 카드 레이아웃 (가로 나열)
+doc.add_table([
+    ["현재가", "목표가", "상승여력"],
+    ["$184.86", "$250", "+35%"],
+])
+
+# 4. 비교 표
+doc.add_table([
+    ["구분", "항목A", "항목B", "차이"],
+    ["성능", "100", "150", "+50%"],
+    ["가격", "1,000", "1,200", "+20%"],
+])
+```
+
+### Indent Guide (들여쓰기 상세)
+
+**intent vs left margin 차이**:
+```
+intent (들여쓰기):  첫 줄만 들여쓰기 (음수 = 내어쓰기)
+left (좌측 여백):   전체 단락 좌측 이동
+
+예시: intent=-2800, left=2800
+  ↓ intent (첫 줄 내어쓰기)
+제1조(목적) 이 규정은 환경기술 및 환경산업
+  ↓ left (2째줄부터 들여쓰기)
+       지원법 제10조에 따른 센터의 설립
+       및 운영에 관한 사항을 규정함을
+       목적으로 한다.
+```
+
+**공문서 들여쓰기 체계**:
+```python
+# 단계별 intent + left 조합
+styles = {
+    "조": {"intent": -2800, "left": 2800},   # 제1조(목적)
+    "호": {"intent": -4880, "left": 4880},   # 1. 항목
+    "목": {"intent": -7680, "left": 7680},   # 가. 세부
+    "세목": {"intent": -9080, "left": 9080}, # 1) 세부세부
+}
 ```
 
 ### Critical Rules for HwpxBuilder
