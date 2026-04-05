@@ -480,6 +480,101 @@ styles = {
 }
 ```
 
+### Table of Contents in Document (문서 내 목차)
+
+HWPX에서 목차는 자동 생성이 아닌 **수동 구성**으로 만듭니다.
+제목(heading)을 기반으로 목차 텍스트를 직접 생성합니다.
+
+**목차 생성 패턴**:
+```python
+doc = HwpxBuilder()
+
+# 목차 페이지
+doc.add_heading("목 차", level=1)
+doc.add_paragraph("")
+doc.add_paragraph("1. 개요 ························· 2", font_size=11)
+doc.add_paragraph("2. 현황 분석 ··················· 5", font_size=11)
+doc.add_paragraph("  2.1 시장 동향 ··············· 5", font_size=10)
+doc.add_paragraph("  2.2 경쟁사 분석 ············· 8", font_size=10)
+doc.add_paragraph("3. 결론 ························· 12", font_size=11)
+doc.add_paragraph("")
+
+# 본문 시작
+doc.add_heading("1. 개요", level=2)
+doc.add_paragraph("본문 내용...")
+```
+
+**목차 자동 생성 헬퍼**:
+```python
+def generate_toc(sections, dot_char="·"):
+    """섹션 목록에서 목차 텍스트 생성
+    sections = [("1. 개요", 2), ("2. 분석", 5), ("  2.1 세부", 6)]
+    """
+    lines = []
+    for title, page in sections:
+        indent = len(title) - len(title.lstrip())
+        dots = dot_char * (40 - len(title) - len(str(page)))
+        lines.append(f"{title} {dots} {page}")
+    return lines
+```
+
+**목차 스타일**:
+| 요소 | 폰트 | 정렬 |
+|------|------|------|
+| "목 차" 제목 | 20pt 볼드 CENTER | 가운데 |
+| 1단계 항목 | 11pt LEFT | 왼쪽 |
+| 2단계 항목 | 10pt LEFT (들여쓰기 2칸) | 왼쪽 |
+| 3단계 항목 | 9pt LEFT (들여쓰기 4칸) | 왼쪽 |
+| 점선 | · 반복 | 제목과 페이지 번호 연결 |
+| 페이지 번호 | 우측 정렬 | 오른쪽 끝 |
+
+**전체 문서 구성 순서**:
+```python
+doc = HwpxBuilder()
+
+# 1. 표지
+doc.add_paragraph("")
+doc.add_paragraph("")
+doc.add_heading("보고서 제목", level=1)
+doc.add_paragraph("2026년 4월", font_size=12, text_color="#888888")
+doc.add_paragraph("작성자: 홍길동", font_size=11)
+doc.add_paragraph("")
+
+# 2. 목차
+doc.add_heading("목 차", level=1)
+doc.add_paragraph("1. 개요 ························· 2", font_size=11)
+doc.add_paragraph("2. 분석 ························· 4", font_size=11)
+doc.add_paragraph("3. 결론 ························· 8", font_size=11)
+doc.add_paragraph("")
+
+# 3. 본문
+doc.add_heading("1. 개요", level=2)
+doc.add_paragraph("본문...")
+doc.add_paragraph("")
+
+doc.add_heading("2. 분석", level=2)
+doc.add_heading("2.1 시장 동향", level=3)
+doc.add_paragraph("분석 내용...")
+doc.add_paragraph("")
+
+doc.add_heading("3. 결론", level=2)
+doc.add_paragraph("결론 내용...")
+doc.add_paragraph("")
+
+# 4. 부록/참고
+doc.add_line()
+doc.add_paragraph("참고 문헌", bold=True, font_size=11)
+doc.add_paragraph("1. 출처1", font_size=9, text_color="#666666")
+doc.add_paragraph("2. 출처2", font_size=9, text_color="#666666")
+doc.add_paragraph("")
+
+# 5. 면책 조항
+doc.add_paragraph("본 문서는 정보 제공 목적으로 작성되었습니다.",
+                   font_size=8, text_color="#999999")
+
+doc.save("report.hwpx")
+```
+
 ### Critical Rules for HwpxBuilder
 
 - **pyhwpxlib 기반** — header.xml은 pyhwpxlib가 생성, section만 HwpxBuilder가 구성
