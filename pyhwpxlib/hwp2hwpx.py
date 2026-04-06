@@ -2,7 +2,7 @@
 
 Ported from hwp2hwpx by neolord0 (https://github.com/neolord0/hwp2hwpx)
 Original work Copyright (c) neolord0, licensed under Apache License 2.0.
-This Python port: Copyright (c) 2026 Eunmi Lee (ratiertm), licensed under BSL 1.1.
+This file: Copyright (c) 2026 Eunmi Lee (ratiertm), licensed under Apache License 2.0.
 Changes: Rewritten in Python; adapted to pyhwpxlib object model and HWPXWriter.
 
 Usage:

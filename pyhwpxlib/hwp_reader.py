@@ -1,8 +1,8 @@
 """HWP 5.x binary file reader
 
-Based on hwplib by seyoon (https://github.com/neolord0/hwplib)
+Based on hwplib by neolord0 (https://github.com/neolord0/hwplib)
 Original work Copyright (c) neolord0, licensed under Apache License 2.0.
-This Python port: Copyright (c) 2026 Eunmi Lee (ratiertm), licensed under BSL 1.1.
+This file: Copyright (c) 2026 Eunmi Lee (ratiertm), licensed under Apache License 2.0.
 Changes: Rewritten in Python; record parsing adapted to Python struct/dataclass.
 
 Parses the complete HWP 5.x binary format (OLE2 Compound File) including:
