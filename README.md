@@ -265,8 +265,13 @@ This project lets you create and edit HWPX files with pure Python, no Hancom Off
 
 ## Credits
 
-- [python-hwpx](https://github.com/airmang/python-hwpx) by Kyuhyun Koh (MIT)
-- [CLI-Anything](https://github.com/HKUDS/CLI-Anything) (MIT)
+This project is built upon the following open-source projects:
+
+| Project | Author | License | Usage |
+|---------|--------|---------|-------|
+| [hwp2hwpx](https://github.com/neolord0/hwp2hwpx) | neolord0 | Apache 2.0 | HWP→HWPX conversion logic (ported to Python) |
+| [hwplib](https://github.com/neolord0/hwplib) | neolord0 | Apache 2.0 | HWP binary parser (ported to Python) |
+| [python-hwpx](https://github.com/airmang/python-hwpx) | Kyuhyun Ko | MIT | HWPX dataclass model |
 
 ## Known Limitations
 
@@ -324,4 +329,15 @@ This project is functional but has real constraints that affect practical use:
 
 ## License
 
-MIT
+This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for full details.
+
+| Files | License |
+|-------|---------|
+| `hwp2hwpx.py`, `hwp_reader.py`, `value_convertor.py` | Apache 2.0 (derivative works) |
+| **All other files** | **BSL 1.1** |
+
+**BSL 1.1 summary:**
+- Personal / non-commercial / educational / open-source: **Free**
+- Internal use (up to 5 users): **Free**
+- Commercial use / 6+ users: **Commercial license required**
+- After 2030-04-07: Converts to Apache 2.0 automatically
