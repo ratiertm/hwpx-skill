@@ -2,12 +2,15 @@
 
 Usage::
 
-    python -m pyhwpxlib md2hwpx  input.md  -o output.hwpx
-    python -m pyhwpxlib hwpx2html input.hwpx -o output.html
-    python -m pyhwpxlib text     input.hwpx
-    python -m pyhwpxlib fill     template.hwpx -o out.hwpx -d name=Hong age=30
-    python -m pyhwpxlib info     input.hwpx
-    python -m pyhwpxlib merge    a.hwpx b.hwpx -o merged.hwpx
+    pyhwpxlib md2hwpx   input.md  -o output.hwpx
+    pyhwpxlib hwpx2html input.hwpx -o output.html
+    pyhwpxlib text      input.hwpx
+    pyhwpxlib fill      template.hwpx -o out.hwpx -d name=Hong age=30
+    pyhwpxlib info      input.hwpx
+    pyhwpxlib merge     a.hwpx b.hwpx -o merged.hwpx
+    pyhwpxlib unpack    input.hwpx -o unpacked/
+    pyhwpxlib pack      unpacked/ -o output.hwpx
+    pyhwpxlib validate  input.hwpx
 """
 
 from __future__ import annotations
@@ -128,6 +131,115 @@ def _cmd_merge(args: argparse.Namespace) -> None:
     print(f"Merged {len(args.inputs)} files -> {args.output}")
 
 
+def _cmd_unpack(args: argparse.Namespace) -> None:
+    import zipfile
+
+    hwpx_path = args.input
+    output_dir = args.output or hwpx_path + ".unpacked"
+
+    if not os.path.exists(hwpx_path):
+        print(f"Error: {hwpx_path} not found", file=sys.stderr)
+        sys.exit(1)
+
+    os.makedirs(output_dir, exist_ok=True)
+    with zipfile.ZipFile(hwpx_path, "r") as z:
+        z.extractall(output_dir)
+        count = len(z.namelist())
+    print(f"Unpacked {count} files → {output_dir}/")
+
+
+def _cmd_pack(args: argparse.Namespace) -> None:
+    import zipfile
+
+    input_dir = args.input
+    output_path = args.output
+
+    if not os.path.isdir(input_dir):
+        print(f"Error: {input_dir} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    all_files = []
+    for root, dirs, files in os.walk(input_dir):
+        for f in files:
+            full = os.path.join(root, f)
+            arcname = os.path.relpath(full, input_dir)
+            all_files.append((full, arcname))
+
+    mimetype_file = None
+    other_files = []
+    for full, arcname in all_files:
+        if arcname == "mimetype":
+            mimetype_file = (full, arcname)
+        else:
+            other_files.append((full, arcname))
+
+    with zipfile.ZipFile(output_path, "w") as zf:
+        if mimetype_file:
+            with open(mimetype_file[0], "rb") as f:
+                data = f.read()
+            zf.writestr(
+                zipfile.ZipInfo("mimetype", date_time=(2026, 1, 1, 0, 0, 0)),
+                data,
+                compress_type=zipfile.ZIP_STORED,
+            )
+        for full, arcname in sorted(other_files):
+            zf.write(full, arcname, compress_type=zipfile.ZIP_DEFLATED)
+
+    size = os.path.getsize(output_path)
+    print(f"Packed {len(all_files)} files → {output_path} ({size:,} bytes)")
+
+
+def _cmd_validate(args: argparse.Namespace) -> None:
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    hwpx_path = args.input
+    required = ["mimetype", "Contents/header.xml", "Contents/section0.xml", "Contents/content.hpf"]
+    errors, info = [], {}
+
+    if not zipfile.is_zipfile(hwpx_path):
+        print(f"❌ INVALID: Not a valid ZIP file")
+        sys.exit(1)
+
+    with zipfile.ZipFile(hwpx_path, "r") as z:
+        names = z.namelist()
+        info["file_count"] = len(names)
+
+        for req in required:
+            if req not in names:
+                errors.append(f"Missing: {req}")
+
+        if "mimetype" in names:
+            mt = z.read("mimetype").decode("utf-8").strip()
+            info["mimetype"] = mt
+
+        for xml_file in ["Contents/header.xml", "Contents/section0.xml"]:
+            if xml_file in names:
+                try:
+                    content = z.read(xml_file).decode("utf-8")
+                    ET.fromstring(content)
+                    info[xml_file] = f"OK ({len(content):,} bytes)"
+                except ET.ParseError as e:
+                    errors.append(f"XML error in {xml_file}: {e}")
+
+    valid = len(errors) == 0
+    print(f"\n{'=' * 50}")
+    print(f"HWPX Validation: {hwpx_path}")
+    print(f"{'=' * 50}")
+    print(f"Result: {'✅ VALID' if valid else '❌ INVALID'}")
+    print(f"Files: {info.get('file_count', '?')}")
+    print(f"Mimetype: {info.get('mimetype', 'N/A')}")
+    for xf in ["Contents/header.xml", "Contents/section0.xml"]:
+        if xf in info:
+            print(f"{xf}: {info[xf]}")
+    if errors:
+        for e in errors:
+            print(f"  ❌ {e}")
+    elif valid:
+        print("\n✅ All checks passed!")
+    sys.exit(0 if valid else 1)
+
+
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the pyhwpxlib CLI."""
     parser = argparse.ArgumentParser(
@@ -176,6 +288,20 @@ def main(argv: list[str] | None = None) -> None:
     p_merge.add_argument("inputs", nargs="+", help="Input .hwpx files")
     p_merge.add_argument("-o", "--output", help="Output .hwpx file")
 
+    # unpack
+    p_unpack = sub.add_parser("unpack", help="Unpack HWPX to folder")
+    p_unpack.add_argument("input", help="Input .hwpx file")
+    p_unpack.add_argument("-o", "--output", help="Output directory")
+
+    # pack
+    p_pack = sub.add_parser("pack", help="Pack folder to HWPX")
+    p_pack.add_argument("input", help="Input directory")
+    p_pack.add_argument("-o", "--output", required=True, help="Output .hwpx file")
+
+    # validate
+    p_val = sub.add_parser("validate", help="Validate HWPX file")
+    p_val.add_argument("input", help="Input .hwpx file")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -189,6 +315,9 @@ def main(argv: list[str] | None = None) -> None:
         "fill": _cmd_fill,
         "info": _cmd_info,
         "merge": _cmd_merge,
+        "unpack": _cmd_unpack,
+        "pack": _cmd_pack,
+        "validate": _cmd_validate,
     }
 
     handler = dispatch.get(args.command)
