@@ -9,3 +9,8 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+key.md
+ssh-key-*.key
+*.key
+.coverage
+hwpx-workspace/

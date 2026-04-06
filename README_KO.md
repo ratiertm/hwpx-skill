@@ -1,304 +1,180 @@
-# hwpx-skill
+# pyhwpxlib
 
-AI에게 말로 설명하면 한글 문서(HWPX)가 만들어집니다. 한컴오피스 설치가 필요 없습니다.
+파이썬으로 .hwpx 파일을 생성하는 오픈소스 도구입니다. 한컴오피스 설치가 필요 없습니다.
 
 [**English**](README.md)
 
-## 핵심 기능
+## 어떤 상황에 쓰나요
 
-AI(Claude Code, Cursor, ChatGPT 등)에게 원하는 문서를 자연어로 설명하면, AI가 CLI 명령어를 조합해서 `.hwpx` 파일을 생성합니다:
+- 서버에서 HWPX 문서를 자동 생성해야 할 때
+- 마크다운/HTML을 HWPX로 변환해야 할 때
+- AI 에이전트가 한글 문서를 출력해야 할 때
+- 정부 양식/계약서를 데이터로 자동 채워야 할 때
+- HWP 5.x 파일을 HWPX로 변환해야 할 때
+
+## 설치
+
+```bash
+pip install pyhwpxlib
+```
+
+Python 3.10 이상 필요.
+
+## 빠른 시작
+
+### Python API로 문서 생성
+
+```python
+from pyhwpxlib import HwpxBuilder
+
+doc = HwpxBuilder()
+doc.add_heading("프로젝트 보고서", level=1)
+doc.add_paragraph("2026년 4월 작성")
+doc.add_table([
+    ["항목", "수량", "금액"],
+    ["서버", "3", "9,000,000"],
+    ["라이선스", "10", "5,000,000"],
+])
+doc.add_paragraph("")
+doc.add_heading("1. 개요", level=2)
+doc.add_paragraph("본 보고서는...")
+doc.save("보고서.hwpx")
+```
+
+### 마크다운에서 변환
+
+```bash
+pyhwpxlib md2hwpx 보고서.md -o 보고서.hwpx
+```
+
+변환 시 자동 인식: 제목(#), **볼드**, *이탈릭*, 글머리표, 번호 목록, 코드 블록, 표, 수평선
+
+### HWP → HWPX 변환
+
+```python
+from pyhwpxlib.hwp2hwpx import convert
+
+convert("기존문서.hwp", "변환결과.hwpx")
+```
+
+### 양식 자동 채우기
+
+```python
+from pyhwpxlib.api import fill_template_checkbox
+
+fill_template_checkbox(
+    "근로계약서_양식.hwpx",
+    data={
+        ">성 명<": ">성 명  홍길동<",
+        ">사업체명<": ">사업체명  (주)블루오션<",
+    },
+    checks=["민간기업"],
+    output_path="근로계약서_홍길동.hwpx",
+)
+```
+
+### AI 에이전트 연동
+
+AI(Claude Code, Cursor 등)에게 자연어로 문서를 설명하면 CLI 명령어를 조합해서 `.hwpx`를 생성합니다:
 
 ```
 나: "3분기 매출 보고서 만들어줘. 제목, 개요, 월별 매출 표,
      핵심 성과 3개를 글머리표로, 마지막에 요약."
 
-AI → CLI 명령어 실행 → 보고서.hwpx (한컴오피스에서 바로 열기)
+AI → pyhwpxlib 호출 → 보고서.hwpx
 ```
 
-AI 에이전트가 CLI 스킬 메타데이터를 읽고, 적절한 명령어(`document new`, `style add`, `table add`, `structure bullet-list`, ...)를 골라서 문서를 조립합니다. 코드를 작성하거나 한컴오피스를 열 필요 없이 서식이 적용된 `.hwpx` 파일을 받습니다.
+## 전체 기능
 
-**웹 UI**에서도 가능합니다 -- LLM 탭에서 원하는 문서를 설명하면 Claude가 생성하고 `.hwpx`로 다운로드됩니다. Claude Code의 OAuth 인증을 사용하므로 API 키가 필요 없습니다.
+### 문서 생성 (HwpxBuilder)
 
-## 다른 방법들
-
-**마크다운에서 변환** -- 명령어 하나로 자동 서식 적용:
-
-```bash
-cli-anything-hwpx convert 보고서.md -o 보고서.hwpx
-```
-
-변환 시 자동 인식: 제목(#), **볼드**, *이탈릭*, 글머리표, 번호 목록, 코드 블록, 표, 하이퍼링크, 수평선
-
-**CLI로 단계별 생성:**
-
-```bash
-# 빈 문서 만들기
-cli-anything-hwpx document new -o 보고서.hwpx
-
-# 스타일 텍스트 추가
-cli-anything-hwpx --file 보고서.hwpx style add "프로젝트 보고서" --bold --font-size 16
-
-# 표 추가 (헤더 + 데이터)
-cli-anything-hwpx --file 보고서.hwpx table add -r 3 -c 2 \
-  -h "이름,역할" -d "김철수,개발자" -d "이영희,디자이너"
-
-# 코드 블록 추가
-cli-anything-hwpx --file 보고서.hwpx structure code-block \
-  "def hello():\n    print('안녕')" --lang python
-
-# 2단 레이아웃 설정
-cli-anything-hwpx --file 보고서.hwpx structure set-columns -n 2
-
-# 텍스트 추출
-cli-anything-hwpx --file 보고서.hwpx text extract
-```
-
-## 설치
-
-```bash
-git clone https://github.com/ratiertm/hwpx-skill.git
-cd hwpx-skill/hwpx/agent-harness
-pip install -e .
-```
-
-Python 3.10 이상 필요.
-
-## 전체 명령어
-
-### 문서 관리
-
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `document new` | `document new -o my.hwpx` | 빈 문서 생성 |
-| `document open` | `document open my.hwpx` | 기존 파일 열기 |
-| `document save` | `document save output.hwpx` | 저장 |
-| `document info` | `document info` | 섹션, 문단, 이미지 수 표시 |
-
-### 텍스트
-
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `text add` | `text add "안녕하세요"` | 문단 추가 |
-| `text extract` | `text extract` | 전체 텍스트 출력 |
-| `text find` | `text find "키워드"` | 텍스트 검색 |
-| `text replace` | `text replace --old "초안" --new "최종"` | 찾아 바꾸기 |
-
-### 스타일
-
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `style add` | `style add "제목" -b -s 16 -c "#0000FF"` | 볼드, 16pt, 파란색 |
-
-### 표
-
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `table add` | `table add -r 3 -c 2 -h "A,B" -d "1,2"` | 데이터 포함 표 생성 |
-| `table list` | `table list` | 모든 표 목록 |
-| `table set-bgcolor` | `table set-bgcolor -r 0 -c 0 --color "#FFD700"` | 셀 배경색 |
-| `table set-gradient` | `table set-gradient -r 0 -c 0 --start "#FF0000" --end "#0000FF"` | 그라데이션 배경 |
-
-### 구조
-
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `structure set-header` | `structure set-header "회사명"` | 머리말 |
-| `structure set-footer` | `structure set-footer "꼬리말"` | 꼬리말 |
-| `structure page-number` | `structure page-number` | 페이지 번호 |
-| `structure bookmark` | `structure bookmark "1장"` | 책갈피 |
-| `structure hyperlink` | `structure hyperlink "https://..." -t "링크"` | 하이퍼링크 |
-| `structure code-block` | `structure code-block "print(1)" --lang python` | 코드 블록 (고정폭 + 배경) |
-| `structure set-columns` | `structure set-columns -n 2 --separator SOLID` | 다단 레이아웃 |
-| `structure bullet-list` | `structure bullet-list "항목1,항목2"` | 글머리표 목록 |
-| `structure numbered-list` | `structure numbered-list "첫째,둘째"` | 번호 목록 |
-| `structure nested-bullet-list` | `structure nested-bullet-list "0:상위,1:하위"` | 중첩 글머리표 |
-| `structure footnote` | `structure footnote "각주 내용"` | 각주 |
-| `structure rectangle` | `structure rectangle -w 14400 -h 7200` | 사각형 도형 |
-| `structure ellipse` | `structure ellipse` | 타원 도형 |
-| `structure line` | `structure line` | 수평선 |
-| `structure equation` | `structure equation "E=mc^2"` | 수식 |
+| 메서드 | 설명 |
+|--------|------|
+| `add_heading(text, level)` | 제목 (1~4) |
+| `add_paragraph(text, bold, font_size, text_color)` | 단락 |
+| `add_table(data, header_bg, col_widths, ...)` | 표 (프리셋 자동) |
+| `add_bullet_list(items)` | 글머리 기호 목록 |
+| `add_numbered_list(items)` | 번호 목록 |
+| `add_image(path, width, height)` | 이미지 삽입 |
+| `add_page_break()` | 페이지 나누기 |
+| `add_header(text)` / `add_footer(text)` | 머리말 / 꼬리말 |
+| `add_page_number()` | 페이지 번호 |
+| `add_footnote(text)` | 각주 |
+| `add_equation(script)` | 수식 |
+| `save(path)` | 저장 |
 
 ### 변환
 
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `convert` | `convert 보고서.md -o 보고서.hwpx` | MD/HTML/TXT를 HWPX로 |
+| 기능 | 코드 |
+|------|------|
+| MD → HWPX | `pyhwpxlib md2hwpx input.md -o output.hwpx` |
+| HTML → HWPX | `convert_html_file_to_hwpx("in.html", "out.hwpx")` |
+| HWPX → HTML | `convert_hwpx_to_html("in.hwpx", "out.html")` |
+| HWP → HWPX | `from pyhwpxlib.hwp2hwpx import convert` |
+| 텍스트 추출 | `extract_text("document.hwpx")` |
 
-마크다운 변환 시 처리하는 요소: `# 제목`, `**볼드**`, `*이탈릭*`, `` `코드` ``, `[링크](url)`, `- 글머리표`, `1. 번호`, ` ``` 코드 블록 ``` `, `| 표 |`, `> 인용문`, `---` 구분선
+### 양식 자동화
 
-### 내보내기
+| 기능 | 설명 |
+|------|------|
+| `fill_template_checkbox()` | 양식에 데이터 채우기 (서식 100% 보존) |
+| `fill_template_batch()` | 동일 양식으로 다건 생성 |
+| `extract_schema()` | 양식 필드 자동 탐지 |
 
-| 명령어 | 예시 | 설명 |
-|--------|------|------|
-| `export text` | `export text -o out.txt` | 텍스트로 내보내기 |
-| `export markdown` | `export markdown -o out.md` | 마크다운으로 내보내기 |
-| `export html` | `export html -o out.html` | HTML로 내보내기 |
-
-### 기타
-
-| 명령어 | 설명 |
-|--------|------|
-| `undo` / `redo` | 실행 취소 / 다시 실행 (최대 50단계) |
-| `validate schema` | OWPML 스키마 검증 |
-| `validate package` | ZIP/OPC 구조 검증 |
-| `repl` | 대화형 편집 모드 |
-
-## 웹 UI
-
-브라우저에서 문서를 만드는 3가지 모드:
+### 문서 편집
 
 ```bash
-cd hwpx/agent-harness
-pip install fastapi uvicorn python-multipart
-python -m uvicorn web.server:app --port 8080
+# 1. 압축 풀기
+python -m pyhwpxlib unpack document.hwpx unpacked/
+
+# 2. XML 직접 편집 (원본 문자열 교체 방식)
+
+# 3. 다시 묶기
+python -m pyhwpxlib pack unpacked/ output.hwpx
+
+# 4. 검증
+python -m pyhwpxlib validate output.hwpx
 ```
 
-- **Direct Input** -- 텍스트 입력 + 폰트 크기 선택 → `.hwpx` 다운로드
-- **LLM Instruction** -- 원하는 문서를 자연어로 설명 → Claude가 서식 적용된 문서 생성
-- **File Upload** -- MD/HTML/TXT 파일 업로드 → `.hwpx` 변환
+## CLI 명령어
 
-[Claude Code](https://claude.ai/claude-code) 설치 + 인증 필요 (`claude auth login`).
+CLI로도 단계별 문서 생성이 가능합니다:
 
-## CSS 기반 문서 스타일링
+```bash
+# 빈 문서 만들기
+pyhwpxlib document new -o 보고서.hwpx
 
-HWPX 문서의 스타일을 CSS 파일로 제어합니다. CSS 속성을 수정하면 HWPX 출력에 자동 반영됩니다.
+# 스타일 텍스트 추가
+pyhwpxlib --file 보고서.hwpx style add "프로젝트 보고서" --bold --font-size 16
 
-### 기본 제공 프리셋
+# 표 추가
+pyhwpxlib --file 보고서.hwpx table add -r 3 -c 2 \
+  -h "이름,역할" -d "김철수,개발자" -d "이영희,디자이너"
 
-`hwpx/agent-harness/web/styles/` 폴더에 4개 CSS 파일:
-
-| 파일 | 스타일 | 출처 |
-|------|--------|------|
-| `github.css` | GitHub 마크다운 | [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) |
-| `vscode.css` | VS Code 프리뷰 | VS Code 내장 |
-| `minimal.css` | 깔끔, 장식 없음 | 자체 제작 |
-| `academic.css` | 학술/공식 문서 | 자체 제작 |
-
-### 작동 방식
-
-CSS 속성이 HWPX XML 속성으로 자동 매핑됩니다:
-
-```css
-/* github.css를 수정하면 출력이 바뀜 */
-h1  { font-size: 2em; border-bottom: 1px solid #d1d9e0; }  /* → 헤딩 20pt + 구분선 */
-pre { background: #f6f8fa; font-size: 85%; }                /* → 코드 블록 배경 + 크기 */
-a   { color: #0969da; }                                      /* → 하이퍼링크 색상 */
-table th { background: #f0f0f0; padding: 6px 13px; }        /* → 표 헤더 배경 + 셀 패딩 */
-```
-
-### CSS → HWPX 매핑
-
-| CSS 속성 | HWPX 대응 | 예시 |
-|----------|----------|------|
-| `body font-size` | charPr height | `16px` → 1000 (10pt) |
-| `body color` | charPr textColor | `#1f2328` |
-| `body line-height` | paraPr lineSpacing | `1.5` → 150% |
-| `h1-h6 font-size` | 헤딩 charPr height | `2em` → 2000 |
-| `code font-family` | 코드 블록 fontRef | `monospace` → D2Coding |
-| `pre background` | 코드 블록 borderFill | `#f6f8fa` |
-| `a color` | 하이퍼링크 textColor | `#0969da` |
-| `table th background` | 헤더 셀 borderFill | `#f0f0f0` |
-| `table td padding` | 셀 margin (hasMargin=1) | `6px 13px` |
-
-### 커스텀 CSS
-
-`web/styles/` 폴더에 `.css` 파일을 추가하거나 Web UI에서 업로드하세요. 서버 재시작 없이 즉시 반영됩니다.
-
-```css
-/* my-company.css */
-body { font-size: 11pt; color: #000; }
-h1   { font-size: 18pt; border-bottom: 2px solid #003366; }
-a    { color: #003366; }
-table th { background: #003366; padding: 8px 16px; }
-```
-
-## Python API
-
-CLI 없이 코드에서 직접 사용:
-
-```python
-from hwpx import HwpxDocument
-
-doc = HwpxDocument.new()
-
-# 제목
-title = doc.ensure_run_style(bold=True, height=1600)
-doc.add_paragraph("프로젝트 보고서", char_pr_id_ref=title)
-
-# 글머리표 목록
-doc.add_bullet_list(["1단계", "2단계", "3단계"])
-
-# 코드 블록
-doc.add_code_block('print("안녕")', language="python")
-
-# 표 + 그라데이션 헤더
-tbl = doc.add_table(3, 2)
-tbl.set_cell_text(0, 0, "항목")
-tbl.set_cell_text(0, 1, "값")
-doc.set_cell_gradient(0, 0, 0,
-    start_color="#4A90D9", end_color="#1A5276")
-
-# 2단 레이아웃
-doc.set_columns(2, separator_type="SOLID")
-
-# 하이퍼링크
-doc.add_hyperlink("여기를 클릭", "https://example.com")
-
-# 저장
-doc.save_to_path("보고서.hwpx")
+# 텍스트 추출
+pyhwpxlib --file 보고서.hwpx text extract
 ```
 
 ## HWPX 포맷이란?
 
 HWPX는 한컴오피스의 차세대 문서 포맷입니다. ZIP 안에 XML 파일이 들어있는 구조로, Microsoft Word의 `.docx`와 비슷한 개념입니다. 한국 공공기관과 기업에서 표준으로 사용됩니다.
 
-이 프로젝트는 순수 Python으로 HWPX 파일을 만들고 편집합니다. 한컴오피스 설치가 필요 없습니다.
-
 ## 참고
 
 - [python-hwpx](https://github.com/airmang/python-hwpx) -- 고규현 (MIT)
-- [CLI-Anything](https://github.com/HKUDS/CLI-Anything) (MIT)
 
-## 기술적 한계
+## 알려진 한계
 
-이 프로젝트는 동작하지만, 실제 사용에서 체감되는 한계가 있습니다:
-
-**양식 레이아웃 재현에 사람 개입이 필수.** 정부/기업 양식은 정밀한 표 구조(셀 병합, 행 높이, 열 너비)를 가지고 있습니다. OpenCV 기반 그리드 감지로 약 70~80%의 구조를 자동 인식하지만, 나머지는 사람이 직접 검토하고 수정해야 합니다. 고객이 원하는 복잡한 형식을 사진이나 스캔으로 전달해도 정확히 재현되지 않습니다.
-
-**결과물을 프로그램이 직접 확인할 수 없음.** HWPX 파일을 생성하지만 렌더링 결과를 시스템이 볼 수 없습니다. 매번 Whale이나 한컴오피스에서 파일을 열고, 캡처하고, 비교하는 과정을 반복해야 합니다. 뷰어 API나 내부 렌더링 엔진이 없는 한 이 병목은 계속됩니다.
-
-**HWPX 포맷 리버스 엔지니어링에 시간이 많이 소요.** HWPX는 한컴 고유 XML 포맷으로, 문서화되지 않은 동작이 많습니다. 셀 병합, 셀 내 줄바꿈, 하이퍼링크 파라미터 등 각 기능마다 실제 한컴오피스 파일을 바이트 단위로 분석해서 올바른 XML 구조를 파악해야 했습니다.
-
-**간단한 양식도 상당한 시간 투자 필요.** 기본 의견제출서(8행 4열, 병합 몇 개)도 셀 줄바꿈 처리, 병합 순서, 행 높이 비율, 폰트 크기 맞추기 등 여러 차례 디버깅이 필요했습니다. "대충 맞는 것"과 "원본과 동일한 것" 사이의 간극이 크고, 이를 좁히는 데 노동 집약적입니다.
-
-**CSS→HWPX 매핑이 불완전.** 수백 개의 CSS 속성 중 46개만 HWPX에 대응됩니다. border-radius, box-shadow, CSS Grid 레이아웃, 구문 강조 등은 HWPX에 대응하는 기능이 없습니다.
-
-**이미지에서 텍스트 인식의 한계.** OpenCV로 표의 그리드 구조(선 위치, 비율, 병합)는 수학적으로 정확하게 감지되지만, 셀 안의 텍스트 인식은 다른 문제입니다. EasyOCR의 한국어 인식률은 70~80%로 실용 수준에 미달합니다. Claude는 대화 안에서 이미지를 볼 수 있지만, 서버에서 독립적으로 Claude에게 이미지를 전송하는 것은 OAuth 인증으로는 불가능하고 Anthropic API 키가 필요합니다. 현재는 그리드 구조만 자동 감지하고, 텍스트는 수동 입력해야 합니다.
-
-## 향후 방향
-
-**이미지→HWPX 자동화 파이프라인 (준비중)**
-- OpenCV 그리드 감지 → Anthropic Vision API 텍스트 인식 → 셀 편집 UI → HWPX 생성
-- API 키가 확보되면 셀 텍스트 자동 인식 가능
-- 감지된 그리드를 HTML 테이블로 표시하여 사용자가 검토/수정 후 생성
-
-**양식 템플릿 시스템**
-- YAML로 양식 정의 → template.hwpx 자동 생성
-- 고객이 캡처/스캔 제공 → 감지 → 검토 → 확정 → 반복 사용
-- template.hwpx에서 입력칸 위치를 메타데이터로 관리
-
-**python-hwpx 라이브러리 확장**
-- 폰트 임베딩 (ttf 파일을 HWPX에 포함)
-- HWPX 내부 렌더링 또는 뷰어 연동 (캡처 반복 제거)
-- OWPML 미구현 기능 ~65개 (도형, 필드, OLE 등)
-
-**HWPX 생성 규칙 (HWPX_RULEBOOK.md)**
-- 셀 줄바꿈은 `\n`이 아닌 별도 `<hp:p>` 요소로 분리
-- 셀 병합 시 피병합 셀을 물리적으로 제거, 빈 행 금지
-- 하이퍼링크는 6개 파라미터 구조 (한컴 실제 파일과 동일)
-- 셀 패딩은 `hasMargin="1"` 필수
-- CSS 파일로 문서 스타일 제어 (서버 재시작 없이 즉시 반영)
+- 복잡한 셀 병합 레이아웃은 수동 검토 필요
+- HWPX 렌더링 미리보기 미지원 (한컴오피스에서 직접 확인)
+- CSS→HWPX 매핑은 주요 속성 46개만 지원
+- 이미지 내 텍스트 인식(OCR)은 별도 API 키 필요
 
 ## 라이선스
 
-MIT
+[BSL 1.1 (Business Source License)](LICENSE.md)
+
+- 개인/비상업/교육/오픈소스 → **무료**
+- 사내 5인 이하 → **무료**
+- 상업적 사용/6인 이상 → **유료 라이선스 필요**
+- 2030-04-07 이후 → Apache 2.0으로 자동 전환

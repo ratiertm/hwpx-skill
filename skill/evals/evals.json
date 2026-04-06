@@ -1,0 +1,43 @@
+{
+  "skill_name": "hwpx",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "근로지원인서비스신청서.hwpx 파일에서 구조를 분석하고, 이름: 김철수, 주민등록번호: 900101-1234567, 연락처: 010-1234-5678 데이터를 넣어서 새 한글 파일로 저장해줘.",
+      "expected_output": "양식을 extract_form()으로 분석하고, INPUT 셀을 식별한 뒤 데이터를 채워 generate_form()으로 새 .hwpx 파일을 생성한다. 파일이 실제로 만들어져야 한다.",
+      "files": ["templates/sources/근로지원인서비스신청서.hwpx"],
+      "expectations": [
+        "extract_form() 또는 extract_schema()를 사용하여 양식 구조를 추출한다",
+        "사용자가 제공한 데이터(김철수, 900101-1234567, 010-1234-5678)가 셀에 채워진다",
+        "generate_form()으로 새 .hwpx 파일이 생성된다",
+        "생성된 파일이 실제로 존재하고 유효한 ZIP 구조를 가진다"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "직원 명단을 한글 파일로 만들어줘. 제목은 '2026년 1분기 직원 명단'이고, 표에 이름/부서/직급/입사일 4개 열로 5명 데이터를 넣어줘. 적당한 데이터를 만들어서 넣어도 돼.",
+      "expected_output": "create_document()로 새 문서를 만들고, add_heading()으로 제목, add_table()로 4열 6행(헤더+5명) 표를 넣고 save()로 저장한다.",
+      "files": [],
+      "expectations": [
+        "create_document()를 사용하여 새 문서를 생성한다",
+        "제목 '2026년 1분기 직원 명단'이 문서에 포함된다",
+        "4열(이름/부서/직급/입사일) 표가 생성된다",
+        "5명 이상의 직원 데이터가 표에 포함된다",
+        ".hwpx 파일이 실제로 저장된다"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "이 HTML 보고서를 한글 파일로 변환해줘:\n<h1>월간 매출 보고서</h1>\n<p>2026년 3월 매출 현황을 보고합니다.</p>\n<table><tr><th>항목</th><th>금액</th></tr><tr><td>온라인</td><td>5,200만원</td></tr><tr><td>오프라인</td><td>3,800만원</td></tr><tr><td>합계</td><td>9,000만원</td></tr></table>\n<p>전월 대비 12% 증가하였습니다.</p>",
+      "expected_output": "create_document()로 문서를 만들고 convert_html_to_hwpx()로 HTML을 HWPX 요소로 변환한 뒤 save()로 저장한다.",
+      "files": [],
+      "expectations": [
+        "create_document()를 사용한다",
+        "convert_html_to_hwpx()를 사용하여 HTML을 변환한다",
+        "제목 '월간 매출 보고서'가 문서에 반영된다",
+        "표(온라인/오프라인/합계)가 문서에 포함된다",
+        ".hwpx 파일이 저장된다"
+      ]
+    }
+  ]
+}

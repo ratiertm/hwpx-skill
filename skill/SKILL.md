@@ -409,6 +409,10 @@ root = ET.fromstring(xml)
 new_xml = ET.tostring(root, encoding='unicode')  # Whale 에러!
 ```
 
+### Advanced Operations
+
+For complex edits (section extraction, paragraph insert/delete, table insertion, multi-run field filling), see [references/form_automation.md — Advanced XML Editing](references/form_automation.md).
+
 ### Step 3: Pack
 ```bash
 python scripts/pack.py unpacked/ output.hwpx
@@ -523,10 +527,30 @@ doc = read_hwp("file.hwp")
 
 ---
 
+## Skill Update (스킬 동기화)
+
+프로젝트 `skill/`과 설치된 `~/.claude/skills/hwpx/` 간 동기화:
+
+```bash
+# 상태 확인 — 어디가 다른지 보기
+python scripts/update_skill.py status
+
+# Push — 프로젝트 → 설치된 스킬
+python scripts/update_skill.py push
+
+# Pull — 설치된 스킬 → 프로젝트
+python scripts/update_skill.py pull
+
+# Backup — 현재 설치된 스킬 스냅샷
+python scripts/update_skill.py backup
+```
+
+---
+
 ## Reference Files
 
 | File | Contents |
 |------|----------|
 | [references/api_full.md](references/api_full.md) | pyhwpxlib full function reference, XML reference, page sizes, size conversion table |
 | [references/document_types.md](references/document_types.md) | Document type specs (5 types), indent guide, TOC patterns, cover page patterns, document structure guide, table design guide |
-| [references/form_automation.md](references/form_automation.md) | fill_template, batch generate, schema extraction, checkbox patterns |
+| [references/form_automation.md](references/form_automation.md) | fill_template, batch generate, schema extraction, checkbox patterns, advanced XML editing |
