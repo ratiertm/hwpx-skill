@@ -275,57 +275,10 @@ This project is built upon the following open-source projects:
 
 ## Known Limitations
 
-This project is functional but has real constraints that affect practical use:
-
-**Form layout accuracy requires human intervention.** Complex government or corporate forms have precise grid structures (merged cells, exact row heights, column widths). Even with OpenCV-based grid detection, the automated pipeline captures only ~70-80% of the structure correctly. A human must review and correct the detected grid before generating the final template. Simple forms still take significant iteration time to match the original exactly.
-
-**No visual feedback loop.** The system generates HWPX files but cannot see the rendered result. Every change requires manually opening the file in Whale or Hancom Office, taking a screenshot, and feeding it back for comparison. This makes the edit-verify cycle slow. Until the system can render HWPX internally or connect to a viewer API, this bottleneck remains.
-
-**Reverse-engineering HWPX is time-consuming.** HWPX is a Hancom-proprietary XML format with undocumented behaviors. Many features (cell merging, newlines in cells, hyperlink parameters) required analyzing real Hancom Office files byte-by-byte to discover the correct XML structure. Each new feature risks breaking existing ones because the format has implicit rules not covered by any public specification.
-
-**Even simple forms take substantial effort.** A basic opinion submission form (8 rows, 4 columns, a few merges) required multiple rounds of debugging -- cell newline handling, merge order, row height proportions, font size matching. The gap between "it looks roughly right" and "it matches the original" is wide and labor-intensive to close.
-
-**CSS-to-HWPX mapping is incomplete.** Only 46 of hundreds of CSS properties have HWPX equivalents. Features like border-radius, box-shadow, CSS Grid layout, and syntax highlighting have no HWPX counterpart. The styling system works within these bounds but cannot reproduce arbitrary web designs.
-
-**Image text recognition gap.** OpenCV detects grid structure (line positions, proportions, merges) with mathematical precision, but reading text inside cells is a separate problem. EasyOCR Korean accuracy is 70-80% -- not production-ready. Claude can read images within a conversation, but the server cannot independently send images to Claude via OAuth -- an Anthropic API key is required. Currently, grid structure is auto-detected but text must be entered manually.
-
-## Roadmap
-
-**Image→HWPX automation pipeline (in progress)**
-- OpenCV grid detection → Anthropic Vision API text recognition → cell editing UI → HWPX generation
-- Requires API key for cell text auto-recognition
-- Detected grid shown as HTML table for user review/edit before generation
-
-**Form template system**
-- YAML-based form definition → template.hwpx auto-generation
-- Customer provides capture/scan → detect → review → finalize → reuse
-- Template metadata tracks which cells accept user data
-
-**python-hwpx library expansion**
-- Font embedding (ttf files inside HWPX)
-- Internal HWPX rendering or viewer integration (eliminate screenshot cycle)
-- ~65 unimplemented OWPML features (shapes, fields, OLE, etc.)
-
-**HWPX generation rules (HWPX_RULEBOOK.md)**
-- Cell newlines must be separate `<hp:p>` elements, not `\n` in `<hp:t>`
-- Merged cells must be physically removed from `<hp:tr>`, no empty rows
-- Hyperlinks require 6-parameter fieldBegin structure
-- Cell padding requires `hasMargin="1"`
-- CSS files control document styling, changes apply without server restart
-
-**Form clone pipeline (`templates/form_pipeline.py`)**
-- `clone <input.hwpx> -o <output.hwpx>` -- one command to clone any form
-- Preserves original fonts (11+), charPr (94+), borderFill (66+) via post-save header replacement
-- Multi-page support with nested tables, per-run charPr, marker-based table insertion
-- pageBreak, cellMargin, lineSpacing, fillColor all preserved from original
-
-**OWPML table sizing rules ([OWPML_TABLE_SIZING.md](docs/OWPML_TABLE_SIZING.md))**
-- No explicit column definitions -- all sizing lives in `cellSz` per cell
-- Hidden column grid: `SUM(col_widths) == tbl.sz.width` (exact match)
-- `cellSz.width = sum(col_widths[col : col+colSpan])`, same for height
-- Table width = text area - outMargin×2
-- Unit: 1mm ≈ 283.46 HWP units, 7200 units = 1 inch
-- Define `col_widths[]` + `row_heights[]` → all cell sizes auto-calculated
+- Complex cell-merge layouts may require manual review
+- No built-in HWPX preview (verify in Hancom Office or Whale)
+- CSS→HWPX mapping covers 46 major properties only
+- Image OCR for form text requires a separate API key
 
 ## License
 
