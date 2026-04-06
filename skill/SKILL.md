@@ -5,6 +5,59 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 # HWPX creation, editing, and form automation
 
+## On Load — 스킬 로드 시 즉시 실행
+
+이 스킬이 로드되면, 사용자의 메시지에 구체적인 작업이 포함되어 있지 않은 경우 **즉시 AskUserQuestion으로 작업을 물어본다**:
+
+```
+"어떤 작업을 하시겠어요?"
+
+1. 새 문서 만들기 — HwpxBuilder로 보고서, 공문서, 양식 등 생성
+2. 기존 문서 편집 — hwpx 파일의 텍스트/서식 수정 (unpack → edit → pack)
+3. 양식 자동화 — 서식 템플릿에 데이터 채우기, 다건 생성, 스키마 추출
+4. 문서 변환 — MD→HWPX, HTML→HWPX, HWPX→HTML, HWP 5.x 읽기
+```
+
+사용자가 이미 구체적인 요청을 했으면 (예: "이 hwp 파일 읽어줘", "보고서 만들어줘") 질문 없이 바로 해당 작업을 진행한다.
+
+**선택별 워크플로우** — 모든 단계에서 AskUserQuestion 사용:
+
+```
+[1] 새 문서 만들기
+    ├─ "어떤 유형?" → 정부양식/공문서/보고서/세무법무/논문/자유
+    ├─ "어떤 양식?" → 새로 만들기/기존 파일 업로드/샘플 선택
+    ├─ "내용 알려주세요" → 제목, 본문, 데이터 입력
+    ├─ "파일명?" → 생성 → validate
+    └─ "수정할 부분 있나요?" → 반복 or 완료
+
+[2] 기존 문서 편집
+    ├─ "파일 경로?" → 프로젝트에서 찾기/직접 입력
+    ├─ (텍스트 추출해서 내용 보여주기)
+    ├─ "어떤 편집?" → 텍스트 교체/양식 채우기/구조 수정
+    ├─ (구체적 수정 내용 질문)
+    ├─ unpack → edit → pack → validate
+    └─ "수정할 부분 있나요?" → 반복 or 완료
+
+[3] 양식 자동화
+    ├─ "템플릿 파일?" → 경로 입력
+    ├─ extract_schema → 필드 목록 보여주기
+    ├─ "데이터 입력 방식?" → 대화형/JSON/CSV파일
+    ├─ (데이터 입력 받기)
+    ├─ "확인합니다:" → 입력 내용 보여주기 → "맞나요?"
+    ├─ fill_template → validate
+    └─ "추가 생성?" → 다건 배치 or 완료
+
+[4] 문서 변환
+    ├─ "변환 유형?" → HWP→HWPX/MD→HWPX/HTML→HWPX/HWPX→HTML
+    ├─ "파일 경로?" → 입력
+    ├─ 변환 실행 → validate → 결과 요약
+    └─ "다음 작업?" → 편집/추가 변환/완료
+```
+
+모든 흐름의 마지막은 **"수정할 부분이 있으면 알려주세요"**로 끝나고, 사용자가 만족할 때까지 반복한다.
+
+---
+
 ## Table of Contents
 
 1. [Document Design Principles](#document-design-principles)
@@ -15,7 +68,7 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 6. [Editing Existing Documents](#editing-existing-documents)
 7. [Converting Documents](#converting-documents)
 8. [Critical Rules Summary](#critical-rules-summary)
-9. [Dependencies](#dependencies)
+9. [Getting Started](#getting-started)
 10. [Reference Files](#reference-files)
 
 ---
@@ -244,7 +297,7 @@ Generate .hwpx files with `HwpxBuilder`, then validate.
 
 ### Setup
 ```python
-from scripts.create import HwpxBuilder, DS, TABLE_PRESETS
+from pyhwpxlib import HwpxBuilder, DS, TABLE_PRESETS
 
 doc = HwpxBuilder(table_preset='corporate')
 doc.add_heading("제목", level=1)
@@ -255,7 +308,7 @@ doc.save("output.hwpx")
 
 ### Validation
 ```bash
-python scripts/validate.py output.hwpx
+pyhwpxlib validate output.hwpx
 ```
 
 ### HwpxBuilder Method Table
@@ -355,7 +408,7 @@ doc.add_table([['참고 정보']],
 
 **디자인 시스템 색상 상수** (`DS` dict):
 ```python
-from scripts.create import DS
+from pyhwpxlib import DS
 DS['primary']           # '#395da2' — 헤더, 소제목
 DS['on_primary']        # '#f7f7ff' — primary 위 텍스트
 DS['on_surface']        # '#2b3437' — 본문 (순검정 금지)
@@ -384,7 +437,7 @@ DS['error']             # '#9f403d' — 경고
 
 ### Step 1: Unpack
 ```bash
-python scripts/unpack.py document.hwpx unpacked/
+pyhwpxlib unpack document.hwpx -o unpacked/
 ```
 Extracts all XML files to a folder.
 
@@ -415,13 +468,13 @@ For complex edits (section extraction, paragraph insert/delete, table insertion,
 
 ### Step 3: Pack
 ```bash
-python scripts/pack.py unpacked/ output.hwpx
+pyhwpxlib pack unpacked/ -o output.hwpx
 ```
 Creates HWPX with mimetype STORED as first entry.
 
 ### Validation
 ```bash
-python scripts/validate.py output.hwpx
+pyhwpxlib validate output.hwpx
 ```
 Checks: ZIP validity, required files, mimetype, XML parsing, namespaces.
 
@@ -520,10 +573,58 @@ doc = read_hwp("file.hwp")
 
 ---
 
+## Getting Started (시작 가이드)
+
+### 1. 설치
+```bash
+pip install pyhwpxlib
+```
+
+### 2. 첫 문서 만들기
+```python
+from pyhwpxlib import HwpxBuilder
+
+doc = HwpxBuilder()
+doc.add_heading("첫 번째 문서", level=1)
+doc.add_paragraph("pyhwpxlib으로 만든 문서입니다.")
+doc.add_table([["이름", "나이"], ["홍길동", "30"]])
+doc.save("my_first.hwpx")
+```
+→ `my_first.hwpx`를 Whale 또는 한컴오피스에서 열어 확인
+
+### 3. 기존 HWP 파일 변환
+```bash
+# HWP 5.x → HWPX
+python -c "from pyhwpxlib.hwp2hwpx import convert; convert('old.hwp', 'new.hwpx')"
+
+# 마크다운 → HWPX
+pyhwpxlib md2hwpx report.md -o report.hwpx
+```
+
+### 4. 기존 문서 편집
+```bash
+pyhwpxlib unpack document.hwpx -o unpacked/   # 풀기
+# unpacked/Contents/section0.xml 편집
+pyhwpxlib pack unpacked/ -o output.hwpx        # 묶기
+pyhwpxlib validate output.hwpx                 # 검증
+```
+
+### 5. 양식 자동 채우기
+```python
+from pyhwpxlib.api import fill_template_checkbox
+
+fill_template_checkbox("양식.hwpx",
+    data={">성 명<": ">성 명  홍길동<"},
+    checks=["동의함"],
+    output_path="완성.hwpx")
+```
+
+---
+
 ## Dependencies
 
-- **olefile**: HWP 5.x binary reading (`pip install olefile`)
-- **pyhwpxlib**: HWPX document API (bundled)
+- **pyhwpxlib**: `pip install pyhwpxlib` (핵심 라이브러리)
+- **olefile**: HWP 5.x 읽기용 (자동 설치됨)
 
 ---
 
@@ -533,16 +634,16 @@ doc = read_hwp("file.hwp")
 
 ```bash
 # 상태 확인 — 어디가 다른지 보기
-python scripts/update_skill.py status
+python -m pyhwpxlib.update_skill status
 
 # Push — 프로젝트 → 설치된 스킬
-python scripts/update_skill.py push
+python -m pyhwpxlib.update_skill push
 
 # Pull — 설치된 스킬 → 프로젝트
-python scripts/update_skill.py pull
+python -m pyhwpxlib.update_skill pull
 
 # Backup — 현재 설치된 스킬 스냅샷
-python scripts/update_skill.py backup
+python -m pyhwpxlib.update_skill backup
 ```
 
 ---
