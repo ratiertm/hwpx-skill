@@ -159,9 +159,15 @@ pyhwpxlib --file 보고서.hwpx text extract
 
 HWPX는 한컴오피스의 차세대 문서 포맷입니다. ZIP 안에 XML 파일이 들어있는 구조로, Microsoft Word의 `.docx`와 비슷한 개념입니다. 한국 공공기관과 기업에서 표준으로 사용됩니다.
 
-## 참고
+## 크레딧
 
-- [python-hwpx](https://github.com/airmang/python-hwpx) -- 고규현 (MIT)
+이 프로젝트는 다음 오픈소스를 기반으로 합니다:
+
+| 프로젝트 | 저작자 | 라이선스 | 사용 내용 |
+|---------|--------|---------|----------|
+| [hwp2hwpx](https://github.com/neolord0/hwp2hwpx) | neolord0 | Apache 2.0 | HWP→HWPX 변환 로직 (Python 포팅) |
+| [hwplib](https://github.com/neolord0/hwplib) | neolord0 | Apache 2.0 | HWP 바이너리 파서 (Python 포팅) |
+| [python-hwpx](https://github.com/airmang/python-hwpx) | 고규현 | MIT | HWPX 데이터클래스 모델 |
 
 ## 알려진 한계
 

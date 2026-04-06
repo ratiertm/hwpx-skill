@@ -1,5 +1,9 @@
 """HWP <-> HWPX 값 변환 유틸리티
-Java hwp2hwpx ValueConvertor.java의 Python 포팅
+
+Ported from hwp2hwpx ValueConvertor.java by neolord0
+(https://github.com/neolord0/hwp2hwpx)
+Original work Copyright (c) neolord0, licensed under Apache License 2.0.
+This Python port: Copyright (c) 2026 Eunmi Lee (ratiertm), licensed under BSL 1.1.
 """
 
 

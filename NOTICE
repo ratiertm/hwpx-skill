@@ -1,0 +1,21 @@
+pyhwpxlib
+Copyright (c) 2026 Eunmi Lee (ratiertm)
+
+This product includes software ported from the following projects:
+
+1. hwp2hwpx (https://github.com/neolord0/hwp2hwpx)
+   Copyright (c) neolord0
+   Licensed under the Apache License, Version 2.0
+   Files: pyhwpxlib/hwp2hwpx.py, pyhwpxlib/value_convertor.py
+   Changes: Rewritten in Python from original Java implementation.
+
+2. hwplib (https://github.com/neolord0/hwplib)
+   Copyright (c) neolord0
+   Licensed under the Apache License, Version 2.0
+   Files: pyhwpxlib/hwp_reader.py
+   Changes: HWP binary format parser rewritten in Python using struct/dataclass.
+
+3. python-hwpx (https://github.com/airmang/python-hwpx)
+   Copyright (c) Kyuhyun Ko (airmang)
+   Licensed under the MIT License
+   Files: ratiertm-hwpx/ (bundled as submodule), pyhwpxlib core dataclass model
