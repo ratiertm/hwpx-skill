@@ -5,6 +5,18 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 # HWPX creation, editing, and form automation
 
+## 절대 규칙 — 이 스킬의 모든 작업에 적용
+
+1. **pyhwpxlib만 사용한다.** 자체 코드를 작성하거나 다른 라이브러리로 우회하지 않는다.
+2. `.hwp` 파일이 들어오면 **반드시 `pyhwpxlib.hwp2hwpx.convert()`로 HWPX 변환부터** 한다. olefile 직접 읽기, 바이너리 파싱 등 다른 방법을 시도하지 않는다.
+3. `.hwpx` 파일이 들어오면 **반드시 `pyhwpxlib.api.extract_text()`로 읽는다.** zipfile로 직접 열거나 xml.etree로 직접 파싱하지 않는다.
+4. 새 문서 생성은 **반드시 `from pyhwpxlib import HwpxBuilder`를 사용한다.** XML을 직접 작성하지 않는다.
+5. 문서 편집은 **반드시 `pyhwpxlib unpack → 문자열 교체 → pyhwpxlib pack` 순서**를 따른다.
+
+위 규칙을 어기면 Whale/한컴오피스에서 파일이 열리지 않거나 서식이 깨진다.
+
+---
+
 ## On Load — 스킬 로드 시 즉시 실행
 
 이 스킬이 로드되면 **반드시** 아래 흐름을 따른다. 이 단계를 건너뛰지 않는다.
@@ -22,175 +34,101 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 사용자가 이미 구체적인 요청을 했으면 (예: "이 hwp 파일 읽어줘", "보고서 만들어줘") 질문 없이 바로 해당 작업을 진행한다. 단, 해당 워크플로우의 각 단계는 **반드시 AskUserQuestion으로 진행**한다 — 단계를 건너뛰고 혼자 판단하지 않는다.
 
-**선택별 워크플로우** — 모든 단계에서 AskUserQuestion 사용:
+**자동 감지 규칙** — 파일 확장자에 따라 자동 판단:
+- 사용자가 `.hwp` 파일을 주면 → **먼저 hwp2hwpx로 HWPX 변환** 후 작업 진행
+- 사용자가 `.hwpx` 파일을 주면 → 바로 읽기/편집/양식 채우기 진행
+- 사용자가 `.md` 파일을 주면 → md2hwpx 또는 LLM+HwpxBuilder로 변환
+- 사용자가 `.html` 파일을 주면 → convert_html_file_to_hwpx로 변환
+- 사용자가 텍스트만 주면 → HwpxBuilder로 새 문서 생성
 
+```python
+# .hwp 파일 감지 시 자동 실행
+from pyhwpxlib.hwp_reader import detect_format
+fmt = detect_format(file_path)  # "HWP" or "HWPX"
+if fmt == "HWP":
+    from pyhwpxlib.hwp2hwpx import convert
+    hwpx_path = file_path.replace('.hwp', '.hwpx')
+    convert(file_path, hwpx_path)
+    # 이후 hwpx_path로 작업 진행
 ```
-[1] 새 문서 만들기
-    ├─ "어떤 유형?" → 정부양식/공문서/보고서/세무법무/논문/자유
-    ├─ "어떤 양식?" → 새로 만들기/기존 파일 업로드/샘플 선택
-    ├─ "내용 알려주세요" → 제목, 본문, 데이터 입력
-    ├─ "파일명?" → 생성 → validate
-    └─ "수정할 부분 있나요?" → 반복 or 완료
 
-[2] 기존 문서 편집
-    ├─ "파일 경로?" → 프로젝트에서 찾기/직접 입력
-    ├─ (텍스트 추출해서 내용 보여주기)
-    ├─ "어떤 편집?" → 텍스트 교체/양식 채우기/구조 수정
-    ├─ (구체적 수정 내용 질문)
-    ├─ unpack → edit → pack → validate
-    └─ "수정할 부분 있나요?" → 반복 or 완료
+**워크플로우 [1] 새 문서 만들기**:
 
-[3] 양식 자동화
-    ├─ "템플릿 파일?" → 경로 입력
-    ├─ extract_schema → 필드 목록 보여주기
-    ├─ "데이터 입력 방식?" → 대화형/JSON/CSV파일
-    ├─ (데이터 입력 받기)
-    ├─ "확인합니다:" → 입력 내용 보여주기 → "맞나요?"
-    ├─ fill_template → validate
-    └─ "추가 생성?" → 다건 배치 or 완료
-
-[4] 문서 변환
-    ├─ "변환 유형?" → HWP→HWPX/MD→HWPX/HTML→HWPX/HWPX→HTML
-    ├─ "파일 경로?" → 입력
-    ├─ 변환 실행 → validate → 결과 요약
-    └─ "다음 작업?" → 편집/추가 변환/완료
+Step A: AskUserQuestion — "어떤 유형?" → 정부양식/공문서/보고서/세무법무/논문/자유
+Step B: 디자인 결정 — [references/design_guide.md](references/design_guide.md) 읽고 주제에 맞는 팔레트 선택
+Step C: AskUserQuestion — "내용을 알려주세요"
+Step D: 실행
+```python
+from pyhwpxlib import HwpxBuilder, DS
+doc = HwpxBuilder(table_preset='corporate')
+# 주제에 맞는 팔레트 적용, 매 섹션 시각 요소 포함, 같은 레이아웃 반복 금지
+doc.add_paragraph(제목, bold=True, font_size=18, text_color=PALETTE['primary'], alignment='CENTER')
+# ... 본문, 표, 박스, 목록 조합 ...
+doc.save(파일명)
 ```
+Step E: `pyhwpxlib validate 파일명`
+Step F: AskUserQuestion — "Whale에서 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
+
+**워크플로우 [2] 기존 문서 편집**:
+
+Step A: AskUserQuestion — "파일 경로?"
+Step B: 자동 감지 + 텍스트 추출
+```python
+from pyhwpxlib.hwp_reader import detect_format
+if detect_format(path) == "HWP":
+    from pyhwpxlib.hwp2hwpx import convert
+    convert(path, hwpx_path)
+from pyhwpxlib.api import extract_text
+print(extract_text(hwpx_path))  # 사용자에게 내용 보여주기
+```
+Step C: AskUserQuestion — "어떤 편집?" → 텍스트 교체/구조 수정/양식 채우기
+Step D: 실행
+```bash
+pyhwpxlib unpack doc.hwpx -o unpacked/
+# 원본 문자열 교체 (ET.tostring 금지!)
+pyhwpxlib pack unpacked/ -o output.hwpx
+pyhwpxlib validate output.hwpx
+```
+Step E: AskUserQuestion — "수정할 부분 있나요?"
+
+**워크플로우 [3] 양식 자동화**:
+
+Step A: AskUserQuestion — "템플릿 파일 경로?"
+Step B: 스키마 추출 → 필드 목록 보여주기
+```python
+from pyhwpxlib.api import extract_schema
+schema = extract_schema(template_path)
+```
+Step C: AskUserQuestion — "데이터 입력 방식?" → 대화형/JSON/CSV파일
+Step D: 데이터 입력 받기 → 확인 보여주기 → AskUserQuestion "맞나요?"
+Step E: 실행
+```python
+from pyhwpxlib.api import fill_template_checkbox
+fill_template_checkbox(template_path, data=data, checks=checks, output_path=output)
+```
+Step F: `pyhwpxlib validate output` → AskUserQuestion "추가 생성?"
+
+**워크플로우 [4] 문서 변환**:
+
+Step A: AskUserQuestion — "변환 유형?" → HWP→HWPX / MD→HWPX / HTML→HWPX / HWPX→HTML
+Step B: AskUserQuestion — "파일 경로?"
+Step C: 실행
+```python
+# HWP→HWPX
+from pyhwpxlib.hwp2hwpx import convert
+convert(hwp_path, hwpx_path)
+
+# MD→HWPX
+# pyhwpxlib md2hwpx input.md -o output.hwpx
+
+# HTML→HWPX
+from pyhwpxlib.api import convert_html_file_to_hwpx
+convert_html_file_to_hwpx(html_path, hwpx_path)
+```
+Step D: `pyhwpxlib validate output` → 결과 요약
+Step E: AskUserQuestion — "다음 작업?" → 편집/추가 변환/완료
 
 모든 흐름의 마지막은 **"수정할 부분이 있으면 알려주세요"**로 끝나고, 사용자가 만족할 때까지 반복한다.
-
----
-
-## Table of Contents
-
-1. [Document Design Principles](#document-design-principles)
-2. [Confirmed Style Rules](#confirmed-style-rules)
-3. [Quick Reference](#quick-reference)
-4. [Interactive Workflow](#interactive-workflow)
-5. [Creating New Documents — HwpxBuilder API](#creating-new-documents)
-6. [Editing Existing Documents](#editing-existing-documents)
-7. [Converting Documents](#converting-documents)
-8. [Critical Rules Summary](#critical-rules-summary)
-9. [Getting Started](#getting-started)
-10. [Reference Files](#reference-files)
-
----
-
-## Document Design Principles (문서 디자인 원칙)
-
-**LLM은 템플릿 복붙 머신이 아니다. 문서 디자이너다.**
-
-매 문서마다 동일한 레이아웃을 반복하지 않는다. 내용을 읽고, 그 문서에 가장 적합한 구성을 판단하여 컴포넌트를 조합한다.
-
-**금지 패턴**:
-- 매번 같은 표지 (빈줄 5개 → 카테고리 → 대제목 → 부제 → 하이라이트 박스 → 날짜 → 구분선)
-- 모든 문서에 "EQUITY RESEARCH", "CONFIDENTIAL" 같은 라벨 붙이기
-- 내용과 무관하게 7개 섹션 + 목차 + 표지를 기계적으로 생성
-- 원문을 요약·재작성하여 자기 말로 바꾸기
-- 모든 섹션마다 page_break를 넣어 1섹션=1페이지 강제하기
-
-**해야 하는 것**:
-- 내용을 먼저 읽고, 문서의 성격(리서치/제안서/공문/안내문/분석)을 파악
-- 그 성격에 맞는 레이아웃과 컴포넌트를 선택
-- 표지가 필요한 문서인지, 목차가 필요한 분량인지 판단
-- 표/박스/구분선/이미지를 어디에 배치하면 효과적인지 판단
-- 원문 텍스트는 그대로 사용하되, 시각적 배치와 강조는 LLM이 디자인
-- page_break는 내용 흐름에 맞게 적절히 사용 (자연스럽게 넘치면 자동 넘김, 주제 전환 시만 명시적 삽입)
-
-**페이지 나누기 판단 기준**:
-- 표지 → 본문: page_break 필요
-- 목차 → 본문: page_break 필요
-- 같은 주제 내 소제목 전환: page_break 불필요 (자연스럽게 이어짐)
-- 큰 주제 전환 (예: "분석" → "결론"): 내용량에 따라 판단
-- 짧은 문서 (3~4페이지): page_break 최소화 — 내용이 자연스럽게 흐르게
-- 긴 문서 (10페이지+): 장(chapter) 단위에서만 page_break
-
-**컴포넌트 조합 판단 기준**:
-
-| 내용 특성 | 적합한 컴포넌트 |
-|----------|----------------|
-| 핵심 수치/요약 | 하이라이트 박스 (#d8e2ff) |
-| 인용문/참고사항 | 콜아웃 박스 (#e2dbfd) |
-| 비교 데이터 | 표 (헤더 + 줄무늬) |
-| 순서/절차 | 번호 목록 + 들여쓰기 |
-| 강조/경고 | error 색상 (#9f403d) 텍스트 |
-| 부연/메타 정보 | 정보 박스 (#cbe7f5) 또는 작은 회색 텍스트 |
-| 시각적 구분 | 텍스트 구분선 (━), 페이지 나누기 |
-| 장문 본문 | 소제목(primary 색상) + 들여쓰기 단락 |
-
-**stitch 레퍼런스 (skill/stitch/ hwpx_1~5)**:
-5가지 서로 다른 레이아웃 패턴이 있다. 매번 같은 걸 쓰지 말고, 내용에 맞는 패턴을 참고한다.
-
----
-
-## Confirmed Style Rules (확정된 스타일 규칙 — 세션 테스트 완료)
-
-**폰트 크기 체계** — 점진적 축소 (heading API 대신 add_paragraph로 직접 제어):
-```
-대제목: 18pt bold CENTER (문서 타이틀)
-섹션 제목: 14pt bold primary색 (1. 2. 3. 번호 포함)
-본문: 11pt on-surface색 (2칸 들여쓰기)
-부제/캡션: 10pt on-surface-variant색
-참고/미주: 8pt outline-variant색
-```
-- heading API(24/18/16/14pt)는 크기 점프가 커서 균형이 안 맞음
-- add_paragraph(bold, font_size, text_color)로 직접 제어 권장
-
-**섹션 구성 패턴**:
-```python
-# 섹션 제목 — 번호 포함, primary 색상
-doc.add_paragraph('1. 섹션 제목', bold=True, font_size=14, text_color='#395da2')
-# 본문 — 바로 아래 (빈 줄 없음), 2칸 들여쓰기
-doc.add_paragraph('  본문 텍스트...', font_size=11, text_color='#2b3437')
-```
-- 섹션 제목과 본문 사이에 빈 줄 넣지 않음 (스페이싱 최소)
-- 본문 첫 줄에 `  ` (2칸) 들여쓰기
-
-**블릿 목록** — 텍스트 방식 (네이티브 블릿은 Whale에서 문자 무시됨):
-```python
-doc.add_bullet_list(['항목1', '항목2', '항목3'])
-# → "    - 항목1" 형태로 출력 (4칸 들여쓰기 + '-' 문자)
-# 블릿 문자 순서: '-' (기본), '•', '◦'
-# 본문보다 들여써서 계층 구분
-```
-
-**표 규칙**:
-- 데이터 행: CENTER 정렬 (프리셋 자동)
-- 헤더 행: CENTER + 볼드 + primary 배경 + 흰 텍스트 (프리셋 자동)
-- 짝수 행: 줄무늬 #f1f4f6 (프리셋 자동)
-- col_widths: 텍스트 길이에 맞게 LLM이 판단 (합계=42520)
-  - 짧은 컬럼(라벨 2~3글자): 7000~9000
-  - 긴 컬럼(설명 20글자+): 20000~30000
-- row_heights: 한 줄이면 2000, 여러 줄이면 3000~4000
-
-**페이지 나누기**: 표지→본문, 목차→본문에서만. 짧은 문서는 자연스럽게 흐르게.
-
-**색상 팔레트 (Administrative Slate 디자인 시스템)**:
-
-"The Digital Archivist" — 권위적이고 세련된 에디토리얼 톤.
-순검정(#000000) 사용 금지. 모든 텍스트는 on-surface(#2b3437) 사용.
-
-| 역할 | 이름 | 코드 | 용도 |
-|------|------|------|------|
-| **기본** | on-surface | #2b3437 | 본문 텍스트 (순검정 금지!) |
-| **보조** | on-surface-variant | #586064 | 메타데이터, 캡션, 날짜 |
-| **연한보조** | outline-variant | #abb3b7 | 구분선, 미주 |
-| **주 강조** | primary | #395da2 | 표 헤더, 섹션 제목, 악센트 |
-| **주 강조 위** | on-primary | #f7f7ff | primary 배경 위 텍스트 |
-| **하이라이트** | primary-container | #d8e2ff | 요약 박스, 핵심 정보 배경 |
-| **정보** | secondary-container | #cbe7f5 | 상태 칩, 정보 박스 |
-| **콜아웃** | tertiary-container | #e2dbfd | 인용, 편집자 주, 참고 |
-| **경고** | error | #9f403d | 기한, 경고, 중요 표시 |
-| **배경** | surface | #f8f9fa | 페이지 배경 (off-white) |
-| **2차 배경** | surface-container-low | #f1f4f6 | 표 교차행, 사이드 영역 |
-| **강조 배경** | surface-container-high | #e3e9ec | 강조 배경 |
-
-**색상 사용 원칙**:
-- 구분선: 테두리 대신 배경색 전환으로 영역 구분 (No-Line Rule)
-- 표 헤더: primary(#395da2) 배경 + on-primary(#f7f7ff) 흰색 볼드 텍스트
-- 하이라이트: primary-container(#d8e2ff) 연한 라벤더블루 배경
-- 콜아웃/인용: tertiary-container(#e2dbfd) 연보라 배경
-- 일정/기한: error(#9f403d) 강조
-- 단조로운 파란색 일색 금지 — 용도별로 primary/secondary/tertiary/error 구분 사용
 
 ---
 
@@ -208,88 +146,6 @@ doc.add_bullet_list(['항목1', '항목2', '항목3'])
 | **Convert HWP → HWPX** | `pyhwpxlib.hwp2hwpx.convert(hwp_path, hwpx_path)` |
 | Read HWP 5.x binary | `pyhwpxlib.hwp_reader.read_hwp()` |
 | Analyze form fields | `extract_schema()` + `analyze_schema_with_llm()` |
-
----
-
-## Interactive Workflow (대화형 문서 생성)
-
-사용자가 "한글 문서 만들어줘"라고 요청하면, 아래 단계를 순서대로 진행합니다.
-**AskUserQuestion 도구를 사용**하여 각 단계에서 사용자 선택을 받습니다.
-
-### Step 1: 문서 유형 선택
-
-```
-"어떤 유형의 문서를 만드시겠어요?"
-
-1. 정부 양식 — 신청서, 계약서, 허가서 (바탕 11pt, 160%)
-2. 공문서 — 기관 공문, 협조전, 통보서 (바탕 12pt, 160%)
-3. 기업 보고서 — 분석, 제안서, 실적 보고 (돋움 제목, 170%)
-4. 세무/법무 — 소장, 세금계산서, 등기 (바탕 12pt, 200%)
-5. 학술 논문 — 학위 논문, 학회 발표 (바탕 11pt, 170%)
-6. 자유 형식 — 직접 지정
-```
-
-→ 선택에 따라 Document Type Specifications의 스타일 자동 적용
-→ 유형별 상세 규격: [references/document_types.md](references/document_types.md)
-
-### Step 2: 양식/템플릿 선택
-
-```
-"어떤 양식을 사용하시겠어요?"
-
-1. 기본 템플릿으로 새로 만들기 — HwpxBuilder로 생성
-2. 기존 hwpx 파일 업로드 — 텍스트 교체 방식 (서식 100% 보존)
-3. 샘플에서 선택 — 미리 만든 양식 중 선택
-```
-
-→ 2번 선택 시: 파일 경로 입력 → extract_schema → 필드 분류
-→ 폼 자동화 상세: [references/form_automation.md](references/form_automation.md)
-
-### Step 3: 내용 입력
-
-**새로 만들기 (1번)**:
-```
-"문서 내용을 알려주세요."
-→ 제목, 본문 주제, 포함할 데이터 등을 자유롭게 입력
-→ 대화를 통해 내용 구성
-```
-
-**기존 양식 편집 (2번)** — 3가지 데이터 입력 방식:
-
-**방식 A: 대화형 (AskUserQuestion)**
-```
-"다음 필드에 데이터를 입력해주세요:"
-
-[성 명]     → 홍길동
-[주민등록번호] → 850101-1234567
-[사업체명]   → (주)블루오션
-[사업체유형]  → 민간기업 ☑ / 공공기관 ☐ / 지방자치단체 ☐
-```
-
-**방식 B: JSON 일괄 입력**
-```
-"데이터를 JSON으로 입력해주세요:"
-
-{
-  "성 명": "홍길동",
-  "주민등록번호": "850101-1234567",
-  "사업체명": "(주)블루오션",
-  "checks": ["민간기업"]
-}
-```
-→ 다건 생성 시 배열로: `[{...}, {...}, ...]`
-
-**방식 C: 파일 참조**
-```
-"데이터 파일 경로를 알려주세요:"
-→ CSV: data.csv (헤더행 = 필드명)
-→ JSON: data.json
-→ Excel → CSV 변환 후 사용
-```
-
-### Step 4~5: 생성 및 수정
-
-파일명 지정 → hwpx 생성 → Whale/한컴오피스로 열기 → 수정 반복.
 
 ---
 
@@ -435,7 +291,7 @@ DS['error']             # '#9f403d' — 경고
 
 ## Editing Existing Documents
 
-**Follow all 3 steps in order.**
+**Read [references/editing.md](references/editing.md) for full details.** 요약:
 
 ### Step 1: Unpack
 ```bash
@@ -657,3 +513,5 @@ python -m pyhwpxlib.update_skill backup
 | [references/api_full.md](references/api_full.md) | pyhwpxlib full function reference, XML reference, page sizes, size conversion table |
 | [references/document_types.md](references/document_types.md) | Document type specs (5 types), indent guide, TOC patterns, cover page patterns, document structure guide, table design guide |
 | [references/form_automation.md](references/form_automation.md) | fill_template, batch generate, schema extraction, checkbox patterns, advanced XML editing |
+| [references/design_guide.md](references/design_guide.md) | 주제별 색상 팔레트 10종, 레이아웃 패턴, 타이포그래피, QA 프로세스 |
+| [references/editing.md](references/editing.md) | 편집 워크플로우, XML 규칙, 흔한 실수, 양식 채우기, 고급 편집 (표 삽입, 섹션 추출) |
