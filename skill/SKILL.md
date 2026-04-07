@@ -77,7 +77,21 @@ doc.add_paragraph(제목, bold=True, font_size=18, text_color=PALETTE['primary']
 doc.save(파일명)
 ```
 Step E: `pyhwpxlib validate 파일명`
-Step F: AskUserQuestion — "Whale에서 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
+Step F: 자동 시각 검토 — HWPX → HTML → 스크린샷 → Claude가 직접 확인
+```python
+from pyhwpxlib.api import convert_hwpx_to_html
+convert_hwpx_to_html(파일명, '/tmp/hwpx_preview.html')
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    page = browser.new_page(viewport={'width': 800, 'height': 1200})
+    page.goto('file:///tmp/hwpx_preview.html')
+    page.wait_for_timeout(1000)
+    page.screenshot(path='/tmp/hwpx_preview.png', full_page=True)
+    browser.close()
+# Read tool로 /tmp/hwpx_preview.png 확인 → 문제 발견 시 자동 수정
+```
+Step G: AskUserQuestion — "Whale에서도 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
 
 **워크플로우 [2] 기존 문서 편집**:
 
