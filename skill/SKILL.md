@@ -15,6 +15,16 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 위 규칙을 어기면 Whale/한컴오피스에서 파일이 열리지 않거나 서식이 깨진다.
 
+## 디자인 규칙 — 새 문서 생성 시 반드시 적용
+
+지루한 문서를 만들지 마라. 자세한 가이드: [references/design_guide.md](references/design_guide.md)
+
+1. **주제에 맞는 색상을 선택한다** — 파란색 디폴트 금지. design_guide.md에 10종 팔레트 있음
+2. **매 섹션마다 시각 요소** — 텍스트만 있는 섹션 금지. 표/박스/목록/수치 중 최소 1개
+3. **같은 레이아웃 반복 금지** — 표→목록→박스→인용문 순환
+4. **AI 생성 패턴 피하기** — 제목 아래 악센트 라인, 매번 같은 표지, 모든 섹션 동일 구조
+5. **QA 필수** — 생성 후 validate + 사용자에게 Whale 확인 요청. 문제가 있다고 가정하고 찾는다
+
 ---
 
 ## On Load — 스킬 로드 시 즉시 실행
