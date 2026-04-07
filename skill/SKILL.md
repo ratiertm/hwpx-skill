@@ -7,7 +7,9 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 
 ## On Load — 스킬 로드 시 즉시 실행
 
-이 스킬이 로드되면, 사용자의 메시지에 구체적인 작업이 포함되어 있지 않은 경우 **즉시 AskUserQuestion으로 작업을 물어본다**:
+이 스킬이 로드되면 **반드시** 아래 흐름을 따른다. 이 단계를 건너뛰지 않는다.
+
+사용자의 메시지에 구체적인 작업이 포함되어 있지 않은 경우, **반드시 AskUserQuestion을 호출**하여 작업을 물어본다:
 
 ```
 "어떤 작업을 하시겠어요?"
@@ -18,7 +20,7 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 4. 문서 변환 — MD→HWPX, HTML→HWPX, HWPX→HTML, HWP 5.x 읽기
 ```
 
-사용자가 이미 구체적인 요청을 했으면 (예: "이 hwp 파일 읽어줘", "보고서 만들어줘") 질문 없이 바로 해당 작업을 진행한다.
+사용자가 이미 구체적인 요청을 했으면 (예: "이 hwp 파일 읽어줘", "보고서 만들어줘") 질문 없이 바로 해당 작업을 진행한다. 단, 해당 워크플로우의 각 단계는 **반드시 AskUserQuestion으로 진행**한다 — 단계를 건너뛰고 혼자 판단하지 않는다.
 
 **선택별 워크플로우** — 모든 단계에서 AskUserQuestion 사용:
 
