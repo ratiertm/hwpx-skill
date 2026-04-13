@@ -13,6 +13,7 @@ Usage:
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -21,6 +22,17 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from fastmcp import FastMCP
+
+# Project root for resolving relative paths
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
+def _abs(path: str) -> str:
+    """Resolve relative paths against project root."""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(_PROJECT_ROOT, path)
+
 
 mcp = FastMCP("hangul-docs", instructions="Korean 한/글 document tools — create, edit, fill forms, preview")
 
@@ -33,7 +45,7 @@ def hwpx_to_json(file: str, section: int | None = None) -> str:
     for token efficiency. Returns JSON string.
     """
     from pyhwpxlib.json_io import to_json
-    result = to_json(file, section_idx=section)
+    result = to_json(_abs(file), section_idx=section)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
@@ -46,7 +58,7 @@ def hwpx_from_json(data: str, output: str) -> str:
     """
     from pyhwpxlib.json_io import from_json
     parsed = json.loads(data) if isinstance(data, str) else data
-    return from_json(parsed, output)
+    return from_json(parsed, _abs(output))
 
 
 @mcp.tool()
@@ -58,7 +70,7 @@ def hwpx_patch(file: str, section: int, edits: str, output: str) -> str:
     """
     from pyhwpxlib.json_io import patch
     edit_dict = json.loads(edits) if isinstance(edits, str) else edits
-    return patch(file, section, edit_dict, output)
+    return patch(_abs(file), section, edit_dict, _abs(output))
 
 
 @mcp.tool()
@@ -71,7 +83,7 @@ def hwpx_inspect(file: str) -> str:
     from pyhwpxlib.json_io import to_json
     from pyhwpxlib.api import extract_text
 
-    doc = to_json(file)
+    doc = to_json(_abs(file))
     sections = doc.get("sections", [])
 
     info = {
@@ -94,7 +106,7 @@ def hwpx_inspect(file: str) -> str:
             "landscape": ps.get("landscape", "WIDELY"),
         })
 
-    text = extract_text(file)
+    text = extract_text(_abs(file))
     info["text_preview"] = text[:300] + ("..." if len(text) > 300 else "")
     info["text_length"] = len(text)
 
@@ -158,12 +170,19 @@ def hwpx_build_step(actions: str, step_name: str = "", output: str = "/tmp/hwpx_
         elif t == "numbered_list":
             b.add_numbered_list(act["items"])
 
-    b.save(output)
-    pages = render_pages(output, "/tmp")
+    b.save(_abs(output))
+    pages = render_pages(_abs(output), "/tmp")
+
+    # Embed PNG as base64 for Claude Desktop visibility
+    for p in pages:
+        png_path = p.get("png", "")
+        if os.path.exists(png_path):
+            with open(png_path, "rb") as f:
+                p["png_base64"] = base64.b64encode(f.read()).decode("ascii")
 
     return json.dumps({
         "step": step_name,
-        "output": output,
+        "output": _abs(output),
         "actions_count": len(action_list),
         "pages": pages,
     }, ensure_ascii=False, indent=2)
@@ -178,7 +197,15 @@ def hwpx_preview(file: str, out_dir: str = "/tmp") -> str:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
     from scripts.preview import render_pages
 
-    results = render_pages(file, out_dir)
+    results = render_pages(_abs(file), out_dir)
+
+    # Embed PNG as base64 for Claude Desktop visibility
+    for r in results:
+        png_path = r.get("png", "")
+        if os.path.exists(png_path):
+            with open(png_path, "rb") as f:
+                r["png_base64"] = base64.b64encode(f.read()).decode("ascii")
+
     return json.dumps(results, ensure_ascii=False, indent=2)
 
 
@@ -200,7 +227,7 @@ def hwpx_fill_form(file: str, mappings: str, output: str) -> str:
     from templates.form_pipeline import fill_by_labels
 
     mapping_dict = json.loads(mappings) if isinstance(mappings, str) else mappings
-    result = fill_by_labels(file, mapping_dict, output)
+    result = fill_by_labels(_abs(file), mapping_dict, _abs(output))
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
@@ -217,7 +244,7 @@ def hwpx_analyze_form(file: str) -> str:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
     from templates.form_pipeline import extract_form, find_cell_by_label
 
-    form = extract_form(file)
+    form = extract_form(_abs(file))
     fields = []
 
     for ti, tbl in enumerate(form.get('tables', [])):
@@ -267,11 +294,11 @@ def hwpx_validate(file: str) -> str:
     issues = []
     info = {"file": os.path.basename(file), "valid": True, "issues": issues}
 
-    if not os.path.exists(file):
-        return json.dumps({"file": file, "valid": False, "issues": ["File not found"]})
+    if not os.path.exists(_abs(file)):
+        return json.dumps({"file": _abs(file), "valid": False, "issues": ["File not found"]})
 
     try:
-        with zipfile.ZipFile(file) as z:
+        with zipfile.ZipFile(_abs(file)) as z:
             names = z.namelist()
 
             # Check mimetype
