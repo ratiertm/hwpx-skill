@@ -911,3 +911,109 @@ shapeComment → drawText 순서 역전 시 한/글 parse error.
 | `BREAK_WORD` | 한글 글자 간격이 비정상적으로 퍼짐 |
 
 pyhwpxlib에서 기본값으로 `KEEP_WORD`를 사용하고 있으나, 외부 파일 편집 시 이 값이 변경되지 않도록 주의.
+
+## 34. fwSpace/nbSpace/hyphen는 extended control이 아님 (2026-04-13 수정)
+
+HWP 바이너리의 특수 문자 코드:
+- `0x1F` (31) = fwSpace (전각 공백)
+- `0x1E` (30) = nbSpace (비분리 공백)
+- `0x18` (24) = hyphen (하이픈)
+
+이 문자들은 범위 1~31이지만 **extended control이 아님**. 텍스트 파싱과 런 생성 양쪽에서 제외 필요.
+
+### 잘못된 처리 (버그)
+```python
+# ❌ fwSpace(31)가 extended로 분류됨
+if 1 <= ch <= 31 and ch not in (_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END):
+    i += 14   # 뒤 14바이트 스킵 → 다음 글자 소실!
+    pos += 8
+```
+
+### 올바른 처리
+```python
+# ✅ fwSpace/nbSpace/hyphen도 제외
+if 1 <= ch <= 31 and ch not in (_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END,
+                                 _CH_FWSPACE, _CH_NBSPACE, _CH_HYPHEN):
+    i += 14
+    pos += 8
+```
+
+### 실패 사례
+"성 명(단체명)" → "성 (단체명)" (명 누락). fwSpace 뒤 14바이트 스킵으로 "명" 소실.
+hwp2hwpx.py 4곳에서 동일 패턴 수정 필요 (upstream commit `3e1ed48`).
+
+## 35. 빈 셀 채우기: cellAddr 앵커 기반 patch
+
+빈 셀(`<hp:t/>`)에 값을 넣으려면 `>old<` → `>new<` 문자열 교체가 안 됨.
+cellAddr로 정확한 `<hp:tc>` 블록을 찾아 `<hp:t/>`를 `<hp:t>값</hp:t>`로 교체.
+
+```python
+def _patch_empty_cell(xml, col, row, value):
+    addr = f'colAddr="{col}" rowAddr="{row}"'
+    addr_idx = xml.find(addr)
+    tc_start = xml.rfind('<hp:tc', 0, addr_idx)
+    tc_end = xml.find('</hp:tc>', addr_idx) + len('</hp:tc>')
+    block = xml[tc_start:tc_end]
+    block = block.replace('<hp:t/>', f'<hp:t>{value}</hp:t>', 1)
+    return xml[:tc_start] + block + xml[tc_end:]
+```
+
+### 빈 셀의 3가지 형태
+- `<hp:t/>` (self-closing)
+- `<hp:t></hp:t>` (빈 텍스트 노드)
+- `<hp:t>   </hp:t>` (공백만 — regex로 매칭)
+
+### 특수 문자 이스케이프 필수
+```python
+value = value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+```
+
+참고 구현: `templates/form_pipeline.py`의 `_patch_empty_cell()`, `fill_by_labels()`
+
+## 36. 라벨 기반 셀 탐색 시 colSpan 반영 필수
+
+`find_cell_by_label()`로 라벨 옆 셀을 찾을 때, 라벨 셀의 colSpan/rowSpan을 고려해야 함.
+
+```
+예: "1. 행정예고 제목" (r1c0, colSpan=3)
+    오른쪽 셀 = c0 + colSpan(3) = c3 ← ✅
+    c0 + 1 = c1 ← ❌ (병합 영역 안)
+```
+
+```python
+if direction == 'right':
+    target_col = cell['col'] + cell.get('colSpan', 1)  # colSpan 반영
+elif direction == 'down':
+    target_row = cell['row'] + cell.get('rowSpan', 1)  # rowSpan 반영
+```
+
+## 37. 단계별 빌드 프리뷰 패턴
+
+문서 생성 시 매 단계마다 저장 → SVG 렌더 → PNG 표시로 사용자에게 진행 상황을 보여줌.
+PPTX 슬라이드 빌드처럼 점진적 시각 확인 가능.
+
+### 패턴
+```python
+doc = HwpxBuilder()
+
+# Step 1: 제목
+doc.add_heading("보고서", level=1)
+doc.save("/tmp/step1.hwpx")
+render_pages("/tmp/step1.hwpx", "/tmp")  # → PNG → Read → 사용자에게 보여줌
+
+# Step 2: 표 추가
+doc.add_table([["항목", "값"], ["매출", "100억"]])
+doc.save("/tmp/step2.hwpx")
+render_pages("/tmp/step2.hwpx", "/tmp")  # → 다시 보여줌
+
+# Step N: 완료
+doc.save("final.hwpx")
+```
+
+### MCP 서버
+`hwpx_build_step` tool로 자동화됨 — JSON action 배열을 보내면 빌드 + 프리뷰 한 번에 반환.
+
+### 주의
+- 매 step마다 전체 문서를 재빌드 (HwpxBuilder는 중간 로드 불가)
+- 2~3초/step 소요 (save + rhwp render + resvg)
+- 4~5단계 이상이면 사용자에게 "전체 빌드 후 한 번에 보여줄까요?" 확인

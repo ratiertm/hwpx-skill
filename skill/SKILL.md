@@ -509,6 +509,10 @@ doc = read_hwp("file.hwp")
 | 18 | TextBox = `hp:rect` + `hp:drawText`, shapeComment 선행 필수 | 순서 역전 시 parse error |
 | 19 | Polygon 꼭짓점: 마지막 점 = 첫 점 (닫힘) | 누락 시 열린 도형 |
 | 20 | breakNonLatinWord = `KEEP_WORD` 필수 | `BREAK_WORD` 시 글자 퍼짐 |
+| 21 | fwSpace/nbSpace/hyphen는 extended control 아님 | 뒤 14바이트 스킵 → 텍스트 소실 |
+| 22 | 빈 셀 채우기: cellAddr 앵커 + `<hp:t/>` 교체 | 문자열 교체 불가, `_patch_empty_cell()` 사용 |
+| 23 | 라벨 탐색 시 colSpan/rowSpan 반영 | 병합 셀 무시하면 잘못된 위치 |
+| 24 | 단계별 빌드 프리뷰: save → render → Read PNG | `hwpx_build_step` MCP tool 또는 수동 루프 |
 
 ---
 
