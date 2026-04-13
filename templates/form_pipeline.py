@@ -1282,6 +1282,203 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
 
 
 # ============================================================
+# Label-based cell navigation (inspired by airmang/python-hwpx v2.9.0)
+# ============================================================
+
+_WS_RE = re.compile(r'\s+')
+
+def _normalize_label(text: str) -> str:
+    """Normalize label text for fuzzy matching.
+
+    - Collapse whitespace ("성  명" → "성 명")
+    - Case-fold ("ABC" → "abc")
+    - Strip trailing colons ("성명:" → "성명")
+    """
+    normalized = _WS_RE.sub(' ', text).strip().casefold()
+    while normalized.endswith((':', '：')):
+        normalized = normalized[:-1].rstrip()
+    return normalized
+
+
+def find_cell_by_label(form_data: dict, label_text: str, direction: str = 'right'):
+    """Find a cell by label text and return the adjacent cell in the given direction.
+
+    Args:
+        form_data: Output of extract_form()
+        label_text: Label to search for (fuzzy matched)
+        direction: 'right', 'left', 'up', 'down'
+
+    Returns:
+        dict with {table_idx, label_cell, target_cell} or None if not found.
+    """
+    target = _normalize_label(label_text)
+    if not target:
+        return None
+
+    deltas = {'right': (0, 1), 'left': (0, -1), 'down': (1, 0), 'up': (-1, 0)}
+    dr, dc = deltas.get(direction, (0, 1))
+
+    for ti, tbl in enumerate(form_data.get('tables', [])):
+        cells = tbl.get('cells', [])
+        if not cells:
+            continue
+        rows = tbl.get('row_count') or (max(c['row'] for c in cells) + 1)
+        cols = tbl.get('col_count') or (max(c['col'] for c in cells) + 1)
+        for cell in tbl.get('cells', []):
+            cell_text = ' '.join(
+                r.get('text', '') for line in cell.get('lines', []) for r in line.get('runs', [])
+            )
+            if _normalize_label(cell_text) != target:
+                continue
+            # Found label — move to adjacent cell (accounting for span)
+            cs = cell.get('colSpan', 1)
+            rs = cell.get('rowSpan', 1)
+            if direction == 'right':
+                tr, tc = cell['row'], cell['col'] + cs
+            elif direction == 'left':
+                tr, tc = cell['row'], cell['col'] - 1
+            elif direction == 'down':
+                tr, tc = cell['row'] + rs, cell['col']
+            elif direction == 'up':
+                tr, tc = cell['row'] - 1, cell['col']
+            else:
+                tr = cell['row'] + dr
+                tc = cell['col'] + dc
+            if 0 <= tr < rows and 0 <= tc < cols:
+                # Find the target cell
+                for adj in tbl['cells']:
+                    if adj['row'] == tr and adj['col'] == tc:
+                        adj_text = ' '.join(
+                            r.get('text', '') for line in adj.get('lines', [])
+                            for r in line.get('runs', [])
+                        )
+                        return {
+                            'table_index': ti,
+                            'label_cell': {'row': cell['row'], 'col': cell['col'], 'text': cell_text.strip()},
+                            'target_cell': {'row': tr, 'col': tc, 'text': adj_text.strip()},
+                        }
+    return None
+
+
+def _patch_empty_cell(xml: str, col: int, row: int, value: str) -> str:
+    """Insert value into an empty cell identified by cellAddr.
+
+    Finds the <hp:tc> block containing cellAddr(col, row),
+    then replaces the first empty <hp:t/> or <hp:t></hp:t> with <hp:t>value</hp:t>.
+    """
+    addr = f'colAddr="{col}" rowAddr="{row}"'
+    addr_idx = xml.find(addr)
+    if addr_idx < 0:
+        return xml
+
+    tc_start = xml.rfind('<hp:tc', 0, addr_idx)
+    tc_end = xml.find('</hp:tc>', addr_idx) + len('</hp:tc>')
+    block = xml[tc_start:tc_end]
+
+    if '<hp:t/>' in block:
+        block = block.replace('<hp:t/>', f'<hp:t>{value}</hp:t>', 1)
+    elif '<hp:t></hp:t>' in block:
+        block = block.replace('<hp:t></hp:t>', f'<hp:t>{value}</hp:t>', 1)
+    else:
+        import re
+        block = re.sub(r'<hp:t>\s*</hp:t>', f'<hp:t>{value}</hp:t>', block, count=1)
+
+    return xml[:tc_start] + block + xml[tc_end:]
+
+
+def fill_by_labels(hwpx_path: str, mappings: dict, output_path: str) -> dict:
+    """Fill form cells using label-based paths.
+
+    Args:
+        hwpx_path: Input HWPX/OWPML file
+        mappings: {"라벨>방향": "값", ...}
+            예: {"성 명>right": "홍길동", "전화번호>right": "010-1234-5678"}
+            방향 생략 시 기본 right: {"성 명": "홍길동"}
+        output_path: Output HWPX file
+
+    Returns:
+        dict with applied/failed counts and details.
+    """
+    import subprocess
+
+    form_data = extract_form(hwpx_path)
+    applied = []
+    failed = []
+
+    # Build text replacement map + empty cell patches
+    replacements = {}
+    empty_cell_patches = []
+    for path, value in mappings.items():
+        parts = [p.strip() for p in path.split('>')]
+        label = parts[0]
+        direction = parts[1] if len(parts) > 1 else 'right'
+
+        result = find_cell_by_label(form_data, label, direction)
+        if result is None:
+            failed.append({'path': path, 'reason': 'label not found or target out of bounds'})
+            continue
+
+        old_text = result['target_cell']['text']
+        # Build XML replacement: >{old}< → >{new}<
+        if old_text:
+            replacements[f'>{old_text}<'] = f'>{value}<'
+        else:
+            # Empty cell — use cellAddr-anchored patch
+            target_col = result['target_cell']['col']
+            target_row = result['target_cell']['row']
+            escaped = value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            empty_cell_patches.append((target_col, target_row, escaped))
+            applied.append({
+                'path': path,
+                'table_index': result['table_index'],
+                'old_value': '',
+                'new_value': value,
+            })
+            continue
+
+        applied.append({
+            'path': path,
+            'table_index': result['table_index'],
+            'old_value': old_text,
+            'new_value': value,
+        })
+
+    # Apply replacements + empty cell patches via unpack → edit → pack
+    if replacements or empty_cell_patches:
+        import shutil, tempfile
+        work = tempfile.mkdtemp(prefix='fill_labels_')
+        try:
+            subprocess.run(
+                [sys.executable, '-m', 'pyhwpxlib', 'unpack', hwpx_path, '-o', work],
+                check=True, capture_output=True,
+            )
+            sec = os.path.join(work, 'Contents', 'section0.xml')
+            with open(sec, 'r', encoding='utf-8') as f:
+                xml = f.read()
+            for old, new in replacements.items():
+                xml = xml.replace(old, new, 1)
+            for col, row, value in empty_cell_patches:
+                xml = _patch_empty_cell(xml, col, row, value)
+            with open(sec, 'w', encoding='utf-8') as f:
+                f.write(xml)
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+            subprocess.run(
+                [sys.executable, '-m', 'pyhwpxlib', 'pack', work, '-o', output_path],
+                check=True, capture_output=True,
+            )
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    return {
+        'applied': applied,
+        'failed': failed,
+        'applied_count': len(applied),
+        'failed_count': len(failed),
+    }
+
+
+# ============================================================
 # CLI
 # ============================================================
 

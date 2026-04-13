@@ -25,9 +25,9 @@ FORMS_WITH_BODY_TEXT = [
 ]
 
 MULTI_RUN_FORMS = [
-    ("녹색환경", "녹색환경지원센터 설립ㆍ운영에 관한 규정(안).owpml"),
-    ("20250224", "20250224112049_9119844.owpml"),
-    ("ibgopongdang", "ibgopongdang_230710.owpml"),
+    ("녹색환경", "samples/녹색환경지원센터 설립ㆍ운영에 관한 규정(안).owpml"),
+    ("20250224", "samples/20250224112049_9119844.owpml"),
+    ("ibgopongdang", "samples/ibgopongdang_230710.owpml"),
 ]
 
 

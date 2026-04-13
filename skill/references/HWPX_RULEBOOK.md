@@ -774,3 +774,140 @@ cd = int(pp.get('condense', '0'))
 if cd:
     info['condense'] = cd
 ```
+
+## 28. 표 높이/너비: `<hp:sz>`와 `<hp:cellSz>` 동시 수정 (2026-04-11 검증)
+
+HWPX `<hp:tbl>`은 **두 개의 독립된 크기 필드**를 가지며, 표 크기 변경 시 **반드시 둘 다** 같은 값으로 업데이트해야 한다.
+
+```xml
+<hp:tbl id="..." rowCnt="1" colCnt="1" ...>
+  <hp:sz width="42520" height="2000" ... />   <!-- (A) 캔버스상 박스 크기 -->
+  <hp:pos .../>
+  <hp:tr>
+    <hp:tc ...>
+      <hp:subList>...</hp:subList>
+      <hp:cellSz width="42520" height="6000" /> <!-- (B) 내부 셀 크기 -->
+    </hp:tc>
+  </hp:tr>
+</hp:tbl>
+```
+
+### 역할
+- **(A) `<hp:sz>`** — 표 전체가 페이지에서 차지하는 박스. **rhwp WASM/외부 렌더러가 시각 박스 경계로 사용**.
+- **(B) `<hp:cellSz>`** — 특정 셀의 내부 공간. 한/글 에디터가 레이아웃 계산에 사용.
+
+### 실패 사례
+강조 박스(1x1 표)의 텍스트가 박스 밖으로 넘쳐 `<hp:cellSz height>`만 2000→15000까지 올려도 **렌더 결과 완전 동일**. 원인은 `<hp:sz height="2000">`이 그대로 → 렌더러가 여전히 2000 높이로 박스를 그림.
+
+### 필수 수정 패턴
+```python
+# 표 ID로 특정한 뒤 두 필드 모두 치환
+for tbl_id, new_h in targets:
+    # (A) hp:sz
+    pat_sz = re.compile(
+        r'(<hp:tbl[^>]*\bid="' + re.escape(tbl_id)
+        + r'"[^>]*>.*?<hp:sz[^/]*?\bheight=")(\d+)(")',
+        re.DOTALL,
+    )
+    xml = pat_sz.sub(rf"\g<1>{new_h}\g<3>", xml, count=1)
+    # (B) hp:cellSz
+    pat_cell = re.compile(
+        r'(<hp:tbl[^>]*\bid="' + re.escape(tbl_id)
+        + r'"[^>]*>.*?<hp:cellSz[^/]*?\bheight=")(\d+)(")',
+        re.DOTALL,
+    )
+    xml = pat_cell.sub(rf"\g<1>{new_h}\g<3>", xml, count=1)
+```
+
+### 체크리스트
+- [ ] 표 높이/너비 변경 시 `<hp:sz>`와 `<hp:cellSz>` **양쪽** 업데이트?
+- [ ] 변경 후 rhwp 프리뷰로 시각 검증?
+- [ ] 병합 셀(rowSpan/colSpan)인 경우 span 범위의 합으로 계산?
+
+참고 구현: `scripts/fix_ai_report.py`
+
+## 29. HWP Color는 BGR 바이트 오더 (2026-04-14 검증)
+
+HWP 바이너리의 색상값은 Windows COLORREF 형식: **0x00BBGGRR** (BGR).
+`0x00FF0000`은 빨간색이 아니라 **파란색**.
+
+| HWP (BGR) | RGB | 의미 |
+|-----------|-----|------|
+| `0x0000FF` | `#FF0000` | 빨간색 |
+| `0xFF0000` | `#0000FF` | 파란색 |
+| `0x00FF00` | `#00FF00` | 초록색 (동일) |
+
+### 변환 함수 (hwp2hwpx.py:3760)
+```python
+def _colorref_to_hex(val: int) -> str:
+    r = val & 0xFF
+    g = (val >> 8) & 0xFF
+    b = (val >> 16) & 0xFF
+    return "#%02X%02X%02X" % (r, g, b)
+```
+
+### 주의
+- charPr의 textColor, underlineColor, shadeColor, shadowColor, strikeoutColor 전부 BGR
+- borderFill의 border color, fill color도 BGR
+- HWPX XML에서는 `#RRGGBB` 형식으로 저장 (변환 필수)
+
+## 30. landscape 값 반전: WIDELY=세로, NARROWLY=가로
+
+HWPX `pagePr[@landscape]` 값이 **직관과 반대**:
+
+| 값 | 실제 의미 |
+|----|----------|
+| `WIDELY` | **세로** (portrait) |
+| `NARROWLY` | **가로** (landscape) |
+
+```python
+if landscape:
+    page_pr.landscape = "NARROWLY"   # 가로 — 이름과 반대!
+else:
+    page_pr.landscape = "WIDELY"     # 세로 — 이름과 반대!
+```
+
+width/height를 교환하면 안 됨 — landscape 값만 바꾸면 렌더러가 알아서 처리.
+
+## 31. TextBox = hp:rect + hp:drawText (control 아님)
+
+HWPX에서 텍스트 박스는 독립 control이 아니라 `<hp:rect>` 안에 `<hp:drawText>`를 넣는 구조.
+
+### 필수 요소 순서
+```xml
+<hp:rect ...>
+  <hp:sz .../>
+  <hp:pos .../>
+  <hp:outMargin .../>
+  <hp:shapeComment></hp:shapeComment>   <!-- 1. 필수 (빈 문자열이라도) -->
+  <hp:drawText ...>                      <!-- 2. shapeComment 뒤에 -->
+    <hp:subList ...>
+      <hp:p ...>...</hp:p>
+    </hp:subList>
+  </hp:drawText>
+</hp:rect>
+```
+
+shapeComment → drawText 순서 역전 시 한/글 parse error.
+
+## 32. Polygon 첫 꼭짓점 반복 필수
+
+`<hp:polygon>` 또는 `<hc:polygon>`의 꼭짓점 목록에서 **마지막 점 = 첫 번째 점**이어야 닫힌 도형.
+
+```
+삼각형: pt1, pt2, pt3, pt1 (4점 — 3꼭짓점 + 닫힘)
+사각형: pt1, pt2, pt3, pt4, pt1 (5점)
+```
+
+닫힘 점 누락 시 도형이 열린 상태로 렌더됨 (선만 남음).
+
+## 33. breakNonLatinWord = KEEP_WORD
+
+`<hh:breakSetting>`에서 `breakNonLatinWord`는 **반드시 `KEEP_WORD`** 사용.
+
+| 값 | 결과 |
+|----|------|
+| `KEEP_WORD` | 정상 — 단어 단위 줄바꿈 |
+| `BREAK_WORD` | 한글 글자 간격이 비정상적으로 퍼짐 |
+
+pyhwpxlib에서 기본값으로 `KEEP_WORD`를 사용하고 있으나, 외부 파일 편집 시 이 값이 변경되지 않도록 주의.

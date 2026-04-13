@@ -211,13 +211,24 @@ def _write_t_item(xsb: XMLStringBuilder, item: Any) -> None:
         xsb.close_element()
     elif ot == ObjectType.hp_tab:
         xsb.open_element(EN.hp_tab)
-        xsb.attribute(AN.width, item.width)
+        if item.width is not None:
+            xsb.attribute(AN.width, item.width)
         leader = getattr(item, "leader", None)
         if leader is not None:
-            xsb.attribute_index(AN.leader, leader)
+            if isinstance(leader, int):
+                xsb.attribute(AN.leader, leader)
+            elif isinstance(leader, str):
+                xsb.attribute(AN.leader, leader)
+            elif hasattr(leader, "index") and not callable(leader.index):
+                xsb.attribute(AN.leader, str(leader.index))
+            else:
+                xsb.attribute_index(AN.leader, leader)
         tab_type = getattr(item, "type", None)
         if tab_type is not None:
-            xsb.attribute_index(AN.type, tab_type)
+            if isinstance(tab_type, int):
+                xsb.attribute(AN.type, tab_type)
+            else:
+                xsb.attribute_index(AN.type, tab_type)
         xsb.close_element()
     elif ot == ObjectType.hp_lineBreak:
         xsb.open_element(EN.hp_lineBreak)
@@ -400,6 +411,8 @@ def _write_parameter(xsb: XMLStringBuilder, p: Any) -> None:
 def _write_header_footer(xsb: XMLStringBuilder, hf: Any, ot: ObjectType) -> None:
     elem = EN.hp_header if ot == ObjectType.hp_header else EN.hp_footer
     xsb.open_element(elem)
+    xsb.attribute(AN.id, getattr(hf, "id", None))
+    xsb.attribute(AN.applyPageType, hf.applyPageType if hasattr(hf, "applyPageType") else getattr(hf, "apply_page_type", None))
 
     sub_list = getattr(hf, "subList", getattr(hf, "sub_list", None))
     if sub_list is not None:
@@ -423,6 +436,15 @@ def _write_auto_num(xsb: XMLStringBuilder, an: Any) -> None:
     xsb.open_element(EN.hp_autoNum)
     xsb.attribute(AN.numType, an.numType if hasattr(an, "numType") else getattr(an, "num_type", None))
     xsb.attribute(AN.num, an.num)
+    anf = getattr(an, "autoNumFormat", getattr(an, "auto_num_format", None))
+    if anf is not None:
+        xsb.open_element(EN.hp_autoNumFormat)
+        xsb.attribute(AN.type, anf.type)
+        xsb.attribute(AN.userChar, anf.userChar if hasattr(anf, "userChar") else getattr(anf, "user_char", None))
+        xsb.attribute(AN.prefixChar, anf.prefixChar if hasattr(anf, "prefixChar") else getattr(anf, "prefix_char", None))
+        xsb.attribute(AN.suffixChar, anf.suffixChar if hasattr(anf, "suffixChar") else getattr(anf, "suffix_char", None))
+        xsb.attribute(AN.supscript, anf.supscript)
+        xsb.close_element()
     xsb.close_element()
 
 
@@ -452,6 +474,7 @@ def _write_page_hiding(xsb: XMLStringBuilder, ph: Any) -> None:
 
 def _write_page_num(xsb: XMLStringBuilder, pn: Any) -> None:
     xsb.open_element(EN.hp_pageNum)
+    xsb.attribute(AN.pos, pn.pos if hasattr(pn, "pos") else None)
     xsb.attribute(AN.formatType, pn.formatType if hasattr(pn, "formatType") else getattr(pn, "format_type", None))
     xsb.attribute(AN.sideChar, pn.sideChar if hasattr(pn, "sideChar") else getattr(pn, "side_char", None))
     xsb.close_element()
@@ -780,34 +803,30 @@ def _write_tc(xsb: XMLStringBuilder, tc: Any) -> None:
 # ======================================================================
 
 def _write_picture(xsb: XMLStringBuilder, pic: Any) -> None:
+    """Write <hp:pic> following HWPX schema order:
+    AbstractShapeComponent (offset..renderingInfo) -> PictureType children
+    -> AbstractShapeObject (sz, pos, outMargin, caption, shapeComment).
+    """
     xsb.open_element(EN.hp_pic)
     _write_shape_object_attrs(xsb, pic)
+    xsb.attribute(
+        AN.href,
+        getattr(pic, "href", None) if getattr(pic, "href", None) is not None else "",
+    )
+    xsb.attribute(
+        AN.groupLevel,
+        getattr(pic, "groupLevel", getattr(pic, "group_level", None)) or 0,
+    )
+    xsb.attribute(
+        AN.instid,
+        getattr(pic, "instid", getattr(pic, "inst_id", None)) or "0",
+    )
     xsb.attribute(AN.reverse, pic.reverse)
 
-    _write_shape_object_children(xsb, pic)
-
-    # Shape component attributes
+    # 1) Shape component base fields FIRST
     _write_shape_component(xsb, pic)
 
-    # lineShape
-    ls = getattr(pic, "lineShape", getattr(pic, "line_shape", None))
-    if ls is not None:
-        xsb.open_element(EN.hp_lineShape)
-        xsb.attribute(AN.color, ls.color)
-        xsb.attribute(AN.width, ls.width)
-        xsb.attribute(AN.style, ls.style)
-        xsb.attribute(AN.endCap, ls.endCap if hasattr(ls, "endCap") else getattr(ls, "end_cap", None))
-        xsb.attribute(AN.headStyle, ls.headStyle if hasattr(ls, "headStyle") else getattr(ls, "head_style", None))
-        xsb.attribute(AN.tailStyle, ls.tailStyle if hasattr(ls, "tailStyle") else getattr(ls, "tail_style", None))
-        xsb.attribute(AN.headfill, getattr(ls, "headfill", getattr(ls, "head_fill", None)))
-        xsb.attribute(AN.tailfill, getattr(ls, "tailfill", getattr(ls, "tail_fill", None)))
-        xsb.attribute(AN.headSz, ls.headSz if hasattr(ls, "headSz") else getattr(ls, "head_sz", None))
-        xsb.attribute(AN.tailSz, ls.tailSz if hasattr(ls, "tailSz") else getattr(ls, "tail_sz", None))
-        xsb.attribute(AN.outlineStyle, ls.outlineStyle if hasattr(ls, "outlineStyle") else getattr(ls, "outline_style", None))
-        xsb.attribute(AN.alpha, ls.alpha)
-        xsb.close_element()
-
-    # imgRect
+    # 2) Picture-specific children: imgRect, imgClip, inMargin, imgDim, hc:img
     ir = getattr(pic, "imgRect", getattr(pic, "img_rect", None))
     if ir is not None:
         xsb.open_element(EN.hp_imgRect)
@@ -817,7 +836,6 @@ def _write_picture(xsb: XMLStringBuilder, pic: Any) -> None:
                 _write_x_and_y(xsb, getattr(EN, f"hc_{pt_name}"), pt)
         xsb.close_element()
 
-    # imgClip
     ic = getattr(pic, "imgClip", getattr(pic, "img_clip", None))
     if ic is not None:
         xsb.open_element(EN.hp_imgClip)
@@ -826,20 +844,48 @@ def _write_picture(xsb: XMLStringBuilder, pic: Any) -> None:
         xsb.attribute(AN.top, ic.top)
         xsb.attribute(AN.bottom, ic.bottom)
         xsb.close_element()
+    else:
+        # imgClip is required by schema; emit default zeros.
+        xsb.open_element(EN.hp_imgClip)
+        xsb.attribute(AN.left, 0)
+        xsb.attribute(AN.top, 0)
+        xsb.attribute(AN.right, 0)
+        xsb.attribute(AN.bottom, 0)
+        xsb.close_element()
 
-    # imgDim
+    in_margin = getattr(pic, "inMargin", getattr(pic, "in_margin", None))
+    if in_margin is not None:
+        _write_left_right_top_bottom(xsb, EN.hp_inMargin, in_margin)
+    else:
+        xsb.open_element(EN.hp_inMargin)
+        xsb.attribute(AN.left, 0)
+        xsb.attribute(AN.right, 0)
+        xsb.attribute(AN.top, 0)
+        xsb.attribute(AN.bottom, 0)
+        xsb.close_element()
+
     dim = getattr(pic, "imgDim", getattr(pic, "img_dim", None))
     if dim is not None:
         xsb.open_element(EN.hp_imgDim)
-        xsb.attribute(AN.dimwidth, dim.dimwidth if hasattr(dim, "dimwidth") else getattr(dim, "dim_width", None))
-        xsb.attribute(AN.dimheight, dim.dimheight if hasattr(dim, "dimheight") else getattr(dim, "dim_height", None))
+        xsb.attribute(
+            AN.dimwidth,
+            getattr(dim, "dimwidth", getattr(dim, "dim_width", None))
+            or getattr(dim, "width", None),
+        )
+        xsb.attribute(
+            AN.dimheight,
+            getattr(dim, "dimheight", getattr(dim, "dim_height", None))
+            or getattr(dim, "height", None),
+        )
         xsb.close_element()
 
-    # img (the actual image reference)
     img = getattr(pic, "img", None)
     if img is not None:
         from pyhwpxlib.writer.header.header_writer import _write_img
         _write_img(xsb, img)
+
+    # 3) Shape object children LAST (sz, pos, outMargin, caption, shapeComment)
+    _write_shape_object_children(xsb, pic)
 
     xsb.close_element()
 
@@ -892,6 +938,19 @@ def _write_shape_component(xsb: XMLStringBuilder, obj: Any) -> None:
                 for e in ["e1", "e2", "e3", "e4", "e5", "e6"]:
                     xsb.attribute(e, getattr(mat, e, None))
                 xsb.close_element()
+        for extra_mat in getattr(ri, "extra_matrices", []):
+            from ...object_type import ObjectType as OT
+            ot = extra_mat._object_type()
+            if ot == OT.hc_scaMatrix:
+                mat_elem = EN.hc_scaMatrix
+            elif ot == OT.hc_rotMatrix:
+                mat_elem = EN.hc_rotMatrix
+            else:
+                mat_elem = EN.hc_transMatrix
+            xsb.open_element(mat_elem)
+            for e in ["e1", "e2", "e3", "e4", "e5", "e6"]:
+                xsb.attribute(e, getattr(extra_mat, e, None))
+            xsb.close_element()
         xsb.close_element()
 
 
@@ -899,47 +958,60 @@ def _write_shape_component(xsb: XMLStringBuilder, obj: Any) -> None:
 # Drawing object (generic writer for shapes)
 # ======================================================================
 
-def _write_drawing_object(xsb: XMLStringBuilder, elem_name: str, obj: Any) -> None:
-    """Generic writer for drawing objects (Line, Rect, Ellipse, etc.)."""
+def _write_container_child(xsb: XMLStringBuilder, child: Any) -> None:
+    """Write a child shape inside an hp:container (omits sz/pos/outMargin)."""
+    ot = child._object_type()
+    _CHILD_ELEM_MAP = {
+        ObjectType.hp_line:        EN.hp_line,
+        ObjectType.hp_rect:        EN.hp_rect,
+        ObjectType.hp_ellipse:     EN.hp_ellipse,
+        ObjectType.hp_arc:         EN.hp_arc,
+        ObjectType.hp_polygon:     EN.hp_polygon,
+        ObjectType.hp_curve:       EN.hp_curve,
+        ObjectType.hp_connectLine: EN.hp_connectLine,
+        ObjectType.hp_textart:     EN.hp_textart,
+        ObjectType.hp_ole:         EN.hp_ole,
+        ObjectType.hp_pic:         None,  # pictures handled separately
+    }
+    elem_name = _CHILD_ELEM_MAP.get(ot)
+    if elem_name is not None:
+        _write_drawing_object(xsb, elem_name, child, is_container_child=True)
+    else:
+        _write_run_item(xsb, child)
+
+
+def _write_drawing_object(xsb: XMLStringBuilder, elem_name: str, obj: Any, is_container_child: bool = False) -> None:
+    """Generic writer for drawing objects (Line, Rect, Ellipse, etc.).
+
+    HWPX schema order:
+    ShapeComponent base (offset..renderingInfo) -> lineShape -> fillBrush
+    -> shadow -> geometry (pt0..pt3 / pts / segs) -> drawText
+    -> ShapeObject children (sz, pos, outMargin) LAST.
+
+    When is_container_child=True, the trailing ShapeObject children (sz, pos,
+    outMargin) are omitted — container children in HWPX do not carry these
+    elements; they belong only to the top-level container element.
+    """
     xsb.open_element(elem_name)
     _write_shape_object_attrs(xsb, obj)
 
-    # Object-specific attributes added by the individual writer classes
-    # These vary by type; we write commonly available ones
     xsb.attribute(AN.instid, getattr(obj, "instid", getattr(obj, "inst_id", None)))
     xsb.attribute(AN.groupLevel, getattr(obj, "groupLevel", getattr(obj, "group_level", None)))
 
-    _write_shape_object_children(xsb, obj)
+    # hp:rect-specific: rounded-corner ratio
+    if elem_name == EN.hp_rect:
+        xsb.attribute(AN.ratio, getattr(obj, "ratio", None))
+
+    # 1) Shape component base (offset, orgSz, curSz, flip, rotationInfo, renderingInfo)
     _write_shape_component(xsb, obj)
 
-    # DrawText (for shapes with text content)
-    dt = getattr(obj, "drawText", getattr(obj, "draw_text", None))
-    if dt is not None:
-        _write_draw_text(xsb, dt)
-
-    # Shadow
-    shadow = getattr(obj, "shadow", None)
-    if shadow is not None and hasattr(shadow, "type"):
-        xsb.open_element(EN.hp_shadow)
-        xsb.attribute(AN.type, shadow.type)
-        xsb.attribute(AN.color, shadow.color)
-        xsb.attribute(AN.offsetX, getattr(shadow, "offsetX", getattr(shadow, "offset_x", None)))
-        xsb.attribute(AN.offsetY, getattr(shadow, "offsetY", getattr(shadow, "offset_y", None)))
-        xsb.attribute(AN.alpha, shadow.alpha)
-        xsb.close_element()
-
-    # FillBrush
-    fb = getattr(obj, "fillBrush", getattr(obj, "fill_brush", None))
-    if fb is not None:
-        from pyhwpxlib.writer.header.header_writer import _write_fill_brush
-        _write_fill_brush(xsb, fb)
-
-    # LineShape
+    # 2) LineShape (required)
     ls = getattr(obj, "lineShape", getattr(obj, "line_shape", None))
     if ls is not None:
         xsb.open_element(EN.hp_lineShape)
         xsb.attribute(AN.color, ls.color)
         xsb.attribute(AN.width, ls.width)
+        xsb.attribute(AN.type, ls.type)
         xsb.attribute(AN.style, ls.style)
         xsb.attribute(AN.endCap, getattr(ls, "endCap", getattr(ls, "end_cap", None)))
         xsb.attribute(AN.headStyle, getattr(ls, "headStyle", getattr(ls, "head_style", None)))
@@ -952,8 +1024,41 @@ def _write_drawing_object(xsb: XMLStringBuilder, elem_name: str, obj: Any) -> No
         xsb.attribute(AN.alpha, ls.alpha)
         xsb.close_element()
 
-    # Type-specific geometry
+    # 3) FillBrush (required)
+    fb = getattr(obj, "fillBrush", getattr(obj, "fill_brush", None))
+    if fb is not None:
+        from pyhwpxlib.writer.header.header_writer import _write_fill_brush
+        _write_fill_brush(xsb, fb)
+
+    # 4) Shadow (optional)
+    shadow = getattr(obj, "shadow", None)
+    if shadow is not None and hasattr(shadow, "type"):
+        xsb.open_element(EN.hp_shadow)
+        xsb.attribute(AN.type, shadow.type)
+        xsb.attribute(AN.color, shadow.color)
+        xsb.attribute(AN.offsetX, getattr(shadow, "offsetX", getattr(shadow, "offset_x", None)))
+        xsb.attribute(AN.offsetY, getattr(shadow, "offsetY", getattr(shadow, "offset_y", None)))
+        xsb.attribute(AN.alpha, shadow.alpha)
+        xsb.close_element()
+
+    # 5) Type-specific geometry (pts, segs, startPt/endPt, center/ax1/ax2, ...)
     _write_object_geometry(xsb, elem_name, obj)
+
+    # 6) DrawText (optional, for shapes that contain text)
+    dt = getattr(obj, "drawText", getattr(obj, "draw_text", None))
+    if dt is not None:
+        _write_draw_text(xsb, dt)
+
+    # 6b) Container child shapes (hp:container only)
+    child_list = getattr(obj, "_child_list", None)
+    if child_list:
+        for child in child_list:
+            _write_container_child(xsb, child)
+
+    # 7) Shape object children LAST (sz, pos, outMargin)
+    # Skip for container children — they don't carry these elements.
+    if not is_container_child:
+        _write_shape_object_children(xsb, obj)
 
     xsb.close_element()
 
@@ -982,7 +1087,24 @@ def _write_draw_text(xsb: XMLStringBuilder, dt: Any) -> None:
 
 def _write_object_geometry(xsb: XMLStringBuilder, elem_name: str, obj: Any) -> None:
     """Write type-specific geometry (line points, ellipse axes, polygon points, etc.)."""
-    if elem_name == EN.hp_line:
+    if elem_name == EN.hp_rect:
+        for attr, elem in [
+            ("pt0", EN.hc_pt0), ("pt1", EN.hc_pt1),
+            ("pt2", EN.hc_pt2), ("pt3", EN.hc_pt3),
+        ]:
+            pt = getattr(obj, attr, None)
+            if pt is not None:
+                _write_x_and_y(xsb, elem, pt)
+
+    elif elem_name == EN.hp_arc:
+        for attr, elem in [
+            ("center", EN.hc_center), ("ax1", EN.hc_ax1), ("ax2", EN.hc_ax2),
+        ]:
+            pt = getattr(obj, attr, None)
+            if pt is not None:
+                _write_x_and_y(xsb, elem, pt)
+
+    elif elem_name == EN.hp_line:
         sp = getattr(obj, "startPt", getattr(obj, "start_pt", None))
         ep = getattr(obj, "endPt", getattr(obj, "end_pt", None))
         if sp is not None:

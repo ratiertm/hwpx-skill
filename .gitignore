@@ -16,3 +16,6 @@ ssh-key-*.key
 *.key
 .coverage
 hwpx-workspace/
+ratiertm-hwpx/
+python-hwpx-fork/
+hwpxlib/

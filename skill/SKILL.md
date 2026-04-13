@@ -77,19 +77,20 @@ doc.add_paragraph(제목, bold=True, font_size=18, text_color=PALETTE['primary']
 doc.save(파일명)
 ```
 Step E: `pyhwpxlib validate 파일명`
-Step F: 자동 시각 검토 — HWPX → HTML → 스크린샷 → Claude가 직접 확인
+Step F: 자동 시각 검토 — HWPX → SVG(rhwp WASM) → PNG → Claude가 직접 확인
 ```python
-from pyhwpxlib.api import convert_hwpx_to_html
-convert_hwpx_to_html(파일명, '/tmp/hwpx_preview.html')
-from playwright.sync_api import sync_playwright
-with sync_playwright() as p:
-    browser = p.chromium.launch()
-    page = browser.new_page(viewport={'width': 800, 'height': 1200})
-    page.goto('file:///tmp/hwpx_preview.html')
-    page.wait_for_timeout(1000)
-    page.screenshot(path='/tmp/hwpx_preview.png', full_page=True)
-    browser.close()
-# Read tool로 /tmp/hwpx_preview.png 확인 → 문제 발견 시 자동 수정
+from pyhwpxlib.rhwp_bridge import RhwpEngine
+import resvg_py
+
+engine = RhwpEngine()                       # 최초 1회 (WASM 로드)
+doc = engine.load(파일명)
+for i in range(doc.page_count):
+    svg = doc.render_page_svg(i)            # 실제 한/글 렌더러 결과
+    png = resvg_py.svg_to_bytes(svg_string=svg)
+    with open(f'/tmp/hwpx_preview_p{i}.png', 'wb') as f:
+        f.write(bytes(png))
+# Read tool로 /tmp/hwpx_preview_p{i}.png 확인 → 문제 발견 시 Step C로 돌아가 자동 수정
+# 의존성: pip install wasmtime resvg-py  (WASM은 pyhwpxlib/vendor에 번들)
 ```
 Step G: AskUserQuestion — "Whale에서도 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
 
@@ -115,22 +116,46 @@ pyhwpxlib validate output.hwpx
 ```
 Step E: AskUserQuestion — "수정할 부분 있나요?"
 
-**워크플로우 [3] 양식 자동화**:
+**워크플로우 [3] 양식 자동화 (시각 분석 기반)**:
 
-Step A: AskUserQuestion — "템플릿 파일 경로?"
-Step B: 스키마 추출 → 필드 목록 보여주기
+Step A: AskUserQuestion — "양식 파일 경로?"
+Step B: rhwp 프리뷰 렌더링 → **Claude가 PNG 이미지를 보고 양식 분석**
 ```python
-from pyhwpxlib.api import extract_schema
-schema = extract_schema(template_path)
+# 1. 프리뷰 렌더링
+from scripts.preview import render_pages
+pages = render_pages(template_path, '/tmp')
+# 2. Read tool로 각 페이지 PNG 확인
+# 3. Claude가 시각적으로 분석:
+#    - 문서 제목/유형 파악
+#    - 빈 칸 = 입력란 식별
+#    - 각 입력란에 사람이 읽는 이름(placeholder) 부여
+#    - 날짜란, 서명란 등 특수 필드 감지
 ```
-Step C: AskUserQuestion — "데이터 입력 방식?" → 대화형/JSON/CSV파일
-Step D: 데이터 입력 받기 → 확인 보여주기 → AskUserQuestion "맞나요?"
-Step E: 실행
+Step C: 분석 결과를 사용자에게 보여주기
+```
+"이 양식은 '의견제출서'입니다. 다음 정보를 입력해주세요:
+ 1. 성명 (필수)
+ 2. 전화번호 (필수)
+ 3. 주소 (필수)
+ 4. 의견 (필수)
+ 5. 날짜 (필수)"
+```
+Step D: AskUserQuestion — "위 정보를 입력해주세요" → 대화형/JSON/CSV
+Step E: 실행 — **라벨 기반 자동 채우기 (빈 셀 포함)**
 ```python
-from pyhwpxlib.api import fill_template_checkbox
-fill_template_checkbox(template_path, data=data, checks=checks, output_path=output)
+import sys; sys.path.insert(0, 'templates')
+from form_pipeline import fill_by_labels
+
+fill_by_labels(template_path, {
+    '성 (단체명)>right': user_data['성명'],
+    '전화번호>right': user_data['전화번호'],
+    '주>right': user_data['주소'],
+    '3. 의 견>right': user_data['의견'],
+}, output_path)
+# 빈 셀도 cellAddr 기반 _patch_empty_cell로 자동 채움
 ```
-Step F: `pyhwpxlib validate output` → AskUserQuestion "추가 생성?"
+Step F: rhwp 프리뷰로 결과 검증 → 문제 발견 시 Step E로 자동 수정
+Step G: AskUserQuestion — "Whale에서도 확인해주세요. 수정할 부분?" → 있으면 Step E로
 
 **워크플로우 [4] 문서 변환**:
 
@@ -152,6 +177,28 @@ convert_html_file_to_hwpx(html_path, hwpx_path)
 Step D: `pyhwpxlib validate output` → 결과 요약
 Step E: AskUserQuestion — "다음 작업?" → 편집/추가 변환/완료
 
+**워크플로우 [5] Excel → HWPX 보고서 생성**:
+
+Step A: AskUserQuestion — "Excel 파일 경로? + 양식/스타일 지정?"
+Step B: Excel 읽기 + 구조 파악
+```python
+import openpyxl
+wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+# 시트명, 행/열 수, 헤더, 데이터 요약을 사용자에게 보여주기
+```
+Step C: AskUserQuestion — "어떤 데이터를 어떻게 정리할까요?" → 요약표/상세표/차트 등
+Step D: HwpxBuilder로 보고서 생성
+```python
+from pyhwpxlib import HwpxBuilder
+doc = HwpxBuilder()
+# 제목, 메타 정보, 요약표, 상세표 순서로 구성
+# 긴 텍스트는 _hard_wrap() 적용 (규칙 #13)
+# 긴 표는 페이지 청킹 (규칙 #14)
+doc.save(output_path)
+```
+Step E: rhwp 프리뷰로 시각 검토 (Step F와 동일)
+Step F: AskUserQuestion — "수정할 부분 있나요?" → 있으면 Step D로
+
 모든 흐름의 마지막은 **"수정할 부분이 있으면 알려주세요"**로 끝나고, 사용자가 만족할 때까지 반복한다.
 
 ---
@@ -160,6 +207,8 @@ Step E: AskUserQuestion — "다음 작업?" → 편집/추가 변환/완료
 
 | Task | Approach |
 |------|----------|
+| **Preview (시각 검토)** | `python scripts/preview.py file.hwpx` → 페이지별 PNG + fill ratio |
+| **Excel → HWPX** | `openpyxl`로 읽기 → `HwpxBuilder`로 보고서 생성 (워크플로우 [5]) |
 | Read/extract text | `pyhwpxlib.api.extract_text()` or unpack for raw XML |
 | Create new document | Use `HwpxBuilder` — see Creating New Documents below |
 | Edit existing document | Unpack → edit XML → repack — see Editing Existing Documents below |
@@ -452,6 +501,14 @@ doc = read_hwp("file.hwp")
 | 10 | 원문 성격에 맞지 않는 양식 강제 금지 | 리서치문에 기업보고서 표지 등 |
 | 11 | LLM은 스타일링은 자유롭게, 내용은 충실하게 | 디자인은 판단, 텍스트는 보존 |
 | 12 | header/footer/page_number는 SecPr 뒤에 삽입 | HwpxBuilder가 자동 처리 (deferred) |
+| 13 | 셀 내 긴 텍스트는 명시적 `\n` 삽입 (30자 기준) | rhwp 렌더러가 자동 줄바꿈 안 함 → 글자 겹침 |
+| 14 | 긴 표는 ~15행 단위로 분할 + `add_page_break()` | rhwp가 표 자동 페이지 분할 안 함 → 내용 잘림 |
+| 15 | 기존 표 높이 수정 시 `<hp:sz>` + `<hp:cellSz>` 둘 다 변경 | 한쪽만 바꾸면 렌더러가 크기 반영 안 함 |
+| 16 | HWP Color는 BGR — `_colorref_to_hex()`로 변환 | 0xFF0000 = 파란색 (빨간색 아님) |
+| 17 | landscape: WIDELY=세로, NARROWLY=가로 (반전) | 이름과 반대, 혼동 주의 |
+| 18 | TextBox = `hp:rect` + `hp:drawText`, shapeComment 선행 필수 | 순서 역전 시 parse error |
+| 19 | Polygon 꼭짓점: 마지막 점 = 첫 점 (닫힘) | 누락 시 열린 도형 |
+| 20 | breakNonLatinWord = `KEEP_WORD` 필수 | `BREAK_WORD` 시 글자 퍼짐 |
 
 ---
 

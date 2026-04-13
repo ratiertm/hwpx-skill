@@ -151,6 +151,7 @@ class RenderingInfo(HWPXObject):
     trans_matrix: Optional[Matrix] = None
     sca_matrix: Optional[Matrix] = None
     rot_matrix: Optional[Matrix] = None
+    extra_matrices: List[Matrix] = field(default_factory=list)
 
     def _object_type(self) -> ObjectType:
         return ObjectType.hp_renderingInfo
