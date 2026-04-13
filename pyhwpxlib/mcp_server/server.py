@@ -102,6 +102,74 @@ def hwpx_inspect(file: str) -> str:
 
 
 @mcp.tool()
+def hwpx_build_step(actions: str, step_name: str = "", output: str = "/tmp/hwpx_step.hwpx") -> str:
+    """Build HWPX incrementally and return a preview PNG.
+
+    Adds content to a document and renders a preview at each step,
+    like showing slides being built. Call repeatedly to build up
+    the document piece by piece.
+
+    actions: JSON array of actions to append. Each action:
+      {"type": "heading", "text": "제목", "level": 1}
+      {"type": "paragraph", "text": "본문", "bold": false, "font_size": 12}
+      {"type": "table", "data": [["A","B"],["1","2"]], "col_widths": [20000,22520]}
+      {"type": "page_break"}
+      {"type": "image", "path": "photo.png", "width": 21260, "height": 15000}
+
+    step_name: Label for this step (e.g., "제목 추가", "표 삽입").
+    output: Where to save the intermediate HWPX file.
+
+    Returns JSON with step info and PNG preview paths.
+    """
+    from pyhwpxlib import HwpxBuilder
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from scripts.preview import render_pages
+
+    action_list = json.loads(actions) if isinstance(actions, str) else actions
+
+    # Load existing or create new builder
+    # Since HwpxBuilder doesn't support loading, we rebuild from accumulated actions.
+    # The caller should send ALL actions up to the current step.
+    b = HwpxBuilder()
+    for act in action_list:
+        t = act.get("type", "")
+        if t == "heading":
+            b.add_heading(act["text"], level=act.get("level", 1),
+                          alignment=act.get("alignment", "JUSTIFY"))
+        elif t == "paragraph":
+            b.add_paragraph(act["text"],
+                            bold=act.get("bold", False),
+                            font_size=act.get("font_size"),
+                            text_color=act.get("text_color"),
+                            alignment=act.get("alignment", "JUSTIFY"))
+        elif t == "table":
+            b.add_table(act["data"],
+                        col_widths=act.get("col_widths"),
+                        row_heights=act.get("row_heights"),
+                        header_bg=act.get("header_bg"))
+        elif t == "page_break":
+            b.add_page_break()
+        elif t == "image":
+            b.add_image(act["path"],
+                        width=act.get("width", 21260),
+                        height=act.get("height", 15000))
+        elif t == "bullet_list":
+            b.add_bullet_list(act["items"])
+        elif t == "numbered_list":
+            b.add_numbered_list(act["items"])
+
+    b.save(output)
+    pages = render_pages(output, "/tmp")
+
+    return json.dumps({
+        "step": step_name,
+        "output": output,
+        "actions_count": len(action_list),
+        "pages": pages,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def hwpx_preview(file: str, out_dir: str = "/tmp") -> str:
     """Render HWPX pages to PNG via rhwp WASM.
 
