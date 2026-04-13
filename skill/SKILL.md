@@ -12,8 +12,16 @@ description: "Use this skill whenever the user wants to create, read, edit, or m
 3. `.hwpx` 파일이 들어오면 **반드시 `pyhwpxlib.api.extract_text()`로 읽는다.** zipfile로 직접 열거나 xml.etree로 직접 파싱하지 않는다.
 4. 새 문서 생성은 **반드시 `from pyhwpxlib import HwpxBuilder`를 사용한다.** XML을 직접 작성하지 않는다.
 5. 문서 편집은 **반드시 `pyhwpxlib unpack → 문자열 교체 → pyhwpxlib pack` 순서**를 따른다.
+6. **HWPX를 생성/편집/변환한 후에는 반드시 PNG 프리뷰를 생성하고 Read tool로 직접 확인한다.** 이 단계를 건너뛰지 않는다. 문제가 발견되면 자동으로 수정하고 다시 프리뷰한다.
+```python
+# 모든 워크플로우의 필수 검증 단계 — 생략 금지
+from scripts.preview import render_pages
+pages = render_pages(output_path, '/tmp')
+# 반드시 Read tool로 각 페이지 PNG 확인 → 문제 발견 시 수정 후 재프리뷰
+```
 
 위 규칙을 어기면 Whale/한컴오피스에서 파일이 열리지 않거나 서식이 깨진다.
+규칙 6을 어기면 사용자에게 깨진 문서를 전달하게 된다.
 
 ## 디자인 규칙 — 새 문서 생성 시 반드시 적용
 

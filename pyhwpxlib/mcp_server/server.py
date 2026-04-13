@@ -37,6 +37,20 @@ def _abs(path: str) -> str:
 mcp = FastMCP("hangul-docs", instructions="Korean 한/글 document tools — create, edit, fill forms, preview")
 
 
+def _with_preview(hwpx_path: str) -> dict:
+    """Auto-generate PNG preview for any HWPX output. Always included."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from scripts.preview import render_pages
+
+    pages = render_pages(hwpx_path, "/tmp")
+    for p in pages:
+        png_path = p.get("png", "")
+        if os.path.exists(png_path):
+            with open(png_path, "rb") as f:
+                p["png_base64"] = base64.b64encode(f.read()).decode("ascii")
+    return {"output": hwpx_path, "preview": pages}
+
+
 @mcp.tool()
 def hwpx_to_json(file: str, section: int | None = None) -> str:
     """Export HWPX to JSON for editing.
@@ -58,7 +72,8 @@ def hwpx_from_json(data: str, output: str) -> str:
     """
     from pyhwpxlib.json_io import from_json
     parsed = json.loads(data) if isinstance(data, str) else data
-    return from_json(parsed, _abs(output))
+    out = from_json(parsed, _abs(output))
+    return json.dumps(_with_preview(out), ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -70,7 +85,8 @@ def hwpx_patch(file: str, section: int, edits: str, output: str) -> str:
     """
     from pyhwpxlib.json_io import patch
     edit_dict = json.loads(edits) if isinstance(edits, str) else edits
-    return patch(_abs(file), section, edit_dict, _abs(output))
+    out = patch(_abs(file), section, edit_dict, _abs(output))
+    return json.dumps(_with_preview(out), ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -228,6 +244,7 @@ def hwpx_fill_form(file: str, mappings: str, output: str) -> str:
 
     mapping_dict = json.loads(mappings) if isinstance(mappings, str) else mappings
     result = fill_by_labels(_abs(file), mapping_dict, _abs(output))
+    result["preview"] = _with_preview(_abs(output))["preview"]
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
