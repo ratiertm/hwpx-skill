@@ -34,7 +34,64 @@ def _abs(path: str) -> str:
     return os.path.join(_PROJECT_ROOT, path)
 
 
-mcp = FastMCP("hangul-docs", instructions="Korean 한/글 document tools — create, edit, fill forms, preview")
+mcp = FastMCP("hangul-docs", instructions="""
+Korean 한/글 document tools (HWPX/OWPML).
+
+## 절대 규칙 (MUST FOLLOW)
+
+1. **모든 HWPX 생성/편집/변환 후 반드시 반환된 preview PNG를 확인한다.**
+   각 tool은 `preview.png_base64` 필드를 반환. 이 이미지를 실제로 보고 문제를 찾아라.
+   preview 확인 없이 사용자에게 "완료"를 보고하지 마라.
+
+2. **양식 채우기는 반드시 analyze → fill 순서**
+   - 먼저 `hwpx_analyze_form(file)`로 fillable 필드를 확인한다.
+   - 사용자에게 필드 목록을 보여주고 데이터를 받는다 (빈 셀 포함).
+   - 그 다음 `hwpx_fill_form(file, mappings, output)`을 호출한다.
+   - analyze 없이 fill_form 호출 금지.
+
+3. **문서 생성은 단계별 빌드 권장**
+   - 복잡한 문서는 `hwpx_build_step`을 여러 번 호출하여 점진적으로 구축한다.
+   - 각 단계마다 반환된 PNG를 확인하고 다음 단계로 진행한다.
+
+4. **출력 경로는 절대 경로 사용**
+   - 프로젝트 루트: `/Users/leeeunmi/Projects/active/hwpx-skill`
+   - 상대 경로는 프로젝트 루트 기준으로 자동 변환됨.
+   - 생성된 파일은 `Test/` 디렉터리에 저장 권장.
+
+## 표준 워크플로우
+
+### A. 양식 채우기 (의견제출서, 신청서 등)
+```
+1. hwpx_analyze_form(file)           → 필드 목록 확인
+2. 사용자에게 필드별 입력값 요청
+3. hwpx_fill_form(file, mappings, output) → 채우기 + PNG 프리뷰 자동
+4. preview.png_base64 확인 → 문제 있으면 mappings 수정 후 재호출
+```
+
+### B. 새 문서 생성 (보고서, 공문서)
+```
+1. hwpx_build_step([제목 action])       → PNG 확인
+2. hwpx_build_step([제목, 메타, 표])    → 누적 빌드, PNG 확인
+3. ... 반복 ...
+4. 최종 output 파일을 사용자에게 전달
+```
+
+### C. 기존 문서 편집
+```
+1. hwpx_inspect(file)                → 구조 파악
+2. hwpx_to_json(file, section)       → 특정 섹션 JSON 추출
+3. JSON 편집
+4. hwpx_patch(file, section, edits, output) → 섹션 교체 + PNG 자동
+5. preview.png_base64 확인
+```
+
+## 금지 사항
+
+- preview 확인 없이 "완료" 보고
+- analyze 없이 fill_form 호출
+- 상대 경로로 저장 (프로젝트 루트 밖으로 새는 경우)
+- PNG에 명백한 오류(깨진 텍스트, 빈 페이지 등)가 보이는데 넘어감
+""")
 
 
 def _with_preview(hwpx_path: str) -> dict:
@@ -48,7 +105,15 @@ def _with_preview(hwpx_path: str) -> dict:
         if os.path.exists(png_path):
             with open(png_path, "rb") as f:
                 p["png_base64"] = base64.b64encode(f.read()).decode("ascii")
-    return {"output": hwpx_path, "preview": pages}
+    return {
+        "output": hwpx_path,
+        "preview": pages,
+        "next_step": (
+            "반드시 각 페이지의 preview.png_base64를 확인하세요. "
+            "깨진 텍스트/빈 페이지/잘린 표가 있으면 수정 후 재호출. "
+            "문제 없으면 사용자에게 결과 + 이미지를 보여주세요."
+        ),
+    }
 
 
 @mcp.tool()
