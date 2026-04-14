@@ -410,5 +410,191 @@ def hwpx_validate(file: str) -> str:
     return json.dumps(info, ensure_ascii=False, indent=2)
 
 
+@mcp.tool()
+def hwpx_hwp_to_hwpx(hwp_path: str, output: str) -> str:
+    """Convert HWP 5.x binary to HWPX.
+
+    Use when the input file has .hwp extension. Returns output path + PNG preview.
+    """
+    from pyhwpxlib.hwp2hwpx import convert
+    convert(_abs(hwp_path), _abs(output))
+    return json.dumps(_with_preview(_abs(output)), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_md_to_hwpx(md_path: str, output: str, style: str = "github") -> str:
+    """Convert Markdown file to HWPX.
+
+    style: github | vscode | minimal | academic
+    """
+    import subprocess
+    subprocess.run(
+        [sys.executable, "-m", "pyhwpxlib", "md2hwpx",
+         _abs(md_path), "-o", _abs(output), "-s", style],
+        check=True, capture_output=True,
+    )
+    return json.dumps(_with_preview(_abs(output)), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_html_to_hwpx(html_path: str, output: str) -> str:
+    """Convert HTML file to HWPX. Strips <a> tags automatically."""
+    from pyhwpxlib.api import convert_html_file_to_hwpx
+    convert_html_file_to_hwpx(_abs(html_path), _abs(output))
+    return json.dumps(_with_preview(_abs(output)), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_fill_batch(template: str, records: str, output_dir: str,
+                    filename_field: str = "") -> str:
+    """Generate multiple filled documents from one template.
+
+    records: JSON array of {"data": {...}, "checks": [...], "filename": "..."}.
+    filename_field: key in data to use as filename (e.g. "성 명").
+    Returns JSON with list of output paths.
+    """
+    from pyhwpxlib.api import fill_template_batch
+    rec_list = json.loads(records) if isinstance(records, str) else records
+    outputs = fill_template_batch(
+        _abs(template), rec_list, _abs(output_dir), filename_field
+    )
+    return json.dumps({
+        "template": _abs(template),
+        "count": len(outputs),
+        "outputs": outputs,
+        "next_step": "각 파일의 내용이 맞는지 hwpx_preview로 몇 개 샘플링하여 확인하세요.",
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_build(actions: str, output: str) -> str:
+    """Build a new HWPX document from a full action list (one-shot, not cumulative).
+
+    actions: JSON array. Each action:
+      {"type": "heading", "text": "제목", "level": 1, "alignment": "CENTER"}
+      {"type": "paragraph", "text": "본문", "bold": false, "font_size": 12,
+       "text_color": "#000000", "alignment": "JUSTIFY"}
+      {"type": "table", "data": [[...]], "col_widths": [...], "header_bg": "#..."}
+      {"type": "bullet_list", "items": [...]}
+      {"type": "numbered_list", "items": [...]}
+      {"type": "page_break"}
+      {"type": "line"}
+      {"type": "image", "path": "photo.png", "width": 21260, "height": 15000}
+      {"type": "image_url", "url": "...", "filename": "a.png", "width": 42520, "height": 21260}
+      {"type": "header", "text": "머리말"}
+      {"type": "footer", "text": "꼬리말"}
+      {"type": "page_number", "pos": "BOTTOM_CENTER"}
+      {"type": "highlight", "text": "...", "color": "#ffff00"}
+    """
+    from pyhwpxlib import HwpxBuilder
+    acts = json.loads(actions) if isinstance(actions, str) else actions
+    b = HwpxBuilder()
+    for a in acts:
+        t = a.get("type", "")
+        if t == "heading":
+            b.add_heading(a["text"], level=a.get("level", 1),
+                          alignment=a.get("alignment", "JUSTIFY"))
+        elif t == "paragraph":
+            b.add_paragraph(a["text"], bold=a.get("bold", False),
+                            italic=a.get("italic", False),
+                            font_size=a.get("font_size"),
+                            text_color=a.get("text_color"),
+                            alignment=a.get("alignment", "JUSTIFY"))
+        elif t == "table":
+            b.add_table(a["data"], col_widths=a.get("col_widths"),
+                        row_heights=a.get("row_heights"),
+                        header_bg=a.get("header_bg"),
+                        cell_colors=a.get("cell_colors"),
+                        cell_styles=a.get("cell_styles"))
+        elif t == "bullet_list":
+            b.add_bullet_list(a["items"], bullet_char=a.get("bullet_char", "•"))
+        elif t == "numbered_list":
+            b.add_numbered_list(a["items"])
+        elif t == "page_break":
+            b.add_page_break()
+        elif t == "line":
+            b.add_line()
+        elif t == "image":
+            b.add_image(_abs(a["path"]),
+                        width=a.get("width", 21260),
+                        height=a.get("height", 15000))
+        elif t == "image_url":
+            b.add_image_from_url(a["url"], filename=a.get("filename"),
+                                 width=a.get("width", 42520),
+                                 height=a.get("height", 21260))
+        elif t == "header":
+            b.add_header(a["text"])
+        elif t == "footer":
+            b.add_footer(a["text"])
+        elif t == "page_number":
+            b.add_page_number(a.get("pos", "BOTTOM_CENTER"))
+        elif t == "highlight":
+            b.add_highlight(a["text"], color=a.get("color", "#ffff00"))
+    b.save(_abs(output))
+    return json.dumps(_with_preview(_abs(output)), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_build_preset(preset: str, title: str, sections: str, output: str,
+                       subtitle: str = "", organization: str = "", date: str = "") -> str:
+    """Build a document using a named preset (official | report | proposal).
+
+    Applies the preset's page margins, fonts, colors, and optional cover page.
+
+    sections: JSON array of {"heading": "제목", "body": ["단락1", ...]} or free actions
+              (same schema as hwpx_build actions).
+
+    preset: "official" (공문서), "report" (보고서), "proposal" (제안서)
+    """
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.presets import get_preset, build_cover_page
+
+    p = get_preset(preset)
+    b = HwpxBuilder()
+    # Cover page for report/proposal (official uses inline title)
+    if preset in ("report", "proposal"):
+        build_cover_page(b, p, title, subtitle=subtitle,
+                         organization=organization, date=date)
+    else:
+        ts = p.get("title", {})
+        b.add_paragraph(title, bold=True, font_size=ts.get("font_size", 16),
+                        alignment=ts.get("alignment", "CENTER"))
+        b.add_paragraph("")
+
+    sec_list = json.loads(sections) if isinstance(sections, str) else sections
+    colors = p.get("colors", {})
+    body_size = p.get("body", {}).get("font_size", 12)
+    h2 = p.get("heading2", {})
+
+    for sec in sec_list:
+        if "heading" in sec:
+            b.add_paragraph(sec["heading"],
+                            bold=h2.get("bold", True),
+                            font_size=h2.get("font_size", 14),
+                            text_color=colors.get("heading", "#000000"))
+            for para in sec.get("body", []):
+                if isinstance(para, str):
+                    b.add_paragraph(para, font_size=body_size)
+                elif isinstance(para, dict) and para.get("type") == "table":
+                    b.add_table(para["data"],
+                                col_widths=para.get("col_widths"),
+                                header_bg=para.get("header_bg",
+                                                   colors.get("table_header")))
+            b.add_paragraph("")
+        elif "type" in sec:
+            # Free-form action (delegate to builder)
+            t = sec["type"]
+            if t == "page_break":
+                b.add_page_break()
+            elif t == "paragraph":
+                b.add_paragraph(sec["text"], font_size=sec.get("font_size", body_size))
+
+    b.save(_abs(output))
+    return json.dumps({
+        "preset": preset,
+        **_with_preview(_abs(output)),
+    }, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
     mcp.run()
