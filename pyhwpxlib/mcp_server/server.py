@@ -43,10 +43,11 @@ Korean 한/글 document tools (HWPX/OWPML).
    각 tool은 `preview.png_base64` 필드를 반환. 이 이미지를 실제로 보고 문제를 찾아라.
    preview 확인 없이 사용자에게 "완료"를 보고하지 마라.
 
-2. **양식 채우기는 반드시 analyze → fill 순서**
-   - 먼저 `hwpx_analyze_form(file)`로 fillable 필드를 확인한다.
-   - 사용자에게 필드 목록을 보여주고 데이터를 받는다 (빈 셀 포함).
-   - 그 다음 `hwpx_fill_form(file, mappings, output)`을 호출한다.
+2. **양식 채우기는 analyze → 구조 판정 → 적절한 도구 호출**
+   - `hwpx_analyze_form(file)`로 필드를 확인한다.
+   - **구조 판정 필수**: analyze 결과의 label 셀 text가 "성 명       " 처럼 레이블+공백 placeholder를 포함하면 **구조 B (같은 셀)**. 별도 빈 값 셀이 있으면 **구조 A (인접 셀)**.
+   - 구조 A → `hwpx_fill_form(file, mappings, output)` 사용 가능
+   - 구조 B → `hwpx_fill_form` 사용 금지. 대신 `hwpx_patch(file, section, edits, output)`으로 원본 문자열 교체.
    - analyze 없이 fill_form 호출 금지.
 
 3. **문서 생성은 단계별 빌드 권장**
@@ -109,9 +110,11 @@ def _with_preview(hwpx_path: str) -> dict:
         "output": hwpx_path,
         "preview": pages,
         "next_step": (
-            "반드시 각 페이지의 preview.png_base64를 확인하세요. "
-            "깨진 텍스트/빈 페이지/잘린 표가 있으면 수정 후 재호출. "
-            "문제 없으면 사용자에게 결과 + 이미지를 보여주세요."
+            "각 페이지의 preview.png_base64를 반드시 확인하고 아래 3가지를 글로 적어라:\n"
+            "1. 관찰1 — 첫 페이지에 무엇이 보이나? (제목/팔레트/레이아웃)\n"
+            "2. 관찰2 — 깨진 텍스트/넘침/빈 페이지/잘린 표가 있나?\n"
+            "3. 관찰3 — 주제 대비 디자인 적절성?\n"
+            "관찰 없이 '완료' 보고 금지. 문제 시 수정 후 재호출."
         ),
     }
 

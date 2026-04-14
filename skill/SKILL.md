@@ -100,6 +100,13 @@ for i in range(doc.page_count):
 # Read tool로 /tmp/hwpx_preview_p{i}.png 확인 → 문제 발견 시 Step C로 돌아가 자동 수정
 # 의존성: pip install wasmtime resvg-py  (WASM은 pyhwpxlib/vendor에 번들)
 ```
+**PNG 관찰 3가지를 글로 적는다 (생략 금지)**:
+1. **관찰 1**: 첫 페이지에 무엇이 보이나? (제목, 팔레트, 첫 섹션 레이아웃)
+2. **관찰 2**: 깨진 텍스트/넘침/빈 페이지/잘린 표가 있나?
+3. **관찰 3**: 주제 대비 디자인이 적절한가? (탄소중립이면 녹색, 의료면 차분한 청록 등)
+
+관찰을 쓰지 않고 "완료" 보고 금지. 문제 발견 시 Step C로 복귀하여 자동 수정.
+
 Step G: AskUserQuestion — "Whale에서도 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
 
 **워크플로우 [2] 기존 문서 편집**:
@@ -149,7 +156,37 @@ Step C: 분석 결과를 사용자에게 보여주기
  5. 날짜 (필수)"
 ```
 Step D: AskUserQuestion — "위 정보를 입력해주세요" → 대화형/JSON/CSV
-Step E: 실행 — **라벨 기반 자동 채우기 (빈 셀 포함)**
+
+Step E-pre: **양식 구조 분기 판정** (필수)
+양식은 두 가지 구조로 나뉜다. 성급히 `fill_by_labels`를 호출하지 마라.
+```python
+import sys; sys.path.insert(0, 'templates')
+from form_pipeline import extract_form
+form = extract_form(template_path)
+# 레이블 셀의 text를 확인:
+# - "성 명       " 처럼 레이블+공백 placeholder = 구조 B (같은 셀)
+# - 레이블 셀 옆에 별도 빈 셀 = 구조 A (인접 셀)
+```
+- **구조 A**: `fill_by_labels` 사용 가능
+- **구조 B**: `fill_by_labels` 사용 금지. `pyhwpxlib unpack → 원본 문자열 교체 → pack` 폴백. ET.tostring 금지.
+
+구조 B 폴백 예:
+```bash
+pyhwpxlib unpack template.hwpx -o /tmp/unp
+```
+```python
+with open('/tmp/unp/Contents/section0.xml', 'r', encoding='utf-8') as f:
+    xml = f.read()
+xml = xml.replace('<hp:t>주 소 </hp:t>',
+                  '<hp:t>주 소  서울시 강남구 테헤란로 123</hp:t>', 1)
+with open('/tmp/unp/Contents/section0.xml', 'w', encoding='utf-8') as f:
+    f.write(xml)
+```
+```bash
+pyhwpxlib pack /tmp/unp -o output.hwpx
+```
+
+Step E: 구조 A일 때만 — **라벨 기반 자동 채우기 (빈 셀 포함)**
 ```python
 import sys; sys.path.insert(0, 'templates')
 from form_pipeline import fill_by_labels
