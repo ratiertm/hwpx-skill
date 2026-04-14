@@ -1,20 +1,19 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyhwpxlib"
-version = "0.1.0"
+version = "0.4.0"
 description = "Python library for creating and editing HWPX (Hancom Office) documents without Hancom Office"
 readme = "README.md"
-license = {text = "BSL-1.1"}
+license = "Apache-2.0"
 license-files = ["LICENSE.md", "LICENSE-APACHE", "NOTICE"]
 requires-python = ">=3.8"
 keywords = ["hwpx", "hwp", "hancom", "korean", "document", "llm"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -30,7 +29,16 @@ dependencies = []
 [project.optional-dependencies]
 images = ["Pillow>=9.0"]
 lxml = ["lxml>=4.9"]
-all = ["Pillow>=9.0", "lxml>=4.9"]
+mcp = ["fastmcp>=0.1"]
+preview = ["wasmtime>=20.0", "resvg-py>=0.1", "fonttools>=4.0"]
+all = [
+    "Pillow>=9.0",
+    "lxml>=4.9",
+    "fastmcp>=0.1",
+    "wasmtime>=20.0",
+    "resvg-py>=0.1",
+    "fonttools>=4.0",
+]
 
 [project.scripts]
 pyhwpxlib = "pyhwpxlib.cli:main"
@@ -45,4 +53,10 @@ where = ["."]
 include = ["pyhwpxlib*"]
 
 [tool.setuptools.package-data]
-pyhwpxlib = ["tools/*.hwpx", "tools/*.xml"]
+pyhwpxlib = [
+    "tools/*.hwpx",
+    "tools/*.xml",
+    "vendor/*.wasm",
+    "vendor/LICENSE.*",
+    "vendor/NOTICE.*",
+]
