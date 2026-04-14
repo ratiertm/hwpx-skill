@@ -1375,15 +1375,17 @@ def _patch_empty_cell(xml: str, col: int, row: int, value: str) -> str:
     tc_end = xml.find('</hp:tc>', addr_idx) + len('</hp:tc>')
     block = xml[tc_start:tc_end]
 
-    if '<hp:t/>' in block:
-        block = block.replace('<hp:t/>', f'<hp:t>{value}</hp:t>', 1)
-    elif '<hp:t></hp:t>' in block:
-        block = block.replace('<hp:t></hp:t>', f'<hp:t>{value}</hp:t>', 1)
-    else:
-        import re
-        block = re.sub(r'<hp:t>\s*</hp:t>', f'<hp:t>{value}</hp:t>', block, count=1)
-
-    return xml[:tc_start] + block + xml[tc_end:]
+    import re
+    # Handles <hp:t/>, <hp:t />, <hp:t></hp:t>, and <hp:t>  </hp:t>
+    new_block, n = re.subn(
+        r'<hp:t\s*/>|<hp:t>\s*</hp:t>',
+        f'<hp:t>{value}</hp:t>',
+        block,
+        count=1,
+    )
+    if n == 0:
+        return xml
+    return xml[:tc_start] + new_block + xml[tc_end:]
 
 
 def fill_by_labels(hwpx_path: str, mappings: dict, output_path: str) -> dict:
