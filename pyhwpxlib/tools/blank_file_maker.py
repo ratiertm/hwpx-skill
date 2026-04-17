@@ -72,7 +72,7 @@ class BlankFileMaker:
     """Creates a valid blank HWPX document matching the Java hwpxlib output."""
 
     @staticmethod
-    def make() -> HWPXFile:
+    def make(font_set=None) -> HWPXFile:
         hwpx_file = HWPXFile()
         _settings_xml_file(hwpx_file.settings_xml_file)
         _version_xml_file(hwpx_file.version_xml_file)
@@ -81,7 +81,7 @@ class BlankFileMaker:
 
         header = HeaderXMLFile()
         hwpx_file.header_xml_file = header
-        _header_xml_file(header)
+        _header_xml_file(header, font_set=font_set)
 
         section = SectionXMLFile()
         hwpx_file.section_xml_file_list.add(section)
@@ -194,7 +194,7 @@ def _add_meta(md: MetaData, name: str, content: str, text: str | None) -> None:
 # Header XML
 # ============================================================
 
-def _header_xml_file(header: HeaderXMLFile) -> None:
+def _header_xml_file(header: HeaderXMLFile, font_set=None) -> None:
     header.version = "1.2"
     header.secCnt = 1
 
@@ -209,7 +209,7 @@ def _header_xml_file(header: HeaderXMLFile) -> None:
 
     # RefList
     ref_list = header.create_ref_list()
-    _fontfaces(ref_list)
+    _fontfaces(ref_list, font_set=font_set)
     _border_fills(ref_list)
     _char_properties(ref_list)
     _tab_properties(ref_list)
@@ -238,7 +238,7 @@ def _header_xml_file(header: HeaderXMLFile) -> None:
 # Fontfaces
 # ============================================================
 
-def _fontfaces(ref_list: RefList) -> None:
+def _fontfaces(ref_list: RefList, font_set=None) -> None:
     fontfaces: Fontfaces = ref_list.create_fontfaces()
     for lang in [
         LanguageType.HANGUL,
@@ -251,7 +251,10 @@ def _fontfaces(ref_list: RefList) -> None:
     ]:
         ff = fontfaces.add_new_fontface()
         ff.lang = lang
-        _add_font_pair(ff)
+        if font_set is not None:
+            _add_theme_fonts(ff, font_set)
+        else:
+            _add_font_pair(ff)
 
 
 def _add_font_pair(fontface) -> None:
@@ -288,6 +291,37 @@ def _add_font_pair(fontface) -> None:
     ti2.letterform = True
     ti2.midline = 1
     ti2.xHeight = 1
+
+
+def _add_theme_fonts(fontface, font_set) -> None:
+    """Register all unique fonts from a FontSet with incremental IDs."""
+    unique_fonts = []
+    seen = set()
+    for font_name in [
+        font_set.heading_hangul, font_set.heading_latin,
+        font_set.body_hangul, font_set.body_latin,
+        font_set.caption_hangul, font_set.caption_latin,
+    ]:
+        if font_name not in seen:
+            seen.add(font_name)
+            unique_fonts.append(font_name)
+
+    for i, font_name in enumerate(unique_fonts):
+        f = fontface.add_new_font()
+        f.id = str(i)
+        f.face = font_name
+        f.type = FontType.TTF
+        f.isEmbedded = False
+        ti = f.create_type_info()
+        ti.familyType = FontFamilyType.FCAT_GOTHIC
+        ti.weight = 6
+        ti.proportion = 4
+        ti.contrast = 0
+        ti.strokeVariation = 1
+        ti.armStyle = True
+        ti.letterform = True
+        ti.midline = 1
+        ti.xHeight = 1
 
 
 # ============================================================

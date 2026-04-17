@@ -33,10 +33,16 @@ def _init_para(para, para_pr_id_ref="0", style_id_ref="0", page_break=False):
     para.merged = False
 
 
-def create_document() -> HWPXFile:
-    """Create a new blank HWPX document ready for content."""
+def create_document(font_set=None) -> HWPXFile:
+    """Create a new blank HWPX document ready for content.
+
+    Args:
+        font_set: Optional FontSet from themes.py. If provided, registers
+                  all theme fonts in header.xml fontfaces instead of the
+                  default pair (함초롬돋움/함초롬바탕).
+    """
     from .tools.blank_file_maker import BlankFileMaker
-    return BlankFileMaker.make()
+    return BlankFileMaker.make(font_set=font_set)
 
 
 def save(hwpx_file: HWPXFile, filepath: str) -> None:
@@ -985,6 +991,9 @@ def add_heading(
     text: str,
     level: int = 1,
     section_index: int = 0,
+    height: int | None = None,
+    font_name: str | None = None,
+    text_color: str | None = None,
 ) -> Para:
     """Add a heading paragraph to the document.
 
@@ -993,11 +1002,25 @@ def add_heading(
     - level 2: 18pt bold
     - level 3: 14pt bold
     - level 4: 12pt bold
+
+    Optional overrides (used by theme integration):
+    - height: override the default charPr height for this level
+    - font_name: override the default font
+    - text_color: override the default text color
     """
     from .style_manager import ensure_char_style
 
-    height, bold = _HEADING_STYLES.get(level, (1200, True))
-    char_pr_id = ensure_char_style(hwpx_file, bold=bold, height=height)
+    default_height, bold = _HEADING_STYLES.get(level, (1200, True))
+    if height is None:
+        height = default_height
+
+    style_kwargs: dict = dict(bold=bold, height=height)
+    if font_name is not None:
+        style_kwargs['font_name'] = font_name
+    if text_color is not None:
+        style_kwargs['text_color'] = text_color
+
+    char_pr_id = ensure_char_style(hwpx_file, **style_kwargs)
     return add_paragraph(
         hwpx_file, text,
         section_index=section_index,
