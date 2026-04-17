@@ -10,7 +10,7 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Theme 데이터 모델 + 10종 내장 테마 + 테스트 스캐폴드
+- [x] 01-01-PLAN.md — Theme 데이터 모델 + 10종 내장 테마 + 테스트 스캐폴드
 - [ ] 01-02-PLAN.md — Builder/BlankFileMaker/api.py 테마 통합 + 통합 테스트
 
 **Deliverables**:
