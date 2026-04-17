@@ -103,13 +103,37 @@ TABLE_PRESETS = {
 class HwpxBuilder:
     """HWPX 문서 빌더 — XML 직접 구성"""
 
-    def __init__(self, table_preset: str = 'default'):
+    def __init__(self, table_preset: str = 'default', theme: str | 'Theme' = 'default'):
         """
         Args:
             table_preset: 표 기본 스타일 ('corporate', 'government', 'academic', 'default')
+            theme: 테마 이름(str) 또는 Theme 인스턴스. 기본 'default' = Administrative Slate.
         """
+        from pyhwpxlib.themes import Theme, BUILTIN_THEMES, _make_table_presets
+
+        # Resolve theme
+        if isinstance(theme, str):
+            if theme not in BUILTIN_THEMES:
+                raise ValueError(
+                    f"Unknown theme '{theme}'. "
+                    f"Available: {', '.join(sorted(BUILTIN_THEMES.keys()))}"
+                )
+            self._theme: Theme = BUILTIN_THEMES[theme]
+        elif isinstance(theme, Theme):
+            self._theme = theme
+        else:
+            raise TypeError(f"theme must be str or Theme, got {type(theme).__name__}")
+
+        # Detect whether this is the built-in default theme (backward compat path)
+        self._is_default_theme = (self._theme is BUILTIN_THEMES.get('default'))
+
         self._actions: list[dict] = []
-        self._table_preset = TABLE_PRESETS.get(table_preset, TABLE_PRESETS['default'])
+
+        # Per-instance table presets derived from theme palette
+        self._table_presets_dict = _make_table_presets(self._theme.palette)
+        self._table_preset = self._table_presets_dict.get(
+            table_preset, self._table_presets_dict['default']
+        )
 
     # ── 콘텐츠 추가 API (동작 기록) ──
 
@@ -382,6 +406,24 @@ class HwpxBuilder:
             'line_color': line_color, 'line_width': line_width,
         })
 
+    # ── 테마 스타일 헬퍼 ──
+
+    def _heading_style_kwargs(self, level: int) -> dict:
+        """Return ensure_char_style kwargs for a heading at the given level.
+
+        For the default theme, returns only bold+height (backward compat).
+        For custom themes, adds font_name and text_color from the theme.
+        """
+        sizes = self._theme.sizes
+        height = {1: sizes.h1, 2: sizes.h2, 3: sizes.h3, 4: sizes.h4}.get(level, 12) * 100
+        kwargs: dict = {'bold': True, 'height': height}
+
+        if not self._is_default_theme:
+            kwargs['font_name'] = self._theme.fonts.heading_hangul
+            kwargs['text_color'] = self._theme.palette.on_surface
+
+        return kwargs
+
     # ── 저장 ──
     # (legacy _build_header/_build_section 제거 — pyhwpxlib API 직접 사용)
 
@@ -483,7 +525,9 @@ class HwpxBuilder:
                                     save as hwpx_save)
         from pyhwpxlib.style_manager import ensure_para_style, ensure_char_style, font_size_to_height
 
-        doc = create_document()
+        # Pass font_set only for non-default themes (backward compat)
+        font_set = None if self._is_default_theme else self._theme.fonts
+        doc = create_document(font_set=font_set)
 
         # 기록된 동작을 pyhwpxlib API로 재생
         # header/footer/page_number는 반드시 마지막에 재생
@@ -496,17 +540,19 @@ class HwpxBuilder:
             kind = action['kind']
             if kind == 'heading':
                 align = action.get('alignment', 'JUSTIFY')
+                # Compute theme-derived heading style
+                heading_kwargs = self._heading_style_kwargs(action['level'])
                 if align != 'JUSTIFY':
                     # heading + alignment: charPr 직접 생성 + paraPr alignment
-                    from pyhwpxlib.api import _HEADING_STYLES
-                    h, b = _HEADING_STYLES.get(action['level'], (1200, True))
-                    char_pr_id = ensure_char_style(doc, bold=b, height=h)
+                    char_pr_id = ensure_char_style(doc, **heading_kwargs)
                     para_pr_id = ensure_para_style(doc, align=align)
                     api_add_para(doc, action['text'],
                                  char_pr_id_ref=char_pr_id,
                                  para_pr_id_ref=para_pr_id)
                 else:
-                    api_add_heading(doc, action['text'], level=action['level'])
+                    api_add_heading(doc, action['text'], level=action['level'],
+                                   **{k: v for k, v in heading_kwargs.items()
+                                      if k not in ('bold',)})
             elif kind == 'paragraph':
                 align = action.get('alignment', 'JUSTIFY')
                 needs_align = align != 'JUSTIFY'
