@@ -406,3 +406,130 @@ class TestApplyOverlay:
             result_xml = zf.read("Contents/section0.xml").decode("utf-8")
             assert "새셀값" in result_xml
             assert ">셀값<" not in result_xml
+
+
+# ─── Nested table extraction ────────────────────
+
+
+class TestNestedTableExtraction:
+    """Tests for nested table (table-in-cell) extraction without duplication."""
+
+    def test_nested_table_no_duplicate(self, tmp_path):
+        """A table nested inside a cell should produce exactly 2 table entries."""
+        sec_xml = _make_section_xml(
+            "<hp:p><hp:run><hp:tbl>"  # outer table
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"  # nested table
+            '<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>중첩셀</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>'
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+        )
+        hwpx = _create_hwpx_zip(tmp_path, sec_xml)
+        overlay = extract_overlay(str(hwpx), include_style_hints=True, include_images=False)
+
+        # Exactly 2 tables: outer + nested (no duplicates)
+        assert len(overlay["tables"]) == 2, (
+            f"Expected 2 tables (outer + nested), got {len(overlay['tables'])}"
+        )
+
+    def test_nested_table_has_nested_in(self, tmp_path):
+        """Nested table entry should have nested_in referencing parent table/cell."""
+        sec_xml = _make_section_xml(
+            "<hp:p><hp:run><hp:tbl>"
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"
+            '<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>중첩</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>'
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+        )
+        hwpx = _create_hwpx_zip(tmp_path, sec_xml)
+        overlay = extract_overlay(str(hwpx), include_style_hints=True, include_images=False)
+
+        nested_tables = [t for t in overlay["tables"] if "nested_in" in t]
+        assert len(nested_tables) == 1
+        assert nested_tables[0]["nested_in"] == "tbl0/r0c0"
+
+    def test_nested_table_cell_has_original_parts(self, tmp_path):
+        """Nested table cells should have original_parts for replacement."""
+        sec_xml = _make_section_xml(
+            "<hp:p><hp:run><hp:tbl>"
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"
+            '<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>중첩값</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>'
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+        )
+        hwpx = _create_hwpx_zip(tmp_path, sec_xml)
+        overlay = extract_overlay(str(hwpx), include_style_hints=True, include_images=False)
+
+        nested_tables = [t for t in overlay["tables"] if "nested_in" in t]
+        assert len(nested_tables) == 1
+        cells = nested_tables[0]["cells"]
+        assert len(cells) >= 1
+        assert cells[0]["original_parts"] == ["중첩값"]
+        assert cells[0]["value"] == "중첩값"
+
+    def test_nested_table_cell_replacement(self, tmp_path):
+        """Nested table cell text can be replaced via apply_overlay."""
+        sec_xml = _make_section_xml(
+            "<hp:p><hp:run><hp:tbl>"
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"
+            '<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>원래중첩</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>'
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+        )
+        hwpx = _create_hwpx_zip(tmp_path, sec_xml)
+        overlay = extract_overlay(str(hwpx), include_style_hints=True, include_images=False)
+
+        # Find nested table and modify its cell
+        nested_tables = [t for t in overlay["tables"] if "nested_in" in t]
+        assert len(nested_tables) == 1
+        nested_tables[0]["cells"][0]["value"] = "새중첩값"
+
+        output = str(tmp_path / "out_nested.hwpx")
+        apply_overlay(str(hwpx), overlay, output)
+
+        with zipfile.ZipFile(output) as zf:
+            result_xml = zf.read("Contents/section0.xml").decode("utf-8")
+            assert "새중첩값" in result_xml
+            assert ">원래중첩<" not in result_xml
+
+    def test_three_level_nesting_no_duplicate(self, tmp_path):
+        """Three-level nesting (table > cell > table > cell > table) extracts each once."""
+        sec_xml = _make_section_xml(
+            "<hp:p><hp:run><hp:tbl>"  # Level 1
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"  # Level 2
+            "<hp:tr><hp:tc>"
+            "<hp:subList>"
+            "<hp:p><hp:run><hp:tbl>"  # Level 3
+            '<hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>깊은셀</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>'
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+            "</hp:subList>"
+            "</hp:tc></hp:tr>"
+            "</hp:tbl></hp:run></hp:p>"
+        )
+        hwpx = _create_hwpx_zip(tmp_path, sec_xml)
+        overlay = extract_overlay(str(hwpx), include_style_hints=True, include_images=False)
+
+        # Exactly 3 tables: level 1 + level 2 + level 3
+        assert len(overlay["tables"]) == 3, (
+            f"Expected 3 tables for 3-level nesting, got {len(overlay['tables'])}"
+        )
