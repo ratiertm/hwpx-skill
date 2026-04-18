@@ -65,10 +65,14 @@ Plans:
 - `_group_paragraphs`: 5개 중첩 표를 5개 paragraph group에 정상 분배 ✅
 - `_find_ctrl_headers_in_group`: TABLE CTRL (level=3) 정상 감지 ✅
 - `_build_text_runs_with_tables`: 호출은 되지만 **표 객체가 run._item_list에 추가 안 됨** ← 여기가 버그
+- 이모지/PUA 문자 → `U+FFFD` (REPLACEMENT CHARACTER) ×6으로 깨짐
+  - Q1~Q5 아이콘이 `������`로 표시
+  - 원인: HWP UTF-16LE → HWPX UTF-8 변환 시 서로게이트 쌍 처리 실패
 
 **Deliverables**:
 - `hwp2hwpx.py` — `_build_text_runs_with_tables`에서 중첩 표 삽입 버그 수정
-- 테스트: ibgopongdang.hwpx 변환 → 21개 표 모두 보존
+- `hwp2hwpx.py` — 이모지/서로게이트 쌍 UTF-16LE→UTF-8 변환 수정 (U+FFFD 방지)
+- 테스트: ibgopongdang.hwpx 변환 → 21개 표 모두 보존 + 이모지 정상
 - Whale에서 양식 표 (성명/주소/연락처) 정상 표시 확인
 
 **Success**: HWP→HWPX 변환 후 원본의 모든 표가 HWPX에 보존됨
