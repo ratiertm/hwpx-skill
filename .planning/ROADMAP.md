@@ -50,6 +50,31 @@ Plans:
 
 ---
 
+### Phase 2.1: hwp2hwpx 양식 표 변환 개선
+**Goal**: HWP→HWPX 변환 시 중첩 표(양식 테이블) 누락 버그 수정
+
+**Requirements**: 신규 (TS-5)
+
+**배경**:
+- HWP 원본에 21개 표 (level=1: 16개, level=3: 5개 중첩)
+- 변환 결과 HWPX에 17개 표 — **중첩 4개 누락**
+- 누락된 표: 사용자 정보(2x3), 보호자 정보(1x4), 개인정보 동의(2x3), 동의 체크(1x2)
+- 원인: `_build_cell_paragraph` → `_build_text_runs_with_tables`에서 중첩 TABLE CTRL 감지는 되지만 run에 표 객체가 삽입되지 않음
+
+**분석 완료 (2026-04-18)**:
+- `_group_paragraphs`: 5개 중첩 표를 5개 paragraph group에 정상 분배 ✅
+- `_find_ctrl_headers_in_group`: TABLE CTRL (level=3) 정상 감지 ✅
+- `_build_text_runs_with_tables`: 호출은 되지만 **표 객체가 run._item_list에 추가 안 됨** ← 여기가 버그
+
+**Deliverables**:
+- `hwp2hwpx.py` — `_build_text_runs_with_tables`에서 중첩 표 삽입 버그 수정
+- 테스트: ibgopongdang.hwpx 변환 → 21개 표 모두 보존
+- Whale에서 양식 표 (성명/주소/연락처) 정상 표시 확인
+
+**Success**: HWP→HWPX 변환 후 원본의 모든 표가 HWPX에 보존됨
+
+---
+
 ### Phase 3: 동적 테마 추출 + 통합
 **Goal**: 사용자 양식에서 테마 자동 추출 → 저장 → 재사용
 
@@ -88,9 +113,10 @@ Plans:
 
 ## Phase Summary
 
-| Phase | Goal | Requirements | Estimate |
-|-------|------|-------------|----------|
-| 1 | 테마 시스템 코어 | TS-1, TS-2 | 3-4일 |
-| 2 | 1/3 | In Progress|  |
-| 3 | 동적 테마 추출 | CF-1 | 2-3일 |
-| 4 | 정비 + 릴리스 | — | 1-2일 |
+| Phase | Goal | Requirements | Status |
+|-------|------|-------------|--------|
+| 1 | 테마 시스템 코어 | TS-1, TS-2 | ✅ 완료 |
+| 2 | JSON Overlay + BinData | TS-3, TS-4, CF-2, CF-3 | ✅ 완료 |
+| 2.1 | hwp2hwpx 양식 표 변환 | TS-5 (신규) | 미시작 |
+| 3 | 동적 테마 추출 | CF-1 | 미시작 |
+| 4 | 정비 + 릴리스 | — | 미시작 |
