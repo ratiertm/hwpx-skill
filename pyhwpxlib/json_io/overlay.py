@@ -8,11 +8,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import re
-import shutil
-import subprocess
-import sys
-import tempfile
 import xml.etree.ElementTree as ET
+import xml.sax.saxutils
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -125,15 +122,18 @@ def _extract_from_paragraph(
         char_id = int(run_el.get("charPrIDRef", "0"))
         hint = style_map.get(char_id, "") if style_map else ""
 
-        # 텍스트
-        for t_el in run_el.findall(f"{_HP}t"):
-            text = _collect_t_text(t_el)
-            if text.strip():
+        # 텍스트 — run 내 모든 <hp:t>를 하나의 엔트리로 수집
+        t_elements = run_el.findall(f"{_HP}t")
+        if t_elements:
+            parts = [_collect_t_text(t) for t in t_elements]
+            joined = "".join(parts)
+            if joined.strip():
                 texts.append({
                     "id": f"t{_text_id[0]}",
                     "location": f"{prefix}/run{ri}",
-                    "value": text,
-                    "original": text,
+                    "value": joined,
+                    "original": joined,
+                    "original_parts": parts,
                     "style_hint": hint,
                 })
                 _text_id[0] += 1
@@ -168,8 +168,8 @@ def _extract_table(
     cells = []
     for ri, tr_el in enumerate(tbl_el.findall(f"{_HP}tr")):
         for ci, tc_el in enumerate(tr_el.findall(f"{_HP}tc")):
-            # 셀 텍스트
-            cell_text = _extract_cell_full_text(tc_el)
+            # 셀 텍스트 + 파트
+            cell_text, cell_parts = _extract_cell_parts(tc_el)
 
             # 셀 역할 추정
             role = _guess_cell_role(cell_text, ri, ci)
@@ -179,6 +179,7 @@ def _extract_table(
                 "col": ci,
                 "value": cell_text,
                 "original": cell_text,
+                "original_parts": cell_parts,
                 "role": role,
                 "editable": role != "header",
             }
@@ -272,11 +273,25 @@ def _collect_t_text(t_el) -> str:
 
 
 def _extract_cell_full_text(tc_el) -> str:
-    """셀 내부 모든 <hp:t> 텍스트를 결합."""
+    """셀 내부 모든 <hp:t> 텍스트를 결합 (공백 없이)."""
     parts = []
     for t_el in tc_el.findall(f".//{_HP}t"):
         parts.append(_collect_t_text(t_el))
-    return " ".join(parts).strip()
+    return "".join(parts).strip()
+
+
+def _extract_cell_parts(tc_el) -> tuple[str, list[str]]:
+    """셀 내부 모든 <hp:t> 텍스트와 개별 파트를 반환.
+
+    Returns
+    -------
+    tuple[str, list[str]]
+        (joined_text, individual_hp_t_parts)
+    """
+    parts = []
+    for t_el in tc_el.findall(f".//{_HP}t"):
+        parts.append(_collect_t_text(t_el))
+    return "".join(parts).strip(), parts
 
 
 def _guess_cell_role(text: str, row: int, col: int) -> str:
@@ -345,6 +360,36 @@ def _build_style_map(header_xml: str) -> dict[int, str]:
 
 
 # ─────────────────────────────────────────────
+# XML text replacement helpers
+# ─────────────────────────────────────────────
+
+
+def _xml_escape(text: str) -> str:
+    """XML 특수 문자 이스케이프."""
+    return xml.sax.saxutils.escape(text)
+
+
+def _replace_text_in_xml(xml_str: str, original_parts: list[str], new_value: str) -> str:
+    """원본 <hp:t> 파트를 새 값으로 교체.
+
+    Single part: 단순 문자열 교체.
+    Multi part: regex로 <hp:t>part1</hp:t>...<hp:t>partN</hp:t> 패턴 매칭 후
+                <hp:t>new_value</hp:t>로 교체.
+    """
+    if len(original_parts) == 1:
+        old = f">{_xml_escape(original_parts[0])}<"
+        new = f">{_xml_escape(new_value)}<"
+        return xml_str.replace(old, new, 1)
+
+    # Multi-<hp:t> case: build regex pattern
+    escaped_parts = [re.escape(_xml_escape(p)) for p in original_parts]
+    parts_pattern = r"</hp:t>\s*<hp:t>".join(escaped_parts)
+    full_pattern = f"<hp:t>{parts_pattern}</hp:t>"
+    replacement = f"<hp:t>{_xml_escape(new_value)}</hp:t>"
+    return re.sub(full_pattern, replacement, xml_str, count=1)
+
+
+# ─────────────────────────────────────────────
 # apply_overlay
 # ─────────────────────────────────────────────
 
@@ -384,33 +429,19 @@ def apply_overlay(
             f"  Actual:   {actual_sha[:16]}..."
         )
 
-    work_dir = Path(tempfile.mkdtemp(prefix="hwpx_overlay_"))
+    sec_path = overlay.get("section_path", f"Contents/section{overlay.get('section_idx', 0)}.xml")
 
-    try:
-        # 1. Unpack
-        subprocess.run(
-            [sys.executable, "-m", "pyhwpxlib", "unpack", source_hwpx, "-o", str(work_dir)],
-            check=True, capture_output=True,
-        )
-
-        # 2. Section XML 수정
-        sec_path = overlay.get("section_path", f"Contents/section{overlay.get('section_idx', 0)}.xml")
-        sec_file = work_dir / sec_path
-        xml = sec_file.read_text(encoding="utf-8")
+    with zipfile.ZipFile(source_hwpx, "r") as zin:
+        xml_bytes = zin.read(sec_path)
+        xml_str = xml_bytes.decode("utf-8")
 
         # 텍스트 교체
-        changes = 0
         for field in overlay.get("texts", []):
             original = field.get("original", "")
             new_value = field.get("value", "")
             if original and original != new_value:
-                # XML 내부의 텍스트를 교체
-                # <hp:t>원본텍스트</hp:t> → <hp:t>새텍스트</hp:t>
-                old_fragment = f">{original}<"
-                new_fragment = f">{new_value}<"
-                if old_fragment in xml:
-                    xml = xml.replace(old_fragment, new_fragment, 1)
-                    changes += 1
+                parts = field.get("original_parts", [original])
+                xml_str = _replace_text_in_xml(xml_str, parts, new_value)
 
         # 표 셀 교체
         for tbl in overlay.get("tables", []):
@@ -418,35 +449,25 @@ def apply_overlay(
                 original = cell.get("original", "")
                 new_value = cell.get("value", "")
                 if original and original != new_value:
-                    old_fragment = f">{original}<"
-                    new_fragment = f">{new_value}<"
-                    if old_fragment in xml:
-                        xml = xml.replace(old_fragment, new_fragment, 1)
-                        changes += 1
+                    parts = cell.get("original_parts", [original])
+                    xml_str = _replace_text_in_xml(xml_str, parts, new_value)
 
-        sec_file.write_text(xml, encoding="utf-8")
-
-        # 3. 이미지 교체
-        if image_replacements:
-            for bin_ref, img_bytes in image_replacements.items():
-                # bin_ref → BinData/BIN0001.png 등
-                bin_dir = work_dir / "BinData"
-                if bin_dir.exists():
-                    for f in bin_dir.iterdir():
-                        if bin_ref in f.name:
-                            f.write_bytes(img_bytes)
-                            changes += 1
-
-        # 4. Repack
+        # 출력 ZIP 작성 — 엔트리 순서 및 압축 방식 보존
         out = Path(output_path)
         if out.exists():
             out.unlink()
-        subprocess.run(
-            [sys.executable, "-m", "pyhwpxlib", "pack", str(work_dir), "-o", output_path],
-            check=True, capture_output=True,
-        )
 
-        return output_path
+        with zipfile.ZipFile(output_path, "w") as zout:
+            for item in zin.infolist():
+                if item.filename == sec_path:
+                    zout.writestr(item, xml_str.encode("utf-8"))
+                elif image_replacements and item.filename.startswith("BinData/"):
+                    bin_stem = Path(item.filename).stem
+                    if bin_stem in image_replacements:
+                        zout.writestr(item, image_replacements[bin_stem])
+                    else:
+                        zout.writestr(item, zin.read(item.filename))
+                else:
+                    zout.writestr(item, zin.read(item.filename))
 
-    finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+    return output_path
