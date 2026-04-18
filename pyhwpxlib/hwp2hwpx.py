@@ -85,6 +85,57 @@ _EXTENDED_CHARS = set(range(1, 32)) - {_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END}
 _CH_TAB_FILL_SENTINEL = 0x0001  # a low control code safely unused elsewhere
 
 
+def _decode_hwp_text_chars(text_data: bytes) -> List[Tuple[int, int]]:
+    """Decode HWP UTF-16LE text_data into (position, codepoint) pairs.
+
+    Handles:
+    - Extended control chars (1-31): consume 8 wchars (2 + 14 bytes addition)
+    - UTF-16 surrogate pairs (0xD800-0xDBFF + 0xDC00-0xDFFF) -> single codepoint
+    - Orphan surrogates -> U+FFFD
+    - PARA_END (13) terminates parsing
+
+    Returns a list of (char_position, codepoint) tuples matching the format
+    expected by _build_text_runs, _build_text_runs_with_tables, etc.
+    """
+    chars: List[Tuple[int, int]] = []
+    i = 0
+    pos = 0
+    while i < len(text_data) - 1:
+        ch = struct.unpack_from('<H', text_data, i)[0]
+        i += 2
+
+        # UTF-16 surrogate pair handling
+        if 0xD800 <= ch <= 0xDBFF:
+            # High surrogate: look for low surrogate
+            if i + 1 < len(text_data):
+                low = struct.unpack_from('<H', text_data, i)[0]
+                if 0xDC00 <= low <= 0xDFFF:
+                    # Valid pair: combine into a single codepoint
+                    ch = 0x10000 + ((ch - 0xD800) << 10) + (low - 0xDC00)
+                    i += 2
+                else:
+                    # Orphan high surrogate (next is not a low surrogate)
+                    ch = 0xFFFD
+            else:
+                # High surrogate at end of data
+                ch = 0xFFFD
+        elif 0xDC00 <= ch <= 0xDFFF:
+            # Orphan low surrogate
+            ch = 0xFFFD
+
+        chars.append((pos, ch))
+        if ch == _CH_PARA_END:
+            pos += 1
+            break
+        elif 1 <= ch <= 31 and ch not in (_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END,
+                                           _CH_FWSPACE, _CH_NBSPACE, _CH_HYPHEN):
+            i += 14
+            pos += 8
+        else:
+            pos += 1
+    return chars
+
+
 # ============================================================
 # Public API
 # ============================================================
@@ -2250,26 +2301,12 @@ def _build_cell_paragraph(sub_list, pg: List[dict], hwp: '_HWPDocument'):
                 i += 36
 
     if text_data is not None:
-        # Parse text into chars - handle extended ctrl chars (table, auto-num, etc.)
-        chars = []
-        i = 0
-        pos = 0
-        needs_ctrl_processing = False  # True when any ctrl char needs a ctrl record
-        while i < len(text_data) - 1:
-            ch = struct.unpack_from('<H', text_data, i)[0]
-            i += 2
-            if ch in (_CH_TABLE, _CH_AUTO_NUM, _CH_HEAD_FOOT, _CH_PAGE_NUM):
-                needs_ctrl_processing = True
-            chars.append((pos, ch))
-            if ch == _CH_PARA_END:
-                pos += 1
-                break
-            elif 1 <= ch <= 31 and ch not in (_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END,
-                                               _CH_FWSPACE, _CH_NBSPACE, _CH_HYPHEN):
-                i += 14
-                pos += 8
-            else:
-                pos += 1
+        # Parse text into chars with surrogate pair handling
+        chars = _decode_hwp_text_chars(text_data)
+        needs_ctrl_processing = any(
+            ch in (_CH_TABLE, _CH_AUTO_NUM, _CH_HEAD_FOOT, _CH_PAGE_NUM)
+            for _, ch in chars
+        )
 
         if needs_ctrl_processing:
             # Has inline ctrl objects (table/auto-num/header-footer) - use ctrl-aware builder
@@ -2890,22 +2927,8 @@ def _build_runs_with_secpr(para, hwp: _HWPDocument, text_data: bytes,
                             has_sec_def: bool,
                             has_table: bool = False):
     """Build runs with SecPr and ColPr support for section-defining paragraphs."""
-    # Parse text into (position, char_code) pairs
-    chars = []
-    i = 0
-    pos = 0
-    while i < len(text_data) - 1:
-        ch = struct.unpack_from('<H', text_data, i)[0]
-        i += 2
-        chars.append((pos, ch))
-        if ch == _CH_PARA_END:
-            pos += 1
-            break
-        elif 1 <= ch <= 31 and ch not in (_CH_TAB, _CH_LINE_BREAK, _CH_PARA_END):
-            i += 14
-            pos += 8
-        else:
-            pos += 1
+    # Parse text into (position, char_code) pairs with surrogate pair handling
+    chars = _decode_hwp_text_chars(text_data)
 
     if not chars:
         run = para.add_new_run()
