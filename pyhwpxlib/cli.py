@@ -11,6 +11,7 @@ Usage::
     pyhwpxlib unpack    input.hwpx -o unpacked/
     pyhwpxlib pack      unpacked/ -o output.hwpx
     pyhwpxlib validate  input.hwpx
+    pyhwpxlib lint      input.hwpx
 """
 
 from __future__ import annotations
@@ -20,6 +21,70 @@ import json
 import os
 import sys
 from pathlib import Path
+
+
+def _emit(result: dict, as_json: bool = False) -> None:
+    """Output result as JSON or human-readable text."""
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        _render_human(result)
+
+
+def _render_human(result: dict) -> None:
+    """Default human-readable rendering of a result dict."""
+    cmd = result.get('command', '')
+    ok = result.get('ok', True)
+    f = result.get('file', '')
+
+    if cmd == 'validate':
+        print(f"\n{'=' * 50}")
+        print(f"HWPX Validation: {f}")
+        print(f"{'=' * 50}")
+        print(f"Result: {'✅ VALID' if ok else '❌ INVALID'}")
+        for check in result.get('checks', []):
+            icon = '✅' if check['ok'] else '❌'
+            print(f"  {icon} {check['name']}: {check.get('detail', '')}")
+
+    elif cmd == 'lint':
+        issues = result.get('issues', [])
+        print(f"\nHWPX Lint: {f}")
+        print(f"{'=' * 50}")
+        if not issues:
+            print("✅ No issues found.")
+        else:
+            for iss in issues:
+                sev = iss['severity'].upper()
+                icon = '⚠️' if sev == 'WARNING' else '❌'
+                print(f"  {icon} [{iss['code']}] {iss['message']}")
+                if iss.get('hint'):
+                    print(f"     💡 {iss['hint']}")
+            warns = sum(1 for i in issues if i['severity'] == 'warning')
+            errs = sum(1 for i in issues if i['severity'] == 'error')
+            print(f"\n{errs} error(s), {warns} warning(s)")
+
+    elif cmd == 'font-check':
+        fonts = result.get('fonts', [])
+        print(f"\n📋 Fonts in document: {len(fonts)}")
+        for fi in fonts:
+            status = fi.get('status', 'ok')
+            icons = {'ok': '✅', 'alias': '🔄', 'fallback': '⚠️', 'missing': '❌'}
+            icon = icons.get(status, '?')
+            line = f"  {icon} {fi['declared']}"
+            if fi.get('resolved'):
+                line += f" → {fi['resolved']}"
+            if status == 'fallback':
+                line += " (fallback)"
+            print(line)
+
+    elif cmd == 'themes list':
+        for section in ('builtin', 'custom'):
+            themes = [t for t in result.get('themes', []) if t['source'] == section]
+            if themes:
+                label = 'Built-in' if section == 'builtin' else 'Custom'
+                print(f"\n{label} themes:")
+                for t in themes:
+                    print(f"  {t['name']:20s}  primary={t.get('primary', '?')}")
 
 
 def _default_output(input_path: str, new_ext: str) -> str:
@@ -194,70 +259,184 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     import xml.etree.ElementTree as ET
 
     hwpx_path = args.input
+    as_json = getattr(args, 'json', False)
     required = ["mimetype", "Contents/header.xml", "Contents/section0.xml", "Contents/content.hpf"]
-    errors, info = [], {}
+    checks = []
 
     if not zipfile.is_zipfile(hwpx_path):
-        print(f"❌ INVALID: Not a valid ZIP file")
+        result = {'command': 'validate', 'ok': False, 'file': hwpx_path,
+                  'checks': [{'name': 'zip_open', 'ok': False, 'detail': 'Not a valid ZIP file'}]}
+        _emit(result, as_json)
         sys.exit(1)
 
     with zipfile.ZipFile(hwpx_path, "r") as z:
         names = z.namelist()
-        info["file_count"] = len(names)
+        checks.append({'name': 'zip_open', 'ok': True, 'detail': f'{len(names)} files'})
 
         for req in required:
-            if req not in names:
-                errors.append(f"Missing: {req}")
+            present = req in names
+            checks.append({'name': f'file_{req.split("/")[-1]}', 'ok': present,
+                          'detail': 'present' if present else 'MISSING'})
 
         if "mimetype" in names:
             mt = z.read("mimetype").decode("utf-8").strip()
-            info["mimetype"] = mt
+            checks.append({'name': 'mimetype_value', 'ok': True, 'detail': mt})
 
         for xml_file in ["Contents/header.xml", "Contents/section0.xml"]:
             if xml_file in names:
                 try:
                     content = z.read(xml_file).decode("utf-8")
                     ET.fromstring(content)
-                    info[xml_file] = f"OK ({len(content):,} bytes)"
+                    checks.append({'name': f'xml_parse_{xml_file.split("/")[-1]}', 'ok': True,
+                                  'detail': f'{len(content):,} bytes'})
                 except ET.ParseError as e:
-                    errors.append(f"XML error in {xml_file}: {e}")
+                    checks.append({'name': f'xml_parse_{xml_file.split("/")[-1]}', 'ok': False,
+                                  'detail': str(e)})
 
-    valid = len(errors) == 0
-    print(f"\n{'=' * 50}")
-    print(f"HWPX Validation: {hwpx_path}")
-    print(f"{'=' * 50}")
-    print(f"Result: {'✅ VALID' if valid else '❌ INVALID'}")
-    print(f"Files: {info.get('file_count', '?')}")
-    print(f"Mimetype: {info.get('mimetype', 'N/A')}")
-    for xf in ["Contents/header.xml", "Contents/section0.xml"]:
-        if xf in info:
-            print(f"{xf}: {info[xf]}")
-    if errors:
-        for e in errors:
-            print(f"  ❌ {e}")
-    elif valid:
-        print("\n✅ All checks passed!")
-    sys.exit(0 if valid else 1)
+    ok = all(c['ok'] for c in checks)
+    result = {'command': 'validate', 'ok': ok, 'file': hwpx_path, 'checks': checks}
+    _emit(result, as_json)
+    sys.exit(0 if ok else 1)
+
+
+def _cmd_lint(args: argparse.Namespace) -> None:
+    """Lint HWPX for rendering/compatibility risks."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+    import re
+
+    hwpx_path = args.input
+    as_json = getattr(args, 'json', False)
+    issues = []
+
+    if not os.path.exists(hwpx_path):
+        print(f"File not found: {hwpx_path}")
+        sys.exit(1)
+
+    try:
+        with zipfile.ZipFile(hwpx_path) as z:
+            names = z.namelist()
+
+            # Lint all section XML files
+            sec_files = sorted(n for n in names if n.startswith('Contents/section') and n.endswith('.xml'))
+            for sec_file in sec_files:
+                xml_str = z.read(sec_file).decode('utf-8')
+
+                # Rule 1: \n inside <hp:t> text nodes
+                for m in re.finditer(r'<hp:t[^>]*>([^<]*)</hp:t>', xml_str):
+                    text = m.group(1)
+                    if '\n' in text:
+                        issues.append({
+                            'code': 'TEXT_NEWLINE_IN_RUN',
+                            'severity': 'error',
+                            'message': f'Text node contains newline: "{text[:40]}..."',
+                            'path': sec_file,
+                            'hint': 'Split into separate <hp:p> paragraphs instead of \\n.',
+                        })
+
+                # Rule 2: Empty paragraph before first content (secPr issue)
+                try:
+                    root = ET.fromstring(xml_str)
+                    ns = {'hp': 'http://www.hancom.co.kr/hwpml/2011/paragraph'}
+                    paras = root.findall('.//hp:p', ns)
+                    if len(paras) >= 2:
+                        first_p = paras[0]
+                        has_secpr = first_p.find('.//hp:secPr', ns) is not None
+                        # Check if first para has secPr but no text
+                        first_texts = [t.text for t in first_p.iter() if t.tag.endswith('}t') and t.text and t.text.strip()]
+                        if not has_secpr and not first_texts:
+                            issues.append({
+                                'code': 'EMPTY_FIRST_PARAGRAPH',
+                                'severity': 'warning',
+                                'message': 'First paragraph has no text and no secPr.',
+                                'path': sec_file,
+                                'hint': 'Empty paragraphs before content may cause rendering issues.',
+                            })
+                except ET.ParseError:
+                    pass  # validate catches this
+
+                # Rule 3: Very long single run (>500 chars) — potential overflow
+                for m in re.finditer(r'<hp:t[^>]*>([^<]{500,})</hp:t>', xml_str):
+                    issues.append({
+                        'code': 'LONG_TEXT_RUN',
+                        'severity': 'warning',
+                        'message': f'Very long text run ({len(m.group(1))} chars) may cause overflow.',
+                        'path': sec_file,
+                        'hint': 'Consider splitting into multiple paragraphs.',
+                    })
+
+                # Rule 4: Unescaped & in text (would cause parse error, but check raw string)
+                for m in re.finditer(r'<hp:t[^>]*>([^<]*&[^<]*)</hp:t>', xml_str):
+                    text = m.group(1)
+                    # Check for unescaped & (not &amp; &lt; &gt; &quot; &apos; &#)
+                    if re.search(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', text):
+                        issues.append({
+                            'code': 'UNESCAPED_AMPERSAND',
+                            'severity': 'error',
+                            'message': f'Unescaped & in text: "{text[:40]}..."',
+                            'path': sec_file,
+                            'hint': 'Use &amp; instead of bare &.',
+                        })
+
+            # Rule 5: Font declared but not in font_map
+            if 'Contents/header.xml' in names:
+                header_xml = z.read('Contents/header.xml').decode('utf-8')
+                try:
+                    hroot = ET.fromstring(header_xml)
+                    doc_fonts = set()
+                    for font_el in hroot.iter('{http://www.hancom.co.kr/hwpml/2011/head}font'):
+                        face = font_el.get('face')
+                        if face:
+                            doc_fonts.add(face)
+                    try:
+                        from .rhwp_bridge import _DEFAULT_FONT_MAP
+                        known = set(_DEFAULT_FONT_MAP.keys())
+                    except ImportError:
+                        known = set()
+                    for font in doc_fonts:
+                        if font.lower() not in known and font not in {'나눔고딕', 'NanumGothic'}:
+                            issues.append({
+                                'code': 'FONT_NOT_IN_MAP',
+                                'severity': 'warning',
+                                'message': f'Font "{font}" not in font_map — preview may use fallback.',
+                                'path': 'Contents/header.xml',
+                                'hint': 'Add to font_map or use a bundled font.',
+                            })
+                except ET.ParseError:
+                    pass
+
+    except zipfile.BadZipFile:
+        issues.append({
+            'code': 'INVALID_ZIP',
+            'severity': 'error',
+            'message': 'File is not a valid ZIP archive.',
+            'path': hwpx_path,
+            'hint': 'Run validate first.',
+        })
+
+    ok = not any(i['severity'] == 'error' for i in issues)
+    result = {'command': 'lint', 'ok': ok, 'file': hwpx_path, 'issues': issues}
+    _emit(result, as_json)
+    sys.exit(0 if ok else 1)
 
 
 def _cmd_font_check(args: argparse.Namespace) -> None:
-    """Check font availability for an HWPX file."""
+    """Check font availability and resolution for an HWPX file."""
     import zipfile
     import xml.etree.ElementTree as ET
 
     path = args.input
+    as_json = getattr(args, 'json', False)
+
     if not os.path.exists(path):
         print(f"File not found: {path}")
         sys.exit(1)
 
-    # Extract font names from header.xml
     doc_fonts: set[str] = set()
     try:
         with zipfile.ZipFile(path) as z:
             header_xml = z.read("Contents/header.xml").decode("utf-8")
         root = ET.fromstring(header_xml)
-        ns = {"hh": "http://www.hancom.co.kr/hwpml/2011/head",
-              "hp": "http://www.hancom.co.kr/hwpml/2011/paragraph"}
         for font_el in root.iter("{http://www.hancom.co.kr/hwpml/2011/head}font"):
             face = font_el.get("face")
             if face:
@@ -266,64 +445,59 @@ def _cmd_font_check(args: argparse.Namespace) -> None:
         print(f"Error reading {path}: {e}")
         sys.exit(1)
 
-    if not doc_fonts:
-        print("No fonts found in document.")
-        return
-
-    # Check against font_map
-    from .vendor import NANUM_GOTHIC_REGULAR
-    bundled = {"나눔고딕", "NanumGothic"}
+    # Resolve each font against font_map
     try:
         from .rhwp_bridge import _DEFAULT_FONT_MAP
-        known = set(k for k in _DEFAULT_FONT_MAP)
+        font_map = dict(_DEFAULT_FONT_MAP)
     except ImportError:
-        known = set()
+        font_map = {}
 
-    print(f"📋 Fonts in document: {len(doc_fonts)}")
-    ok_count = 0
-    warn_count = 0
+    fonts_result = []
     for font in sorted(doc_fonts):
         lower = font.lower()
-        if font in bundled or lower in known:
-            print(f"  ✅ {font}")
-            ok_count += 1
+        resolved = font_map.get(lower, '')
+        if resolved and os.path.exists(resolved):
+            # Check if it's the bundled font (alias) or exact match
+            if lower in ('나눔고딕', 'nanumgothic', 'nanum gothic'):
+                status = 'ok'
+            elif lower in ('함초롬돋움', '함초롬바탕'):
+                status = 'alias'
+            else:
+                status = 'ok'
+            fonts_result.append({'declared': font, 'resolved': resolved, 'status': status})
+        elif resolved:
+            # Path in map but file doesn't exist
+            fonts_result.append({'declared': font, 'resolved': resolved, 'status': 'missing'})
         else:
-            print(f"  ⚠️  {font} — not in font_map (may render with fallback)")
-            warn_count += 1
+            # Not in map at all — will use fallback
+            fonts_result.append({'declared': font, 'resolved': '', 'status': 'fallback'})
 
-    print(f"\nBundled font: 나눔고딕 ({'exists' if NANUM_GOTHIC_REGULAR.exists() else 'MISSING'})")
-    if warn_count:
-        print(f"\n⚠️  {warn_count} font(s) may need manual installation or font_map entry.")
-    else:
-        print(f"\n✅ All {ok_count} font(s) available.")
+    ok = not any(f['status'] in ('missing',) for f in fonts_result)
+    result = {'command': 'font-check', 'ok': ok, 'file': path, 'fonts': fonts_result}
+    _emit(result, as_json)
 
 
 def _cmd_themes(args: argparse.Namespace) -> None:
     """List saved custom themes or extract/save a theme."""
     from .themes import BUILTIN_THEMES, _THEMES_DIR, extract_theme, save_theme, load_theme
 
+    as_json = getattr(args, 'json', False)
+
     if args.action == 'list':
-        # Built-in themes
-        print("Built-in themes:")
+        themes_list = []
         for name in sorted(BUILTIN_THEMES):
             t = BUILTIN_THEMES[name]
-            print(f"  {name:20s}  primary={t.palette.primary}")
-
-        # Custom themes
+            themes_list.append({'name': name, 'source': 'builtin', 'primary': t.palette.primary})
         if _THEMES_DIR.exists():
-            customs = sorted(_THEMES_DIR.glob('*.json'))
-            if customs:
-                print(f"\nCustom themes ({_THEMES_DIR}):")
-                for p in customs:
-                    try:
-                        t = load_theme(p)
-                        print(f"  {t.name:20s}  primary={t.palette.primary}  font={t.fonts.body_hangul}")
-                    except Exception:
-                        print(f"  {p.stem:20s}  (error loading)")
-            else:
-                print("\nNo custom themes saved yet.")
-        else:
-            print("\nNo custom themes saved yet.")
+            for p in sorted(_THEMES_DIR.glob('*.json')):
+                try:
+                    t = load_theme(p)
+                    themes_list.append({'name': t.name, 'source': 'custom',
+                                       'primary': t.palette.primary, 'font': t.fonts.body_hangul})
+                except Exception:
+                    themes_list.append({'name': p.stem, 'source': 'custom', 'primary': '?'})
+        result = {'command': 'themes list', 'ok': True, 'themes': themes_list}
+        _emit(result, as_json)
 
     elif args.action == 'extract':
         if not args.input:
@@ -411,12 +585,19 @@ def main(argv: list[str] | None = None) -> None:
     p_pack.add_argument("-o", "--output", required=True, help="Output .hwpx file")
 
     # validate
-    p_val = sub.add_parser("validate", help="Validate HWPX file")
+    p_val = sub.add_parser("validate", help="Validate HWPX file structure")
     p_val.add_argument("input", help="Input .hwpx file")
+    p_val.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # lint
+    p_lint = sub.add_parser("lint", help="Check HWPX for rendering/compatibility risks")
+    p_lint.add_argument("input", help="Input .hwpx file")
+    p_lint.add_argument("--json", action="store_true", help="Output as JSON")
 
     # font-check
-    p_fc = sub.add_parser("font-check", help="Check font availability for HWPX")
+    p_fc = sub.add_parser("font-check", help="Check font availability and resolution")
     p_fc.add_argument("input", help="Input .hwpx file")
+    p_fc.add_argument("--json", action="store_true", help="Output as JSON")
 
     # themes
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
@@ -424,6 +605,7 @@ def main(argv: list[str] | None = None) -> None:
                        help="list: show all themes, extract: save theme from HWPX, delete: remove custom theme")
     p_th.add_argument("--input", "-i", help="Input .hwpx file (for extract)")
     p_th.add_argument("--name", "-n", help="Theme name (for extract/delete)")
+    p_th.add_argument("--json", action="store_true", help="Output as JSON")
 
     args = parser.parse_args(argv)
 
@@ -441,6 +623,7 @@ def main(argv: list[str] | None = None) -> None:
         "unpack": _cmd_unpack,
         "pack": _cmd_pack,
         "validate": _cmd_validate,
+        "lint": _cmd_lint,
         "font-check": _cmd_font_check,
         "themes": _cmd_themes,
     }
