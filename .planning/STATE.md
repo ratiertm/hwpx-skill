@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Phase
-Phase 1: 테마 시스템 코어 — **All plans complete (2/2)**
-Current Plan: 2 of 2 (DONE)
+Phase 2: JSON Overlay 정밀화 + BinData 에러 핸들링
+Current Plan: 2 of 3 (02-02 complete)
 
 ## Context
 - 코드베이스 매핑 완료 (7개 문서, 1,555 lines)
@@ -20,10 +20,11 @@ Current Plan: 2 of 2 (DONE)
 - Cross-theme consistent values: on_surface, on_surface_var, outline_var, error
 - Default theme uses _is_default_theme flag to skip font/color injection for backward compat
 - Per-instance _table_presets_dict derived from theme palette, module-level constants untouched
+- BinData: Skip corrupt streams entirely (no empty bytes) -- Whale handles missing BinData gracefully
 
 ## Last Session
-- **Stopped at:** Completed 01-02-PLAN.md
-- **Timestamp:** 2026-04-17T22:22:16Z
+- **Stopped at:** Completed 02-02-PLAN.md
+- **Timestamp:** 2026-04-18T02:04:19Z
 
 ## Blockers
 - 없음
