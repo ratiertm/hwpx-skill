@@ -2557,3 +2557,152 @@ def extract_schema(
         "fields": fields,
         "checkboxes": checkboxes,
     }
+
+
+# ======================================================================
+# Insert image into existing document
+# ======================================================================
+
+def insert_image_to_existing(
+    hwpx_path: str,
+    image_path: str,
+    output_path: str,
+    width: int = 21260,
+    height: int = 15000,
+    position: str = 'end',
+    section: int = 0,
+) -> str:
+    """Insert an image into an existing HWPX document.
+
+    Args:
+        hwpx_path: path to existing .hwpx file
+        image_path: path to image file (PNG, JPEG, BMP, etc.)
+        output_path: path for output .hwpx file
+        width: display width in HWPX units (default ~75mm)
+        height: display height in HWPX units (default ~53mm)
+        position: 'end' (append) or 'start' (prepend after secPr)
+        section: section index (default 0)
+
+    Returns:
+        output_path
+    """
+    import zipfile
+    import tempfile
+    import shutil
+    from pathlib import Path
+
+    img = Path(image_path)
+    if not img.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+
+    ext = img.suffix.lower().lstrip('.')
+    if ext == 'jpg':
+        ext = 'jpeg'
+    mime_map = {'png': 'image/png', 'jpeg': 'image/jpeg', 'bmp': 'image/bmp',
+                'gif': 'image/gif', 'tiff': 'image/tiff'}
+    media_type = mime_map.get(ext, 'image/png')
+
+    # Read image to get original dimensions
+    img_data = img.read_bytes()
+    org_w, org_h = width, height
+    try:
+        from PIL import Image as PILImage
+        with PILImage.open(image_path) as pil_img:
+            pw, ph = pil_img.size
+            # Convert pixels to HWPX units (~7.2 units per pixel at 96dpi)
+            org_w = int(pw * 7.2)
+            org_h = int(ph * 7.2)
+    except ImportError:
+        pass
+
+    # Unpack to temp directory
+    tmp_dir = tempfile.mkdtemp(prefix='hwpx_insert_img_')
+    try:
+        with zipfile.ZipFile(hwpx_path) as z:
+            z.extractall(tmp_dir)
+            names = z.namelist()
+
+        # Find next available BinData ID
+        existing_bins = [n for n in names if n.startswith('BinData/')]
+        bin_id = len(existing_bins) + 1
+        bin_name = f"image{bin_id}"
+        bin_filename = f"{bin_name}.{ext}"
+        bin_path = f"BinData/{bin_filename}"
+
+        # Copy image to BinData/
+        bindata_dir = Path(tmp_dir) / 'BinData'
+        bindata_dir.mkdir(exist_ok=True)
+        (bindata_dir / bin_filename).write_bytes(img_data)
+
+        # Update content.hpf manifest
+        hpf_path = Path(tmp_dir) / 'Contents' / 'content.hpf'
+        hpf = hpf_path.read_text(encoding='utf-8')
+        manifest_item = f'<opf:item id="{bin_name}" href="BinData/{bin_filename}" media-type="{media_type}" isEmbeded="1"/>'
+        hpf = hpf.replace('</opf:manifest>', f'  {manifest_item}\n</opf:manifest>')
+        hpf_path.write_text(hpf, encoding='utf-8')
+
+        # Build image paragraph XML
+        import random
+        pic_id = random.randint(1_000_000_000, 3_000_000_000)
+        inst_id = random.randint(1_000_000_000, 3_000_000_000)
+        para_id = random.randint(1_000_000_000, 3_000_000_000)
+
+        scale_x = f"{width / org_w:.6f}" if org_w else "1"
+        scale_y = f"{height / org_h:.6f}" if org_h else "1"
+
+        img_para_xml = (
+            f'<hp:p id="{para_id}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+            f'<hp:run charPrIDRef="0">'
+            f'<hp:pic id="{pic_id}" zOrder="0" numberingType="PICTURE" '
+            f'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+            f'dropcapstyle="None" href="" groupLevel="0" instid="{inst_id}" reverse="0">'
+            f'<hp:offset x="0" y="0"/>'
+            f'<hp:orgSz width="{org_w}" height="{org_h}"/>'
+            f'<hp:curSz width="{width}" height="{height}"/>'
+            f'<hp:flip horizontal="0" vertical="0"/>'
+            f'<hp:rotationInfo angle="0" centerX="{width//2}" centerY="{height//2}" rotateimage="1"/>'
+            f'<hp:renderingInfo>'
+            f'<hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+            f'<hc:scaMatrix e1="{scale_x}" e2="0" e3="0" e4="0" e5="{scale_y}" e6="0"/>'
+            f'<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+            f'</hp:renderingInfo>'
+            f'<hp:imgRect>'
+            f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{org_w}" y="0"/>'
+            f'<hc:pt2 x="{org_w}" y="{org_h}"/><hc:pt3 x="0" y="{org_h}"/>'
+            f'</hp:imgRect>'
+            f'<hp:imgClip left="0" top="0" right="0" bottom="0"/>'
+            f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+            f'<hp:imgDim dimwidth="{org_w}" dimheight="{org_h}"/>'
+            f'<hc:img binaryItemIDRef="{bin_name}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+            f'<hp:sz width="{width}" height="{height}" widthRelTo="ABSOLUTE" heightRelTo="ABSOLUTE" protect="0"/>'
+            f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="1" '
+            f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" '
+            f'vertOffset="0" horzOffset="0"/>'
+            f'<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
+            f'</hp:pic></hp:run></hp:p>'
+        )
+
+        # Insert into section XML
+        sec_file = Path(tmp_dir) / 'Contents' / f'section{section}.xml'
+        sec_xml = sec_file.read_text(encoding='utf-8')
+
+        if position == 'end':
+            sec_xml = sec_xml.replace('</hs:sec>', img_para_xml + '\n</hs:sec>')
+        else:  # start — after first </hp:p> (secPr paragraph)
+            first_p_end = sec_xml.find('</hp:p>')
+            if first_p_end > 0:
+                insert_pos = first_p_end + len('</hp:p>')
+                sec_xml = sec_xml[:insert_pos] + '\n' + img_para_xml + sec_xml[insert_pos:]
+
+        sec_file.write_text(sec_xml, encoding='utf-8')
+
+        # Repack using pyhwpxlib pack
+        from .cli import _cmd_pack
+        import argparse
+        pack_args = argparse.Namespace(input=tmp_dir, output=output_path)
+        _cmd_pack(pack_args)
+
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return output_path
