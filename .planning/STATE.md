@@ -2,55 +2,60 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: milestone
-current_plan: 1 of 1 (02.1-01 complete) -- PHASE COMPLETE
-status: complete
-stopped_at: Completed 02.1-01-PLAN.md (Phase 2.1 complete)
-last_updated: "2026-04-18T06:47:09Z"
-progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+current_plan: Phase 2.2 next
 ---
 
 # Project State
 
 ## Current Phase
+Phase 2.2: BinData 이미지 복구 — **Not started**
 
-Phase 2.1: hwp2hwpx 양식 표 변환 개선
-Current Plan: 1 of 1 (02.1-01 complete) -- PHASE COMPLETE
+## Completed Phases
+- Phase 1: 테마 시스템 코어 ✅
+- Phase 2: JSON Overlay + BinData ✅
+- Phase 2.1: hwp2hwpx 양식 표 + 이모지 ✅
 
-## Context
+## PyPI Status
+- **현재 배포**: 0.6.0 (2026-04-18)
 
-- 코드베이스 매핑 완료 (7개 문서, 1,555 lines)
-- PROJECT.md, REQUIREMENTS.md, ROADMAP.md 생성 완료
-- 기존 builder.py의 DS/TABLE_PRESETS/fontfaces 하드코딩 위치 파악 완료
-- Plan 01 완료: Theme dataclass hierarchy + 10 built-in themes + test scaffold
-- Plan 02 완료: Theme integration into HwpxBuilder, BlankFileMaker, api.py
+## 남은 TODO (순서대로)
+
+### TODO 1: Phase 2.2 — BinData 이미지 복구
+- **파일**: `hwp2hwpx.py` `_decompress()` line 419-425
+- **문제**: ibgopongdang BIN0001~0004.png zlib 실패 → 이미지 스킵
+- **시도**: raw passthrough, deflate window size 변형
+- **테스트**: 변환 후 Whale에서 이미지 표시
+
+### TODO 2: Phase 2.3 — 폰트 파이프라인
+- NanumGothic TTF vendor/ 번들
+- embed_fonts=True 기본값
+- font_map 번들 폰트 고정
+- `python -m pyhwpxlib font-check` CLI
+- SKILL.md Rule 25 (폰트 민감하지 않은 레이아웃)
+
+### TODO 3: Phase 3 — 동적 테마 추출
+- `extract_theme(hwpx_path)` → 테마 JSON
+- 테마 저장/로드 (`~/.pyhwpxlib/themes/`)
+- `HwpxBuilder(theme='custom/my-form')`
+- MCP 서버 `hwpx_extract_theme` 도구
+
+### TODO 4: Phase 4 — 정비 + 릴리스
+- README.md + design_guide.md 동기화
+- Oracle MCP 서버 업데이트
+- SKILL.md claude.ai 재업로드
+- PyPI 최종 배포
+
+## 미해결 이슈
+- overlay 40-run 셀 비례 분배 가끔 부정확
+- linesegarray 불일치 → rhwp 프리뷰 뭉침 (Whale 정상)
+- Linux 한글 폰트 fallback 개선 필요 (Phase 2.3)
 
 ## Key Decisions
-
-- Oracle MCP 서버 유지 ($0/월)
-- Overlay 방식 JSON 편집 채택 (전체 재구성 X)
-- 테마 = 팔레트 + 폰트 + 사이즈 + 여백 통합 구조
-- Palette 14 fields: DS dict 12개 + secondary/accent (design guide 4색 시스템)
-- on_primary brightness heuristic: dark primary -> #f7f7ff, light -> #2b3437
-- Cross-theme consistent values: on_surface, on_surface_var, outline_var, error
-- Default theme uses _is_default_theme flag to skip font/color injection for backward compat
-- Per-instance _table_presets_dict derived from theme palette, module-level constants untouched
-- BinData: Skip corrupt streams entirely (no empty bytes) -- Whale handles missing BinData gracefully
-- Overlay: regex-based multi-hp:t replacement instead of ET serialization (avoids namespace rewriting)
-- Overlay: cell text join '' not ' ' for matching accuracy
-- Overlay: zipfile direct manipulation replaces subprocess unpack/repack
-- Nested table XPath: direct-child traversal (tc->subList->p->run->tbl) instead of .//{_HP}tbl
-- Level filtering in _build_cell_paragraph: skip records at level != para_level+1 to prevent nested table cell data overwriting parent
-- Centralized _decode_hwp_text_chars for UTF-16 surrogate pair handling across all text parsing locations
+- Overlay 방식 (JSON 전체 재구성 X)
+- heading textColor = primary
+- body 기본 12pt
+- 체크박스 4패턴 (□/☐/[  ]/[ ])
+- Oracle MCP 유지 ($0/월)
 
 ## Last Session
-
-- **Stopped at:** Completed 02.1-01-PLAN.md (Phase 2.1 complete)
-- **Timestamp:** 2026-04-18T06:47:09Z
-
-## Blockers
-
-- 없음
+- **Timestamp**: 2026-04-18T15:30:00Z
