@@ -508,8 +508,15 @@ _ILLEGAL_XML_CHARS = _re.compile(
 
 
 def _sanitize_text(value: str) -> str:
-    """Remove control characters that are invalid in XML text nodes."""
-    return _ILLEGAL_XML_CHARS.sub("", value)
+    """Remove control characters and escape XML special characters.
+
+    Handles both illegal XML chars (control characters) and characters
+    that must be escaped in XML text nodes (&, <, >, ", ').
+    Without escaping, text like "A&B" or "x < y" would break the XML.
+    """
+    from xml.sax.saxutils import escape
+    cleaned = _ILLEGAL_XML_CHARS.sub("", value)
+    return escape(cleaned)
 
 
 def _new_raw_para(hwpx_file: HWPXFile, section_index: int = 0) -> Para:
