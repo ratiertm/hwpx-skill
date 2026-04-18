@@ -2,7 +2,7 @@
 
 ## Current Phase
 Phase 2: JSON Overlay 정밀화 + BinData 에러 핸들링
-Current Plan: 2 of 3 (02-02 complete)
+Current Plan: 2 of 3 (02-01, 02-02 complete)
 
 ## Context
 - 코드베이스 매핑 완료 (7개 문서, 1,555 lines)
@@ -21,10 +21,13 @@ Current Plan: 2 of 3 (02-02 complete)
 - Default theme uses _is_default_theme flag to skip font/color injection for backward compat
 - Per-instance _table_presets_dict derived from theme palette, module-level constants untouched
 - BinData: Skip corrupt streams entirely (no empty bytes) -- Whale handles missing BinData gracefully
+- Overlay: regex-based multi-hp:t replacement instead of ET serialization (avoids namespace rewriting)
+- Overlay: cell text join '' not ' ' for matching accuracy
+- Overlay: zipfile direct manipulation replaces subprocess unpack/repack
 
 ## Last Session
-- **Stopped at:** Completed 02-02-PLAN.md
-- **Timestamp:** 2026-04-18T02:04:19Z
+- **Stopped at:** Completed 02-01-PLAN.md
+- **Timestamp:** 2026-04-18T02:05:51Z
 
 ## Blockers
 - 없음
