@@ -14,7 +14,9 @@ import io as _io
 import logging
 import pathlib as _pathlib
 import re as _re
-import random as _random
+import itertools as _itertools
+
+_para_id_counter = _itertools.count(1000000000)
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ from .objects.section.paragraph import Para, Run, T
 
 def _init_para(para, para_pr_id_ref="0", style_id_ref="0", page_break=False):
     """Initialize common paragraph attributes."""
-    para.id = str(_random.randint(1000000000, 4294967295))
+    para.id = str(next(_para_id_counter))
     para.para_pr_id_ref = para_pr_id_ref
     para.style_id_ref = style_id_ref
     para.page_break = page_break
