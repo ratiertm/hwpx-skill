@@ -2177,7 +2177,7 @@ def _build_cell_paragraphs(sub_list, cell_subs: List[dict],
         try:
             _build_cell_paragraph(sub_list, pg, hwp)
         except Exception as e:
-            logger.debug("Error building cell paragraph: %s", e)
+            logger.warning("Error building cell paragraph: %s", e, exc_info=True)
             para = sub_list.add_new_para()
             para.id = "0"
             para.para_pr_id_ref = "0"
@@ -2212,7 +2212,15 @@ def _build_cell_paragraph(sub_list, pg: List[dict], hwp: '_HWPDocument'):
     char_shape_pairs = []
     line_segs = []
 
+    # Only process direct-child records (at para_level + 1).
+    # Deeper records belong to nested structures (e.g. nested table cells)
+    # and must NOT overwrite this paragraph's text/charShape/lineSeg.
+    para_level = pg[0].get('level', 0)
+    direct_level = para_level + 1
+
     for rec in pg[1:]:
+        if rec.get('level', 0) != direct_level:
+            continue
         if rec['tag'] == _TAG_PARA_TEXT:
             text_data = rec['data']
         elif rec['tag'] == _TAG_PARA_CHAR_SHAPE:
