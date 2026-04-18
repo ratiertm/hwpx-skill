@@ -267,6 +267,121 @@ class TestApplyOverlay:
         with zipfile.ZipFile(output) as zf:
             assert zf.read("BinData/BIN0001.png") == new_img
 
+    def test_image_replacement_nonexistent_binref_skipped(self, tmp_path):
+        """Nonexistent bin_ref in image_replacements should be silently skipped."""
+        sec_xml = _make_section_xml(
+            '<hp:p><hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run></hp:p>'
+        )
+        hwpx_path = tmp_path / "test_img2.hwpx"
+        with zipfile.ZipFile(hwpx_path, "w") as zf:
+            zf.writestr(
+                zipfile.ZipInfo("mimetype"),
+                "application/hwp+zip",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            zf.writestr("Contents/header.xml", _make_header_xml())
+            zf.writestr("Contents/section0.xml", sec_xml)
+            zf.writestr("BinData/BIN0001.png", b"original_data")
+
+        overlay = extract_overlay(str(hwpx_path), include_style_hints=True)
+        output = str(tmp_path / "out_skip.hwpx")
+        # Replace a bin_ref that doesn't exist in the ZIP
+        apply_overlay(
+            str(hwpx_path),
+            overlay,
+            output,
+            image_replacements={"BIN9999": b"should_be_ignored"},
+        )
+
+        # Original image should be preserved
+        with zipfile.ZipFile(output) as zf:
+            assert zf.read("BinData/BIN0001.png") == b"original_data"
+
+    def test_image_replacement_preserves_unreplaced(self, tmp_path):
+        """BinData files not in image_replacements dict should be preserved."""
+        sec_xml = _make_section_xml(
+            '<hp:p><hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run></hp:p>'
+        )
+        hwpx_path = tmp_path / "test_img3.hwpx"
+        with zipfile.ZipFile(hwpx_path, "w") as zf:
+            zf.writestr(
+                zipfile.ZipInfo("mimetype"),
+                "application/hwp+zip",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            zf.writestr("Contents/header.xml", _make_header_xml())
+            zf.writestr("Contents/section0.xml", sec_xml)
+            zf.writestr("BinData/BIN0001.png", b"img1_data")
+            zf.writestr("BinData/BIN0002.jpg", b"img2_data")
+
+        overlay = extract_overlay(str(hwpx_path), include_style_hints=True)
+        output = str(tmp_path / "out_partial.hwpx")
+        # Only replace BIN0001, BIN0002 should be preserved
+        apply_overlay(
+            str(hwpx_path),
+            overlay,
+            output,
+            image_replacements={"BIN0001": b"new_img1"},
+        )
+
+        with zipfile.ZipFile(output) as zf:
+            assert zf.read("BinData/BIN0001.png") == b"new_img1"
+            assert zf.read("BinData/BIN0002.jpg") == b"img2_data"
+
+    def test_image_replacement_exact_bytes(self, tmp_path):
+        """Replaced image bytes must match exactly (binary fidelity)."""
+        sec_xml = _make_section_xml(
+            '<hp:p><hp:run charPrIDRef="0"><hp:t>텍스트</hp:t></hp:run></hp:p>'
+        )
+        hwpx_path = tmp_path / "test_img4.hwpx"
+        # Create a "PNG" with specific byte pattern
+        png_bytes = bytes(range(256)) * 10  # 2560 bytes
+        with zipfile.ZipFile(hwpx_path, "w") as zf:
+            zf.writestr(
+                zipfile.ZipInfo("mimetype"),
+                "application/hwp+zip",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            zf.writestr("Contents/header.xml", _make_header_xml())
+            zf.writestr("Contents/section0.xml", sec_xml)
+            zf.writestr("BinData/BIN0001.png", b"old")
+
+        overlay = extract_overlay(str(hwpx_path), include_style_hints=True)
+        output = str(tmp_path / "out_exact.hwpx")
+        apply_overlay(
+            str(hwpx_path),
+            overlay,
+            output,
+            image_replacements={"BIN0001": png_bytes},
+        )
+
+        with zipfile.ZipFile(output) as zf:
+            assert zf.read("BinData/BIN0001.png") == png_bytes
+
+    def test_no_image_replacements_no_regression(self, tmp_path):
+        """apply_overlay without image_replacements should not affect BinData."""
+        sec_xml = _make_section_xml(
+            '<hp:p><hp:run charPrIDRef="0"><hp:t>원본</hp:t></hp:run></hp:p>'
+        )
+        hwpx_path = tmp_path / "test_noreg.hwpx"
+        with zipfile.ZipFile(hwpx_path, "w") as zf:
+            zf.writestr(
+                zipfile.ZipInfo("mimetype"),
+                "application/hwp+zip",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            zf.writestr("Contents/header.xml", _make_header_xml())
+            zf.writestr("Contents/section0.xml", sec_xml)
+            zf.writestr("BinData/BIN0001.png", b"keep_this")
+
+        overlay = extract_overlay(str(hwpx_path), include_style_hints=True)
+        overlay["texts"][0]["value"] = "수정"
+        output = str(tmp_path / "out_noreg.hwpx")
+        apply_overlay(str(hwpx_path), overlay, output)  # No image_replacements
+
+        with zipfile.ZipFile(output) as zf:
+            assert zf.read("BinData/BIN0001.png") == b"keep_this"
+
     def test_table_cell_replacement(self, tmp_path):
         sec_xml = _make_section_xml(
             "<hp:p><hp:run><hp:tbl>"
