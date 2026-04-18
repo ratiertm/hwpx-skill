@@ -31,6 +31,13 @@ Plans:
 
 **Requirements**: TS-3, TS-4, CF-2, CF-3
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — overlay.py extract/apply 정밀화: original_parts + regex replacement + zipfile 리팩토링
+- [ ] 02-02-PLAN.md — hwp2hwpx.py BinData 에러 핸들링 (try/except + warning)
+- [ ] 02-03-PLAN.md — 이미지 교체 + 중첩 표 double-extraction 버그 수정
+
 **Deliverables**:
 - `overlay.py` 개선 — `<hp:t>` 단위 원본 보존 + 정밀 매칭
 - 분리된 텍스트 (`울산중부` + `소방서`) 교체 동작
