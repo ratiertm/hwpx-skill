@@ -84,6 +84,26 @@ Plans:
 
 ---
 
+### Phase 2.2: hwp2hwpx BinData 이미지 복구
+**Goal**: HWP→HWPX 변환 시 zlib 해제 실패하는 BinData 이미지 복구
+
+**Requirements**: 신규 (TS-6)
+
+**배경**:
+- TS-4에서 크래시 방지(try/except)는 완료
+- 일부 HWP 파일의 BinData가 `zlib.decompress(raw, -15)` 및 `zlib.decompress(raw)` 모두 실패
+- ibgopongdang: BIN0001~0004.png 4개 스킵, BIN0005~0006.bmp 정상
+- 가능 원인: 비표준 압축, 암호화, 또는 raw 데이터(비압축)
+
+**Deliverables**:
+- `hwp2hwpx.py` `_decompress` — 추가 압축 방식 시도 (raw passthrough 등)
+- 테스트: ibgopongdang BIN0001~0004 이미지 복구
+- Whale에서 이미지 표시 확인
+
+**Success**: HWP→HWPX 변환 후 모든 BinData 이미지 보존
+
+---
+
 ### Phase 3: 동적 테마 추출 + 통합
 **Goal**: 사용자 양식에서 테마 자동 추출 → 저장 → 재사용
 
