@@ -196,8 +196,18 @@ def _extract_table(
 
             cells.append(cell_entry)
 
-            # 셀 내부 중첩 표 재귀
-            for inner_tbl in tc_el.findall(f".//{_HP}tbl"):
+            # 셀 내부 중첩 표 재귀 — 직속 자식 표만 탐색 (깊은 자손 제외)
+            # 구조: <hp:tc> -> <hp:subList> -> <hp:p> -> <hp:run> -> <hp:tbl>
+            # .//{_HP}tbl 은 모든 자손을 매칭하여 중복 추출 발생
+            direct_tables = []
+            for sub_list in tc_el.findall(f"{_HP}subList"):
+                for p_el in sub_list.findall(f"{_HP}p"):
+                    for run_el in p_el.findall(f"{_HP}run"):
+                        tbl = run_el.find(f"{_HP}tbl")
+                        if tbl is not None:
+                            direct_tables.append(tbl)
+
+            for inner_tbl in direct_tables:
                 nested = _extract_table(
                     inner_tbl, _tbl_id[0], texts, tables, images,
                     _text_id, _tbl_id, _img_id,
