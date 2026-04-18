@@ -252,6 +252,7 @@ class _TextMeasurer:
         if font_map:
             self._map.update({k.lower(): v for k, v in font_map.items()})
         self._cache: dict[tuple[str, int], object] = {}  # (path, size_int) -> ImageFont
+        self._css_cache: dict[str, tuple[list[str], float, bool]] = {}  # css_str -> parsed
 
     @staticmethod
     def _parse_css_font(css: str) -> tuple[list[str], float, bool]:
@@ -284,7 +285,12 @@ class _TextMeasurer:
     def measure(self, css_font: str, text: str) -> float:
         if not text:
             return 0.0
-        fams, size, _bold = self._parse_css_font(css_font)
+        cached = self._css_cache.get(css_font)
+        if cached is not None:
+            fams, size, _bold = cached
+        else:
+            fams, size, _bold = self._parse_css_font(css_font)
+            self._css_cache[css_font] = (fams, size, _bold)
 
         if not _HAS_PIL:
             # Heuristic: 1.0em for CJK, 0.5em for ASCII/punctuation
@@ -321,12 +327,19 @@ class _TextMeasurer:
 # Font embedding
 # ---------------------------------------------------------------------------
 
+# Module-level font subset cache: (font_path, frozenset(codepoints)) → base64 string
+_SUBSET_CACHE: dict[tuple[str, frozenset[int]], str] = {}
+
+
 def _embed_fonts_in_svg(svg: str, font_map: dict[str, str]) -> str:
     """Parse SVG for font usage, subset TTFs, and inject @font-face CSS.
 
     Scans ``<text font-family="...">`` elements, finds matching TTF files,
     subsets them to only the characters actually used, base64-encodes the
     subsets, and inserts ``@font-face`` rules into the SVG ``<defs>``.
+
+    Uses a module-level cache: identical (font_path, codepoints) combinations
+    skip subsetting entirely. This significantly speeds up multi-page rendering.
 
     Requires ``fonttools``.  Returns the SVG unchanged if fonttools is missing.
     """
@@ -366,21 +379,25 @@ def _embed_fonts_in_svg(svg: str, font_map: dict[str, str]) -> str:
             path = _KOREAN_FALLBACK
         if not os.path.exists(path):
             continue
+        codepoints = frozenset(ord(c) for c in chars if ord(c) > 32)
+        if not codepoints:
+            continue
         try:
-            font = TTFont(path, fontNumber=0)
-            opts = SubsetOptions()
-            opts.flavor = None  # keep as raw TTF (broadest SVG viewer support)
-            opts.desubroutinize = True
-            subsetter = Subsetter(options=opts)
-            codepoints = {ord(c) for c in chars if ord(c) > 32}
-            if not codepoints:
-                continue
-            subsetter.populate(unicodes=codepoints)
-            subsetter.subset(font)
-            buf = io.BytesIO()
-            font.save(buf)
-            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-            font.close()
+            cache_key = (path, codepoints)
+            b64 = _SUBSET_CACHE.get(cache_key)
+            if b64 is None:
+                font = TTFont(path, fontNumber=0)
+                opts = SubsetOptions()
+                opts.flavor = None  # keep as raw TTF (broadest SVG viewer support)
+                opts.desubroutinize = True
+                subsetter = Subsetter(options=opts)
+                subsetter.populate(unicodes=set(codepoints))
+                subsetter.subset(font)
+                buf = io.BytesIO()
+                font.save(buf)
+                b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                font.close()
+                _SUBSET_CACHE[cache_key] = b64
             # Use the original family name (preserving case) for CSS
             original_family = family_lower
             for m2 in re.finditer(r'font-family="([^"]*)"', svg):
