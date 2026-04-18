@@ -15,8 +15,11 @@ import logging
 import pathlib as _pathlib
 import re as _re
 import itertools as _itertools
+import random as _random
 
-_para_id_counter = _itertools.count(1000000000)
+# Random start + sequential increment: unique within session,
+# and unlikely to collide when merging documents from different sessions.
+_para_id_counter = _itertools.count(_random.randint(1_000_000_000, 3_000_000_000))
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
