@@ -2186,18 +2186,49 @@ def fill_template_checkbox(
             for old, new in data.items():
                 text = text.replace(old, new, 1)
 
-        # 2. Checkbox marks
+        # 2. Checkbox marks — 4가지 패턴 지원
+        # □ (U+25A1) → ■ (U+25A0)
+        # ☐ (U+2610) → ☑ (U+2611)
+        # [  ] → [■]
+        # [ ] → [■]
+        _CHECK_PATTERNS = [
+            ("□", "■"),
+            ("☐", "☑"),
+            ("[  ]", "[■]"),
+            ("[ ]", "[■]"),
+        ]
         if checks:
             if "__ALL__" in checks:
-                text = text.replace("□", "■")
+                for unchecked, checked in _CHECK_PATTERNS:
+                    text = text.replace(unchecked, checked)
             else:
                 for label in checks:
-                    # Find label, then replace next □ after it
                     pos = text.find(label)
-                    if pos >= 0:
-                        box_pos = text.find("□", pos)
-                        if box_pos >= 0:
-                            text = text[:box_pos] + "■" + text[box_pos + 1:]
+                    if pos < 0:
+                        continue
+                    # 라벨 주변에서 체크박스 탐색 (앞 50자 ~ 뒤 50자)
+                    search_start = max(0, pos - 50)
+                    search_end = min(len(text), pos + len(label) + 50)
+                    region = text[search_start:search_end]
+                    replaced = False
+                    for unchecked, checked in _CHECK_PATTERNS:
+                        # 라벨 앞의 체크박스 우선 (□예 패턴)
+                        label_in_region = pos - search_start
+                        before = region[:label_in_region]
+                        box_before = before.rfind(unchecked)
+                        if box_before >= 0:
+                            abs_pos = search_start + box_before
+                            text = text[:abs_pos] + checked + text[abs_pos + len(unchecked):]
+                            replaced = True
+                            break
+                        # 라벨 뒤의 체크박스 (동의함 □ 패턴)
+                        after = region[label_in_region + len(label):]
+                        box_after = after.find(unchecked)
+                        if box_after >= 0:
+                            abs_pos = pos + len(label) + box_after
+                            text = text[:abs_pos] + checked + text[abs_pos + len(unchecked):]
+                            replaced = True
+                            break
 
         all_files[sec_name] = text.encode("utf-8")
 

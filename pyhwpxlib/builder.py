@@ -420,7 +420,7 @@ class HwpxBuilder:
 
         if not self._is_default_theme:
             kwargs['font_name'] = self._theme.fonts.heading_hangul
-            kwargs['text_color'] = self._theme.palette.on_surface
+            kwargs['text_color'] = self._theme.palette.primary
 
         return kwargs
 
@@ -559,13 +559,22 @@ class HwpxBuilder:
                 para_pr_id = "0"
                 if needs_align:
                     para_pr_id = ensure_para_style(doc, align=align)
-                if action.get('styled'):
+                # 테마 본문 스타일: non-default 테마일 때 body 사이즈/폰트 적용
+                needs_theme_body = not self._is_default_theme and not action.get('styled')
+                if action.get('styled') or needs_theme_body:
+                    font_size = action.get('font_size')
+                    text_color = action.get('text_color')
+                    font_name = None
+                    if needs_theme_body:
+                        font_size = font_size or self._theme.sizes.body
+                        font_name = self._theme.fonts.body_hangul
                     char_pr_id = ensure_char_style(
                         doc,
                         bold=action.get('bold', False),
                         italic=action.get('italic', False),
-                        height=font_size_to_height(action.get('font_size')),
-                        text_color=action.get('text_color'),
+                        height=font_size_to_height(font_size),
+                        text_color=text_color,
+                        font_name=font_name,
                     )
                     api_add_para(doc, action['text'],
                                  char_pr_id_ref=char_pr_id,

@@ -101,43 +101,62 @@ def get_preset(name: str) -> dict:
 
 def build_cover_page(builder, preset: dict, title: str,
                      subtitle: str = "", organization: str = "", date: str = ""):
-    """Build a professional cover page using the preset style."""
+    """Build a professional cover page using the preset style.
+
+    테마가 설정된 builder라면 테마 palette에서 색상을 가져옴.
+    preset의 colors는 fallback으로 사용.
+    """
     colors = preset.get("colors", {})
-    ts = preset.get("title", {})
 
-    # Top spacer
-    builder.add_paragraph("", font_size=40)
-    builder.add_paragraph("", font_size=40)
+    # 테마 palette 연동 — builder에 테마가 있으면 우선 사용
+    theme_palette = None
+    if hasattr(builder, '_theme') and hasattr(builder._theme, 'palette'):
+        theme_palette = builder._theme.palette
 
-    # Organization
+    primary = theme_palette.primary if theme_palette else colors.get("heading", "#000000")
+    meta_color = theme_palette.on_surface_var if theme_palette else colors.get("meta", "#666666")
+    on_surface = theme_palette.on_surface if theme_palette else colors.get("heading", "#000000")
+
+    # 상단 여백 (페이지 1/3 지점에 제목 배치)
+    for _ in range(5):
+        builder.add_paragraph("")
+
+    # 구분선 (테마 primary)
+    builder.add_line()
+    builder.add_paragraph("")
+
+    # Organization (기관명)
     if organization:
         builder.add_paragraph(organization,
-                              font_size=14, text_color=colors.get("meta", "#666666"),
+                              font_size=16, text_color=meta_color,
                               alignment="CENTER")
         builder.add_paragraph("")
 
-    # Title
+    # Title (대제목 — 크게)
     builder.add_paragraph(title,
-                          bold=ts.get("bold", True),
-                          font_size=ts.get("font_size", 18),
-                          text_color=colors.get("heading", "#000000"),
-                          alignment=ts.get("alignment", "CENTER"))
+                          bold=True,
+                          font_size=28,
+                          text_color=primary,
+                          alignment="CENTER")
 
     # Subtitle
     if subtitle:
         builder.add_paragraph("")
         builder.add_paragraph(subtitle,
-                              font_size=14,
-                              text_color=colors.get("meta", "#666666"),
+                              font_size=18,
+                              text_color=on_surface,
                               alignment="CENTER")
 
-    # Date
+    builder.add_paragraph("")
+    builder.add_line()
+
+    # Date (하단)
     if date:
-        builder.add_paragraph("", font_size=30)
-        builder.add_paragraph("", font_size=30)
+        for _ in range(6):
+            builder.add_paragraph("")
         builder.add_paragraph(date,
-                              font_size=13,
-                              text_color=colors.get("meta", "#666666"),
+                              font_size=16,
+                              text_color=meta_color,
                               alignment="CENTER")
 
     builder.add_page_break()

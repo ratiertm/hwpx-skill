@@ -57,7 +57,7 @@ class SizeSet:
     h2: int = 18
     h3: int = 16
     h4: int = 14
-    body: int = 11
+    body: int = 12
     caption: int = 10
 
 

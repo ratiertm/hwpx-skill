@@ -104,7 +104,7 @@ class TestDefaultSizeSet:
         assert ss.h2 == 18
         assert ss.h3 == 16
         assert ss.h4 == 14
-        assert ss.body == 11
+        assert ss.body == 12
         assert ss.caption == 10
 
 
@@ -311,8 +311,8 @@ class TestThemeIntegration:
                 heading_cp = cp
                 break
         assert heading_cp is not None, "Heading charPr not found"
-        assert heading_cp.get('textColor') == '#2b3437', \
-            f"Expected forest on_surface '#2b3437', got '{heading_cp.get('textColor')}'"
+        assert heading_cp.get('textColor') == '#2C5F2D', \
+            f"Expected forest primary '#2C5F2D', got '{heading_cp.get('textColor')}'"
 
     def test_default_theme_backward_compat(self):
         """HwpxBuilder() and HwpxBuilder(theme='default') produce structurally identical output.
