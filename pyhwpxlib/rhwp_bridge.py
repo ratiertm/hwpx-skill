@@ -125,49 +125,108 @@ def _find_wasm() -> Path:
 # Text measurement
 # ---------------------------------------------------------------------------
 
-# System font fallback — macOS + Linux paths.
-_DEFAULT_FONT_MAP: dict[str, str] = {
-    # macOS
-    "apple sd gothic neo": "/System/Library/Fonts/AppleSDGothicNeo.ttc",
-    "helvetica": "/System/Library/Fonts/Helvetica.ttc",
-    "arial": "/System/Library/Fonts/Supplemental/Arial.ttf",
-    "times new roman": "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
-    "courier new": "/System/Library/Fonts/Supplemental/Courier New.ttf",
-    # Linux (common Korean fonts)
-    "nanumgothic": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-    "nanum gothic": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-    "nanummyeongjo": "/usr/share/fonts/truetype/nanum/NanumMyeongjo.ttf",
-    "noto sans cjk kr": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "noto sans korean": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    # Generic aliases — map to Korean-capable font
-    "sans-serif": "",  # resolved dynamically below
-    "serif": "",
-}
+# Bundled font paths (shipped with pyhwpxlib)
+from pyhwpxlib.vendor import NANUM_GOTHIC_REGULAR, NANUM_GOTHIC_BOLD
+
+_BUNDLED_REGULAR = str(NANUM_GOTHIC_REGULAR)
+_BUNDLED_BOLD = str(NANUM_GOTHIC_BOLD)
+
+# System font map — resolved per-platform at import time.
+# Bundled fonts use package-relative paths (cross-platform).
+# System fonts are checked for existence before registration.
+
+def _build_font_map() -> dict[str, str]:
+    """Build font map with bundled fonts + platform-specific system fonts."""
+    fmap: dict[str, str] = {
+        # Bundled NanumGothic (always available, cross-platform)
+        "나눔고딕": _BUNDLED_REGULAR,
+        "nanumgothic": _BUNDLED_REGULAR,
+        "nanum gothic": _BUNDLED_REGULAR,
+        # Legacy Hancom fonts → fallback to bundled NanumGothic
+        "함초롬돋움": _BUNDLED_REGULAR,
+        "함초롬바탕": _BUNDLED_REGULAR,
+    }
+
+    # Platform-specific system font candidates: (name, [paths])
+    _SYSTEM_FONTS = [
+        # Korean
+        ("apple sd gothic neo", ["/System/Library/Fonts/AppleSDGothicNeo.ttc"]),
+        ("malgun gothic", ["C:/Windows/Fonts/malgun.ttf"]),
+        ("맑은 고딕", ["C:/Windows/Fonts/malgun.ttf"]),
+        ("nanummyeongjo", [
+            "/usr/share/fonts/truetype/nanum/NanumMyeongjo.ttf",
+            "C:/Windows/Fonts/NanumMyeongjo.ttf",
+        ]),
+        ("나눔명조", [
+            "/usr/share/fonts/truetype/nanum/NanumMyeongjo.ttf",
+            "C:/Windows/Fonts/NanumMyeongjo.ttf",
+        ]),
+        ("noto sans cjk kr", [
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        ]),
+        # Latin
+        ("helvetica", ["/System/Library/Fonts/Helvetica.ttc"]),
+        ("arial", [
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+        ]),
+        ("times new roman", [
+            "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
+            "C:/Windows/Fonts/times.ttf",
+        ]),
+        ("courier new", [
+            "/System/Library/Fonts/Supplemental/Courier New.ttf",
+            "C:/Windows/Fonts/cour.ttf",
+        ]),
+    ]
+
+    for name, paths in _SYSTEM_FONTS:
+        for p in paths:
+            if os.path.exists(p):
+                fmap[name] = p
+                break
+
+    # Generic aliases — resolved dynamically below
+    fmap["sans-serif"] = ""
+    fmap["serif"] = ""
+    return fmap
+
+
+_DEFAULT_FONT_MAP = _build_font_map()
 
 
 def _find_korean_font() -> str:
-    """Find a Korean-capable font on the current system."""
+    """Find a Korean-capable font on the current system.
+
+    Priority: bundled NanumGothic → system fonts (macOS/Windows/Linux).
+    """
+    # Bundled font always exists
+    if NANUM_GOTHIC_REGULAR.exists():
+        return _BUNDLED_REGULAR
     candidates = [
         # macOS
         "/System/Library/Fonts/AppleSDGothicNeo.ttc",
-        # Linux common locations
+        # Windows
+        "C:/Windows/Fonts/malgun.ttf",
+        "C:/Windows/Fonts/NanumGothic.ttf",
+        # Linux
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
-        # Fallback: any Nanum font
     ]
     for p in candidates:
         if os.path.exists(p):
             return p
-    # Search for any Nanum font
     import glob
     for pattern in ["/usr/share/fonts/**/Nanum*.ttf", "/usr/share/fonts/**/NotoSans*CJK*.ttc"]:
         found = glob.glob(pattern, recursive=True)
         if found:
             return found[0]
-    return candidates[0]  # final resort
+    return _BUNDLED_REGULAR  # final resort: bundled font path
 
 
 _KOREAN_FALLBACK = _find_korean_font()

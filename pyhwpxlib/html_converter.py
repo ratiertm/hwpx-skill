@@ -66,7 +66,7 @@ _HTML_TEMPLATE = """\
 <meta charset="UTF-8">
 <title>{title}</title>
 <style>
-body {{ max-width: 210mm; margin: 20mm auto; font-family: '함초롬돋움', 'Malgun Gothic', sans-serif; font-size: 10pt; line-height: 1.6; color: #333; }}
+body {{ max-width: 210mm; margin: 20mm auto; font-family: '나눔고딕', 'NanumGothic', 'Malgun Gothic', sans-serif; font-size: 10pt; line-height: 1.6; color: #333; }}
 table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}
 td, th {{ border: 1px solid #000; padding: 5px 8px; vertical-align: middle; }}
 h1 {{ font-size: 24pt; }} h2 {{ font-size: 18pt; }} h3 {{ font-size: 14pt; }} h4 {{ font-size: 12pt; }}

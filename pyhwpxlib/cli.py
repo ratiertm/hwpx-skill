@@ -240,6 +240,118 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     sys.exit(0 if valid else 1)
 
 
+def _cmd_font_check(args: argparse.Namespace) -> None:
+    """Check font availability for an HWPX file."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    path = args.input
+    if not os.path.exists(path):
+        print(f"File not found: {path}")
+        sys.exit(1)
+
+    # Extract font names from header.xml
+    doc_fonts: set[str] = set()
+    try:
+        with zipfile.ZipFile(path) as z:
+            header_xml = z.read("Contents/header.xml").decode("utf-8")
+        root = ET.fromstring(header_xml)
+        ns = {"hh": "http://www.hancom.co.kr/hwpml/2011/head",
+              "hp": "http://www.hancom.co.kr/hwpml/2011/paragraph"}
+        for font_el in root.iter("{http://www.hancom.co.kr/hwpml/2011/head}font"):
+            face = font_el.get("face")
+            if face:
+                doc_fonts.add(face)
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        sys.exit(1)
+
+    if not doc_fonts:
+        print("No fonts found in document.")
+        return
+
+    # Check against font_map
+    from .vendor import NANUM_GOTHIC_REGULAR
+    bundled = {"나눔고딕", "NanumGothic"}
+    try:
+        from .rhwp_bridge import _DEFAULT_FONT_MAP
+        known = set(k for k in _DEFAULT_FONT_MAP)
+    except ImportError:
+        known = set()
+
+    print(f"📋 Fonts in document: {len(doc_fonts)}")
+    ok_count = 0
+    warn_count = 0
+    for font in sorted(doc_fonts):
+        lower = font.lower()
+        if font in bundled or lower in known:
+            print(f"  ✅ {font}")
+            ok_count += 1
+        else:
+            print(f"  ⚠️  {font} — not in font_map (may render with fallback)")
+            warn_count += 1
+
+    print(f"\nBundled font: 나눔고딕 ({'exists' if NANUM_GOTHIC_REGULAR.exists() else 'MISSING'})")
+    if warn_count:
+        print(f"\n⚠️  {warn_count} font(s) may need manual installation or font_map entry.")
+    else:
+        print(f"\n✅ All {ok_count} font(s) available.")
+
+
+def _cmd_themes(args: argparse.Namespace) -> None:
+    """List saved custom themes or extract/save a theme."""
+    from .themes import BUILTIN_THEMES, _THEMES_DIR, extract_theme, save_theme, load_theme
+
+    if args.action == 'list':
+        # Built-in themes
+        print("Built-in themes:")
+        for name in sorted(BUILTIN_THEMES):
+            t = BUILTIN_THEMES[name]
+            print(f"  {name:20s}  primary={t.palette.primary}")
+
+        # Custom themes
+        if _THEMES_DIR.exists():
+            customs = sorted(_THEMES_DIR.glob('*.json'))
+            if customs:
+                print(f"\nCustom themes ({_THEMES_DIR}):")
+                for p in customs:
+                    try:
+                        t = load_theme(p)
+                        print(f"  {t.name:20s}  primary={t.palette.primary}  font={t.fonts.body_hangul}")
+                    except Exception:
+                        print(f"  {p.stem:20s}  (error loading)")
+            else:
+                print("\nNo custom themes saved yet.")
+        else:
+            print("\nNo custom themes saved yet.")
+
+    elif args.action == 'extract':
+        if not args.input:
+            print("Error: --input required for extract")
+            sys.exit(1)
+        name = args.name or Path(args.input).stem
+        theme = extract_theme(args.input, name=name)
+        path = save_theme(theme)
+        print(f"Extracted theme '{theme.name}':")
+        print(f"  Primary: {theme.palette.primary}")
+        print(f"  Font:    {theme.fonts.body_hangul}")
+        print(f"  Body:    {theme.sizes.body}pt")
+        print(f"  Saved:   {path}")
+        print(f"\nUse: HwpxBuilder(theme='custom/{theme.name}')")
+
+    elif args.action == 'delete':
+        if not args.name:
+            print("Error: --name required for delete")
+            sys.exit(1)
+        target = _THEMES_DIR / f'{args.name}.json'
+        if target.exists():
+            target.unlink()
+            print(f"Deleted theme: {args.name}")
+        else:
+            print(f"Theme not found: {args.name}")
+            sys.exit(1)
+
+
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the pyhwpxlib CLI."""
     parser = argparse.ArgumentParser(
@@ -302,6 +414,17 @@ def main(argv: list[str] | None = None) -> None:
     p_val = sub.add_parser("validate", help="Validate HWPX file")
     p_val.add_argument("input", help="Input .hwpx file")
 
+    # font-check
+    p_fc = sub.add_parser("font-check", help="Check font availability for HWPX")
+    p_fc.add_argument("input", help="Input .hwpx file")
+
+    # themes
+    p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
+    p_th.add_argument("action", choices=["list", "extract", "delete"],
+                       help="list: show all themes, extract: save theme from HWPX, delete: remove custom theme")
+    p_th.add_argument("--input", "-i", help="Input .hwpx file (for extract)")
+    p_th.add_argument("--name", "-n", help="Theme name (for extract/delete)")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -318,6 +441,8 @@ def main(argv: list[str] | None = None) -> None:
         "unpack": _cmd_unpack,
         "pack": _cmd_pack,
         "validate": _cmd_validate,
+        "font-check": _cmd_font_check,
+        "themes": _cmd_themes,
     }
 
     handler = dispatch.get(args.command)

@@ -112,6 +112,26 @@ doc = engine.load("output.hwpx")
 svg = doc.render_page_svg(0, embed_fonts=True)
 ```
 
+## 10. Extract Theme from Existing Document
+```python
+from pyhwpxlib import extract_theme, save_theme, HwpxBuilder
+
+# Extract style from any HWPX file
+theme = extract_theme("reference.hwpx", name="my_style")
+save_theme(theme)  # saves to ~/.pyhwpxlib/themes/my_style.json
+
+# Reuse the extracted style
+doc = HwpxBuilder(theme='custom/my_style')
+doc.add_heading("Same style, different content", level=1)
+doc.save("new_doc.hwpx")
+```
+
+## 11. Font Check
+```bash
+python -m pyhwpxlib font-check output.hwpx
+python -m pyhwpxlib themes list
+```
+
 ## CRITICAL RULES — Violating these breaks Whale/Hancom rendering
 
 1. **No newlines in text** — Never `add_paragraph("line1\nline2")`.

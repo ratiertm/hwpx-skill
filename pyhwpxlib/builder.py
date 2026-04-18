@@ -110,20 +110,10 @@ class HwpxBuilder:
             table_preset: 표 기본 스타일 ('corporate', 'government', 'academic', 'default')
             theme: 테마 이름(str) 또는 Theme 인스턴스. 기본 'default' = Administrative Slate.
         """
-        from pyhwpxlib.themes import Theme, BUILTIN_THEMES, _make_table_presets
+        from pyhwpxlib.themes import Theme, BUILTIN_THEMES, _make_table_presets, resolve_theme
 
-        # Resolve theme
-        if isinstance(theme, str):
-            if theme not in BUILTIN_THEMES:
-                raise ValueError(
-                    f"Unknown theme '{theme}'. "
-                    f"Available: {', '.join(sorted(BUILTIN_THEMES.keys()))}"
-                )
-            self._theme: Theme = BUILTIN_THEMES[theme]
-        elif isinstance(theme, Theme):
-            self._theme = theme
-        else:
-            raise TypeError(f"theme must be str or Theme, got {type(theme).__name__}")
+        # Resolve theme — supports built-in names, 'custom/name', .json paths, Theme instances
+        self._theme: Theme = resolve_theme(theme)
 
         # Detect whether this is the built-in default theme (backward compat path)
         self._is_default_theme = (self._theme is BUILTIN_THEMES.get('default'))
@@ -430,15 +420,10 @@ class HwpxBuilder:
 
     def _build_header_legacy(self) -> str:
         # fontfaces
-        fontfaces = '''<hh:fontfaces>
-  <hh:fontface lang="HANGUL"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="LATIN"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="HANJA"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="JAPANESE"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="OTHER"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="SYMBOL"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-  <hh:fontface lang="USER"><hh:font id="0" face="함초롬돋움" type="TTF" /></hh:fontface>
-</hh:fontfaces>'''
+        font_face = self._theme.fonts.body_hangul
+        langs = ['HANGUL', 'LATIN', 'HANJA', 'JAPANESE', 'OTHER', 'SYMBOL', 'USER']
+        ff_lines = [f'  <hh:fontface lang="{l}"><hh:font id="0" face="{font_face}" type="TTF" /></hh:fontface>' for l in langs]
+        fontfaces = '<hh:fontfaces>\n' + '\n'.join(ff_lines) + '\n</hh:fontfaces>'
 
         # borderFills
         borders = '''<hh:borderFills itemCnt="1">

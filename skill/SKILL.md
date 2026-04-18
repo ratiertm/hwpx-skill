@@ -72,13 +72,26 @@ if fmt == "HWP":
 
 **워크플로우 [1] 새 문서 만들기**:
 
-Step A: AskUserQuestion — "어떤 유형?" → 정부양식/공문서/보고서/세무법무/논문/자유
-Step B: 테마 선택 — 주제에 맞는 내장 테마 선택 (10종). 아래 테마 표 참고
+Step A: 테마 선택 — 저장된 커스텀 양식이 있으면 먼저 제안
+```python
+from pyhwpxlib.themes import _THEMES_DIR, BUILTIN_THEMES, load_theme
+customs = sorted(_THEMES_DIR.glob('*.json')) if _THEMES_DIR.exists() else []
+```
+저장된 양식이 있으면:
+```
+"어떤 스타일로 만들까요?"
+1. AFC점검양식 (primary=#2E74B5, 함초롬돋움)  ← 저장된 양식
+2. 소방서양식 (primary=#333399, 맑은 고딕)     ← 저장된 양식
+3. 내장 테마에서 선택 (10종)
+4. 새 스타일 (주제에 맞게 자동 선택)
+```
+저장된 양식이 없으면: "어떤 유형?" → 정부양식/공문서/보고서/세무법무/논문/자유
+Step B: (저장된 양식 선택 시) `theme = load_theme('양식이름')` / (내장 선택 시) 주제에 맞는 테마
 Step C: AskUserQuestion — "내용을 알려주세요"
 Step D: 실행
 ```python
-from pyhwpxlib import HwpxBuilder, BUILTIN_THEMES
-doc = HwpxBuilder(theme='forest')  # 주제에 맞는 테마 선택
+from pyhwpxlib import HwpxBuilder
+doc = HwpxBuilder(theme='custom/AFC점검양식')  # 또는 theme='forest'
 # 테마가 색상+폰트+사이즈를 자동 적용. 매 섹션 시각 요소 포함, 같은 레이아웃 반복 금지
 doc.add_heading(제목, level=1)  # 테마 primary 색상 + h1 사이즈 자동
 doc.add_paragraph(본문)  # 테마 body 사이즈 자동
@@ -138,6 +151,18 @@ pages = render_pages(파일명, '/tmp')  # embed_fonts=True 기본
 **수정 후 반드시 재렌더링하여 재검증** — 한 번의 수정이 다른 문제를 만들 수 있다.
 의존성: `pip install pyhwpxlib[preview-fonts]` (wasmtime + Pillow + fonttools)
 Step G: AskUserQuestion — "Whale에서도 열어 확인해주세요. 수정할 부분 있나요?" → 있으면 Step C로
+Step H: **양식 저장 제안** — 문서가 완성되면 제안한다:
+```
+"이 스타일을 양식으로 저장하면 다음에 같은 스타일로 바로 만들 수 있어요.
+ 저장할까요? 저장할 이름을 알려주세요. (예: 회의록양식, 사내보고서)"
+```
+사용자가 원하면:
+```python
+from pyhwpxlib import extract_theme, save_theme
+theme = extract_theme('output.hwpx', name='사용자가_지정한_이름')
+path = save_theme(theme)
+# "양식 '사내보고서'가 저장되었습니다. 다음에 '사내보고서 스타일로 만들어줘'라고 하면 됩니다."
+```
 
 **워크플로우 [2] 기존 문서 편집**:
 
@@ -235,6 +260,7 @@ fill_by_labels(template_path, {
 ```
 Step F: rhwp 프리뷰로 결과 검증 → 문제 발견 시 Step E로 자동 수정
 Step G: AskUserQuestion — "Whale에서도 확인해주세요. 수정할 부분?" → 있으면 Step E로
+Step H: **양식 저장 제안** — 완성된 양식의 스타일을 저장할지 제안 (워크플로우 [1] Step H와 동일)
 
 **워크플로우 [4] 문서 변환**:
 
@@ -255,6 +281,7 @@ convert_html_file_to_hwpx(html_path, hwpx_path)
 ```
 Step D: `pyhwpxlib validate output` → 결과 요약
 Step E: AskUserQuestion — "다음 작업?" → 편집/추가 변환/완료
+Step F: **양식 저장 제안** — 변환된 문서의 스타일을 저장할지 제안 (워크플로우 [1] Step H와 동일)
 
 **워크플로우 [5] Excel → HWPX 보고서 생성**:
 

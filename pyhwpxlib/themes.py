@@ -41,13 +41,18 @@ class Palette:
 
 @dataclass(frozen=True)
 class FontSet:
-    """Font names for heading, body, and caption text."""
-    heading_hangul: str = '함초롬돋움'
-    heading_latin: str = '함초롬돋움'
-    body_hangul: str = '함초롬돋움'
-    body_latin: str = '함초롬돋움'
-    caption_hangul: str = '함초롬돋움'
-    caption_latin: str = '함초롬돋움'
+    """Font names for heading, body, and caption text.
+
+    Default is '나눔고딕' (NanumGothic), bundled in vendor/.
+    Cross-platform: works on macOS, Linux, and Windows without
+    requiring Hancom Office fonts.
+    """
+    heading_hangul: str = '나눔고딕'
+    heading_latin: str = '나눔고딕'
+    body_hangul: str = '나눔고딕'
+    body_latin: str = '나눔고딕'
+    caption_hangul: str = '나눔고딕'
+    caption_latin: str = '나눔고딕'
 
 
 @dataclass(frozen=True)
@@ -73,6 +78,19 @@ class Margins:
 
 
 @dataclass(frozen=True)
+class Density:
+    """Document density — line spacing, alignment, cell padding.
+
+    line_spacing: percent (e.g. 160 = 160%)
+    align: default horizontal alignment ('JUSTIFY', 'LEFT', 'CENTER', 'RIGHT')
+    cell_padding: table cell padding in HWPX units (1mm ~ 283)
+    """
+    line_spacing: int = 160
+    align: str = 'JUSTIFY'
+    cell_padding: int = 283
+
+
+@dataclass(frozen=True)
 class Theme:
     """Complete visual theme for HWPX document generation."""
     name: str
@@ -80,6 +98,7 @@ class Theme:
     fonts: FontSet = field(default_factory=FontSet)
     sizes: SizeSet = field(default_factory=SizeSet)
     margins: Margins = field(default_factory=Margins)
+    density: Density = field(default_factory=Density)
 
 
 # ======================================================================
@@ -325,3 +344,299 @@ BUILTIN_THEMES: dict[str, Theme] = {
     'sage_calm': Theme(name='sage_calm', palette=_SAGE_CALM_PALETTE),
     'cherry_bold': Theme(name='cherry_bold', palette=_CHERRY_BOLD_PALETTE),
 }
+
+
+# ======================================================================
+# Theme extraction from HWPX files
+# ======================================================================
+
+import json
+import zipfile
+import xml.etree.ElementTree as ET
+from collections import Counter
+from pathlib import Path
+
+_HEAD_NS = 'http://www.hancom.co.kr/hwpml/2011/head'
+_PARA_NS = 'http://www.hancom.co.kr/hwpml/2011/paragraph'
+_SEC_NS = 'http://www.hancom.co.kr/hwpml/2011/section'
+
+_THEMES_DIR = Path.home() / '.pyhwpxlib' / 'themes'
+
+
+def _lighten(hex_color: str, factor: float = 0.85) -> str:
+    """Lighten a hex color by mixing with white."""
+    c = hex_color.lstrip('#')
+    r, g, b = int(c[:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+def _darken(hex_color: str, factor: float = 0.2) -> str:
+    """Darken a hex color."""
+    c = hex_color.lstrip('#')
+    r, g, b = int(c[:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    r = int(r * (1 - factor))
+    g = int(g * (1 - factor))
+    b = int(b * (1 - factor))
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+def extract_theme(hwpx_path: str | Path, name: str | None = None) -> Theme:
+    """Extract a Theme from an existing HWPX file.
+
+    Analyzes header.xml (charPr, fontface, borderFill) and section0.xml
+    (secPr/pageMg) to infer palette, fonts, sizes, and margins.
+
+    Parameters
+    ----------
+    hwpx_path : path to .hwpx file
+    name : optional theme name (defaults to filename stem)
+
+    Returns
+    -------
+    Theme dataclass instance
+    """
+    hwpx_path = Path(hwpx_path)
+    if name is None:
+        name = hwpx_path.stem
+
+    with zipfile.ZipFile(hwpx_path) as z:
+        header_xml = z.read('Contents/header.xml').decode('utf-8')
+        try:
+            sec_xml = z.read('Contents/section0.xml').decode('utf-8')
+        except KeyError:
+            sec_xml = None
+
+    root = ET.fromstring(header_xml)
+
+    # --- Fonts ---
+    hangul_fonts = []
+    for ff in root.iter(f'{{{_HEAD_NS}}}fontface'):
+        if ff.get('lang') == 'HANGUL':
+            for font_el in ff.iter(f'{{{_HEAD_NS}}}font'):
+                face = font_el.get('face')
+                if face:
+                    hangul_fonts.append(face)
+    primary_font = hangul_fonts[0] if hangul_fonts else '나눔고딕'
+    fonts = FontSet(
+        heading_hangul=primary_font, heading_latin=primary_font,
+        body_hangul=primary_font, body_latin=primary_font,
+        caption_hangul=primary_font, caption_latin=primary_font,
+    )
+
+    # --- Sizes (from charPr height, in hwpx units: 100 = 1pt) ---
+    heights = []
+    for cp in root.iter(f'{{{_HEAD_NS}}}charPr'):
+        h = int(cp.get('height', '0'))
+        if h > 0:
+            heights.append(h)
+    if heights:
+        sorted_h = sorted(set(heights), reverse=True)
+        h1 = sorted_h[0] // 100 if len(sorted_h) > 0 else 24
+        h2 = sorted_h[1] // 100 if len(sorted_h) > 1 else 18
+        h3 = sorted_h[2] // 100 if len(sorted_h) > 2 else 16
+        h4 = sorted_h[3] // 100 if len(sorted_h) > 3 else 14
+        # Body = most common height
+        body_h = Counter(heights).most_common(1)[0][0] // 100
+        sizes = SizeSet(h1=h1, h2=h2, h3=h3, h4=h4, body=body_h, caption=max(body_h - 2, 8))
+    else:
+        sizes = SizeSet()
+
+    # --- Colors (from charPr textColor + borderFill faceColor) ---
+    text_colors = []
+    for cp in root.iter(f'{{{_HEAD_NS}}}charPr'):
+        c = cp.get('textColor', '#000000')
+        if c not in ('#000000', 'none', '#FFFFFF', '#ffffff'):
+            text_colors.append(c.upper())
+
+    fill_colors = []
+    for bf in root.iter(f'{{{_HEAD_NS}}}borderFill'):
+        for wb in bf.iter():
+            tag = wb.tag.split('}')[-1] if '}' in wb.tag else wb.tag
+            if tag == 'winBrush':
+                fc = wb.get('faceColor', 'none')
+                if fc not in ('none', '#FFFFFF', '#ffffff', '#000000'):
+                    fill_colors.append(fc.upper())
+
+    # Primary = most common non-black text color, or darkest fill color
+    if text_colors:
+        primary = Counter(text_colors).most_common(1)[0][0]
+    elif fill_colors:
+        # Pick the darkest fill as primary
+        def _brightness(c):
+            c = c.lstrip('#')
+            return int(c[:2], 16) + int(c[2:4], 16) + int(c[4:6], 16)
+        primary = min(fill_colors, key=_brightness)
+    else:
+        primary = '#395da2'
+
+    # Table header = darkest fill, surface_low = lightest fill
+    if fill_colors:
+        def _brightness(c):
+            c = c.lstrip('#')
+            return int(c[:2], 16) + int(c[2:4], 16) + int(c[4:6], 16)
+        sorted_fills = sorted(set(fill_colors), key=_brightness)
+        table_header = sorted_fills[0]  # darkest
+        surface_low = sorted_fills[-1]  # lightest
+    else:
+        table_header = primary
+        surface_low = '#f1f4f6'
+
+    palette = Palette(
+        primary=primary,
+        on_primary='#f7f7ff',
+        secondary=_lighten(primary, 0.6),
+        accent=table_header if table_header != primary else _darken(primary, 0.3),
+        surface='#f8f9fa',
+        on_surface='#2b3437',
+        on_surface_var='#586064',
+        surface_low=surface_low,
+        surface_high=_lighten(primary, 0.75),
+        primary_container=_lighten(primary, 0.8),
+        outline_var='#abb3b7',
+        error='#9f403d',
+        tertiary_container=_lighten(table_header, 0.8) if table_header != primary else '#e2dbfd',
+        primary_dim=_darken(primary, 0.2),
+    )
+
+    # --- Margins (from secPr/pageMg) ---
+    margins = Margins()
+    if sec_xml:
+        sec_root = ET.fromstring(sec_xml)
+        for el in sec_root.iter():
+            tag = el.tag.split('}')[-1] if '}' in el.tag else el.tag
+            if tag == 'pageMg':
+                try:
+                    margins = Margins(
+                        left=int(el.get('left', margins.left)),
+                        right=int(el.get('right', margins.right)),
+                        top=int(el.get('top', margins.top)),
+                        bottom=int(el.get('bottom', margins.bottom)),
+                        header=int(el.get('header', margins.header)),
+                        footer=int(el.get('footer', margins.footer)),
+                    )
+                except (ValueError, TypeError):
+                    pass
+                break
+
+    # --- Density (line spacing, alignment, cell padding) ---
+    line_spacings = []
+    aligns = []
+    for pp in root.iter(f'{{{_HEAD_NS}}}paraPr'):
+        for child in pp:
+            tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+            if tag == 'lineSpacing':
+                v = child.get('value')
+                if v and child.get('type') == 'PERCENT':
+                    line_spacings.append(int(v))
+            if tag == 'align':
+                h = child.get('horizontal')
+                if h:
+                    aligns.append(h)
+
+    cell_paddings = []
+    if sec_xml:
+        if not sec_root:
+            sec_root = ET.fromstring(sec_xml)
+        for el in sec_root.iter():
+            tag = el.tag.split('}')[-1] if '}' in el.tag else el.tag
+            if tag == 'cellMargin':
+                vals = [int(el.get(k, '0')) for k in ('left', 'right', 'top', 'bottom')]
+                if any(v > 0 for v in vals):
+                    cell_paddings.append(sum(vals) // 4)  # average
+
+    density = Density(
+        line_spacing=Counter(line_spacings).most_common(1)[0][0] if line_spacings else 160,
+        align=Counter(aligns).most_common(1)[0][0] if aligns else 'JUSTIFY',
+        cell_padding=Counter(cell_paddings).most_common(1)[0][0] if cell_paddings else 283,
+    )
+
+    return Theme(name=name, palette=palette, fonts=fonts, sizes=sizes, margins=margins, density=density)
+
+
+def save_theme(theme: Theme, path: str | Path | None = None) -> Path:
+    """Save a Theme to JSON file.
+
+    Parameters
+    ----------
+    theme : Theme instance
+    path : file path. If None, saves to ~/.pyhwpxlib/themes/{name}.json
+
+    Returns
+    -------
+    Path to saved file
+    """
+    if path is None:
+        _THEMES_DIR.mkdir(parents=True, exist_ok=True)
+        path = _THEMES_DIR / f'{theme.name}.json'
+    else:
+        path = Path(path)
+
+    data = {
+        'name': theme.name,
+        'palette': {f.name: getattr(theme.palette, f.name) for f in theme.palette.__dataclass_fields__.values()},
+        'fonts': {f.name: getattr(theme.fonts, f.name) for f in theme.fonts.__dataclass_fields__.values()},
+        'sizes': {f.name: getattr(theme.sizes, f.name) for f in theme.sizes.__dataclass_fields__.values()},
+        'margins': {f.name: getattr(theme.margins, f.name) for f in theme.margins.__dataclass_fields__.values()},
+        'density': {f.name: getattr(theme.density, f.name) for f in theme.density.__dataclass_fields__.values()},
+    }
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    return path
+
+
+def load_theme(path: str | Path) -> Theme:
+    """Load a Theme from JSON file.
+
+    Parameters
+    ----------
+    path : file path, or theme name (looked up in ~/.pyhwpxlib/themes/)
+
+    Returns
+    -------
+    Theme instance
+    """
+    path = Path(path)
+    if not path.exists() and not path.suffix:
+        # Try themes directory
+        path = _THEMES_DIR / f'{path}.json'
+    if not path.exists():
+        raise FileNotFoundError(f'Theme file not found: {path}')
+
+    data = json.loads(path.read_text(encoding='utf-8'))
+    return Theme(
+        name=data['name'],
+        palette=Palette(**data['palette']),
+        fonts=FontSet(**data['fonts']),
+        sizes=SizeSet(**data['sizes']),
+        margins=Margins(**data['margins']),
+        density=Density(**data['density']) if 'density' in data else Density(),
+    )
+
+
+def resolve_theme(theme: str | Theme | None) -> Theme:
+    """Resolve a theme argument to a Theme instance.
+
+    Accepts:
+    - None / 'default' → built-in default
+    - Built-in name ('forest', 'ocean_analytics', ...)
+    - 'custom/{name}' → load from ~/.pyhwpxlib/themes/{name}.json
+    - Path to .json file
+    - Theme instance (pass-through)
+    """
+    if theme is None or theme == 'default':
+        return BUILTIN_THEMES['default']
+    if isinstance(theme, Theme):
+        return theme
+    if theme in BUILTIN_THEMES:
+        return BUILTIN_THEMES[theme]
+    # custom/ prefix
+    if isinstance(theme, str) and theme.startswith('custom/'):
+        name = theme[7:]  # strip 'custom/'
+        return load_theme(name)
+    # Try as file path
+    p = Path(theme)
+    if p.exists() and p.suffix == '.json':
+        return load_theme(p)
+    raise ValueError(f"Unknown theme: {theme!r}. Use a built-in name, 'custom/name', or a .json path.")

@@ -258,10 +258,10 @@ def _fontfaces(ref_list: RefList, font_set=None) -> None:
 
 
 def _add_font_pair(fontface) -> None:
-    # Font 0: 함초롬돋움
+    # Font 0: 나눔고딕 (bundled in vendor/)
     f1 = fontface.add_new_font()
     f1.id = "0"
-    f1.face = "함초롬돋움"
+    f1.face = "나눔고딕"
     f1.type = FontType.TTF
     f1.isEmbedded = False
     ti1 = f1.create_type_info()
@@ -275,10 +275,10 @@ def _add_font_pair(fontface) -> None:
     ti1.midline = 1
     ti1.xHeight = 1
 
-    # Font 1: 함초롬바탕
+    # Font 1: 나눔명조 (system fallback — NanumMyeongjo)
     f2 = fontface.add_new_font()
     f2.id = "1"
-    f2.face = "함초롬바탕"
+    f2.face = "나눔명조"
     f2.type = FontType.TTF
     f2.isEmbedded = False
     ti2 = f2.create_type_info()

@@ -1027,6 +1027,25 @@ def _build_hwpx(hwp: _HWPDocument) -> Any:
     return hwpx
 
 
+_IMAGE_SIGNATURES = {
+    b'\x89PNG': 'png',
+    b'BM': 'bmp',
+    b'\xff\xd8': 'jpeg',
+    b'GIF8': 'gif',
+    b'RIFF': 'webp',
+    b'II\x2a\x00': 'tiff',
+    b'MM\x00\x2a': 'tiff',
+}
+
+
+def _is_known_image(data: bytes) -> bool:
+    """Check if data starts with a known image file signature."""
+    for sig in _IMAGE_SIGNATURES:
+        if data[:len(sig)] == sig:
+            return True
+    return False
+
+
 def _attach_binary_data(hwpx, hwp: '_HWPDocument'):
     """Read embedded binary data from HWP OLE streams and attach to HWPX."""
     attachments = {}
@@ -1036,7 +1055,14 @@ def _attach_binary_data(hwpx, hwp: '_HWPDocument'):
         if hwp.ole.exists(ole_stream):
             try:
                 raw = hwp.ole.openstream(ole_stream).read()
-                data = hwp._decompress(raw)
+                try:
+                    data = hwp._decompress(raw)
+                except Exception:
+                    # Decompression failed — raw data may already be uncompressed
+                    if _is_known_image(raw):
+                        data = raw
+                    else:
+                        raise
                 attachments[f"BinData/{hex_id}.{ext}"] = data
             except Exception as e:
                 logger.warning("Failed to decompress BinData %s: %s -- skipping", ole_stream, e)

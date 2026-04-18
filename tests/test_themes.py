@@ -89,8 +89,8 @@ class TestDefaultFontSet:
 
         fs = FontSet()
         for f in dataclasses.fields(fs):
-            assert getattr(fs, f.name) == '\ud568\ucd08\ub86c\ub3cb\uc6c0', \
-                f"FontSet().{f.name} != '\ud568\ucd08\ub86c\ub3cb\uc6c0'"
+            assert getattr(fs, f.name) == '나눔고딕', \
+                f"FontSet().{f.name} != '나눔고딕'"
 
 
 class TestDefaultSizeSet:
@@ -179,7 +179,7 @@ class TestFontSystem:
 
         fs = FontSet(
             heading_hangul='맑은 고딕', heading_latin='맑은 고딕',
-            body_hangul='함초롬돋움', body_latin='함초롬돋움',
+            body_hangul='나눔고딕', body_latin='나눔고딕',
         )
         theme = Theme(name='test_multi_font',
                        palette=BUILTIN_THEMES['forest'].palette,
@@ -198,7 +198,7 @@ class TestFontSystem:
         hangul_ff = root.find('.//hh:fontface[@lang="HANGUL"]', ns)
         fonts = [f.get('face') for f in hangul_ff.findall('hh:font', ns)]
         assert '맑은 고딕' in fonts, f"Expected '맑은 고딕' in fontfaces, got {fonts}"
-        assert '함초롬돋움' in fonts, f"Expected '함초롬돋움' in fontfaces, got {fonts}"
+        assert '나눔고딕' in fonts, f"Expected '나눔고딕' in fontfaces, got {fonts}"
 
     def test_heading_body_font_separation(self):
         """Heading charPr references heading font, body uses body font (or default)."""
@@ -210,7 +210,7 @@ class TestFontSystem:
 
         fs = FontSet(
             heading_hangul='맑은 고딕', heading_latin='맑은 고딕',
-            body_hangul='함초롬돋움', body_latin='함초롬돋움',
+            body_hangul='나눔고딕', body_latin='나눔고딕',
         )
         theme = Theme(name='test_font_sep',
                        palette=BUILTIN_THEMES['forest'].palette,
@@ -257,7 +257,7 @@ class TestFontSystem:
 
         fs = FontSet(
             heading_hangul='나눔명조', heading_latin='Arial',
-            body_hangul='함초롬돋움', body_latin='함초롬돋움',
+            body_hangul='나눔고딕', body_latin='나눔고딕',
         )
         theme = Theme(name='test_split',
                        palette=BUILTIN_THEMES['default'].palette,
@@ -276,7 +276,7 @@ class TestFontSystem:
         fonts = [f.get('face') for f in hangul_ff.findall('hh:font', ns)]
         assert '나눔명조' in fonts, f"Expected '나눔명조' in fontfaces, got {fonts}"
         assert 'Arial' in fonts, f"Expected 'Arial' in fontfaces, got {fonts}"
-        assert '함초롬돋움' in fonts, f"Expected '함초롬돋움' in fontfaces, got {fonts}"
+        assert '나눔고딕' in fonts, f"Expected '나눔고딕' in fontfaces, got {fonts}"
 
 
 # ======================================================================
@@ -346,13 +346,13 @@ class TestThemeIntegration:
         # Header XML is deterministic and contains charPr/paraPr/fontfaces
         assert header1 == header2, "Header XML differs between HwpxBuilder() and HwpxBuilder(theme='default')"
 
-        # Verify both use the same fontfaces (함초롬돋움/함초롬바탕)
+        # Verify both use the same fontfaces (나눔고딕/나눔명조)
         ns = {'hh': 'http://www.hancom.co.kr/hwpml/2011/head'}
         root = ET.fromstring(header1)
         hangul_ff = root.find('.//hh:fontface[@lang="HANGUL"]', ns)
         fonts = [f.get('face') for f in hangul_ff.findall('hh:font', ns)]
-        assert fonts == ['함초롬돋움', '함초롬바탕'], \
-            f"Default theme should use original font pair, got {fonts}"
+        assert fonts == ['나눔고딕', '나눔명조'], \
+            f"Default theme should use NanumGothic/NanumMyeongjo, got {fonts}"
 
     def test_all_themes_generate_valid_hwpx(self):
         """All 10 built-in themes produce valid HWPX (ZIP) files with required entries."""
