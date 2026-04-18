@@ -10,6 +10,7 @@ Usage:
     doc.add_table([["A", "B"], ["1", "2"]])
     doc.save("output.hwpx")
 """
+from __future__ import annotations
 import os
 import sys
 import zipfile
