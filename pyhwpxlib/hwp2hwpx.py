@@ -983,9 +983,12 @@ def _attach_binary_data(hwpx, hwp: '_HWPDocument'):
         hex_id = f"BIN{bin_id:04X}"
         ole_stream = f"BinData/{hex_id}.{ext}"
         if hwp.ole.exists(ole_stream):
-            raw = hwp.ole.openstream(ole_stream).read()
-            data = hwp._decompress(raw)
-            attachments[f"BinData/{hex_id}.{ext}"] = data
+            try:
+                raw = hwp.ole.openstream(ole_stream).read()
+                data = hwp._decompress(raw)
+                attachments[f"BinData/{hex_id}.{ext}"] = data
+            except Exception as e:
+                logger.warning("Failed to decompress BinData %s: %s -- skipping", ole_stream, e)
         else:
             logger.warning("Binary stream not found in HWP OLE: %s", ole_stream)
     hwpx._binary_attachments = attachments
