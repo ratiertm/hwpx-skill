@@ -125,16 +125,61 @@ def _find_wasm() -> Path:
 # Text measurement
 # ---------------------------------------------------------------------------
 
-# macOS system font fallback. Extend this mapping to taste.
+# System font fallback — macOS + Linux paths.
 _DEFAULT_FONT_MAP: dict[str, str] = {
+    # macOS
     "apple sd gothic neo": "/System/Library/Fonts/AppleSDGothicNeo.ttc",
     "helvetica": "/System/Library/Fonts/Helvetica.ttc",
     "arial": "/System/Library/Fonts/Supplemental/Arial.ttf",
     "times new roman": "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
     "courier new": "/System/Library/Fonts/Supplemental/Courier New.ttf",
+    # Linux (common Korean fonts)
+    "nanumgothic": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "nanum gothic": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "nanummyeongjo": "/usr/share/fonts/truetype/nanum/NanumMyeongjo.ttf",
+    "noto sans cjk kr": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "noto sans korean": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    # Generic aliases — map to Korean-capable font
+    "sans-serif": "",  # resolved dynamically below
+    "serif": "",
 }
-_KOREAN_FALLBACK = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
-_LATIN_FALLBACK = "/System/Library/Fonts/Helvetica.ttc"
+
+
+def _find_korean_font() -> str:
+    """Find a Korean-capable font on the current system."""
+    candidates = [
+        # macOS
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+        # Linux common locations
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+        # Fallback: any Nanum font
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    # Search for any Nanum font
+    import glob
+    for pattern in ["/usr/share/fonts/**/Nanum*.ttf", "/usr/share/fonts/**/NotoSans*CJK*.ttc"]:
+        found = glob.glob(pattern, recursive=True)
+        if found:
+            return found[0]
+    return candidates[0]  # final resort
+
+
+_KOREAN_FALLBACK = _find_korean_font()
+_LATIN_FALLBACK = (
+    "/System/Library/Fonts/Helvetica.ttc"
+    if os.path.exists("/System/Library/Fonts/Helvetica.ttc")
+    else _KOREAN_FALLBACK
+)
+
+# Fill generic aliases
+_DEFAULT_FONT_MAP["sans-serif"] = _KOREAN_FALLBACK
+_DEFAULT_FONT_MAP["serif"] = _KOREAN_FALLBACK
 
 
 class _TextMeasurer:
@@ -255,6 +300,11 @@ def _embed_fonts_in_svg(svg: str, font_map: dict[str, str]) -> str:
 
     for family_lower, chars in font_chars.items():
         path = resolver._resolve_path([family_lower])
+        # If text contains Korean characters but resolved font is non-Korean,
+        # force Korean fallback
+        has_korean = any(0xAC00 <= ord(c) <= 0xD7A3 or 0x3131 <= ord(c) <= 0x318E for c in chars)
+        if has_korean and not os.path.exists(path):
+            path = _KOREAN_FALLBACK
         if not os.path.exists(path):
             continue
         try:
