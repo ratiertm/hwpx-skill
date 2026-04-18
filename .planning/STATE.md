@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: milestone
-current_plan: 3 of 3 (02-01, 02-02, 02-03 complete) -- PHASE COMPLETE
-status: unknown
-stopped_at: Completed 02-03-PLAN.md (Phase 2 complete)
-last_updated: "2026-04-18T02:17:19.992Z"
+current_plan: 1 of 1 (02.1-01 complete) -- PHASE COMPLETE
+status: complete
+stopped_at: Completed 02.1-01-PLAN.md (Phase 2.1 complete)
+last_updated: "2026-04-18T06:47:09Z"
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 5
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # Project State
 
 ## Current Phase
 
-Phase 2: JSON Overlay 정밀화 + BinData 에러 핸들링
-Current Plan: 3 of 3 (02-01, 02-02, 02-03 complete) -- PHASE COMPLETE
+Phase 2.1: hwp2hwpx 양식 표 변환 개선
+Current Plan: 1 of 1 (02.1-01 complete) -- PHASE COMPLETE
 
 ## Context
 
@@ -43,11 +43,13 @@ Current Plan: 3 of 3 (02-01, 02-02, 02-03 complete) -- PHASE COMPLETE
 - Overlay: cell text join '' not ' ' for matching accuracy
 - Overlay: zipfile direct manipulation replaces subprocess unpack/repack
 - Nested table XPath: direct-child traversal (tc->subList->p->run->tbl) instead of .//{_HP}tbl
+- Level filtering in _build_cell_paragraph: skip records at level != para_level+1 to prevent nested table cell data overwriting parent
+- Centralized _decode_hwp_text_chars for UTF-16 surrogate pair handling across all text parsing locations
 
 ## Last Session
 
-- **Stopped at:** Completed 02-03-PLAN.md (Phase 2 complete)
-- **Timestamp:** 2026-04-18T02:16:30Z
+- **Stopped at:** Completed 02.1-01-PLAN.md (Phase 2.1 complete)
+- **Timestamp:** 2026-04-18T06:47:09Z
 
 ## Blockers
 
