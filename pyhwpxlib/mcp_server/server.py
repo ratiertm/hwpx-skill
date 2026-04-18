@@ -86,6 +86,11 @@ Korean 한/글 document tools (HWPX/OWPML).
 5. preview.png_base64 확인
 ```
 
+## 시작할 때
+
+처음 HWPX 관련 작업을 시작하면 **hwpx_guide()를 호출**하여 최신 가이드를 읽는다.
+가이드에 테마, 워크플로우, Critical Rules, 디자인 규칙이 모두 포함되어 있다.
+
 ## 금지 사항
 
 - preview 확인 없이 "완료" 보고
@@ -597,6 +602,23 @@ def hwpx_build_preset(preset: str, title: str, sections: str, output: str,
         "preset": preset,
         **_with_preview(_abs(output)),
     }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_guide() -> str:
+    """Get the latest pyhwpxlib usage guide.
+
+    Returns the full guide including API reference, themes, workflows,
+    critical rules, and design guidelines. Call this first when starting
+    any HWPX document task to ensure you have the latest instructions.
+    """
+    guide_path = os.path.join(_PROJECT_ROOT, 'skill', 'chatgpt_hwpx_guide.md')
+    if os.path.exists(guide_path):
+        with open(guide_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    # Fallback to built-in LLM guide
+    from pyhwpxlib.llm_guide import GUIDE
+    return GUIDE
 
 
 if __name__ == "__main__":
