@@ -235,3 +235,78 @@ class TestCellParagraphLevelFiltering:
                 i += 14
 
         assert chars == [11, 13], f"Expected [11, 13] from direct child PARA_TEXT, got {chars}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test 4: Surrogate pair decoding
+# ═══════════════════════════════════════════════════════════════
+
+class TestSurrogatePairDecoding:
+    """Tests for UTF-16LE surrogate pair handling in text_data parsing."""
+
+    def _parse_text_data(self, text_data: bytes):
+        """Simulate the text parsing loop from _build_cell_paragraph,
+        returning (position, char_code) pairs."""
+        from pyhwpxlib.hwp2hwpx import _decode_hwp_text_chars
+        return _decode_hwp_text_chars(text_data)
+
+    def test_surrogate_pair_combined(self):
+        """Surrogate pair (high + low) should produce a single codepoint > U+FFFF."""
+        # U+1F600 (grinning face) = 0xD83D 0xDE00 in UTF-16LE
+        high = 0xD83D
+        low = 0xDE00
+        expected_cp = 0x1F600
+        text_data = struct.pack('<HH', high, low) + struct.pack('<H', 13)  # + PARA_END
+        chars = self._parse_text_data(text_data)
+        # Should have 2 entries: (0, 0x1F600) and (1, 13)
+        codepoints = [ch for _, ch in chars]
+        assert expected_cp in codepoints, (
+            f"Expected U+{expected_cp:04X} in output, got {[hex(c) for c in codepoints]}"
+        )
+
+    def test_bmp_chars_unaffected(self):
+        """BMP characters (Korean, ASCII) should pass through unchanged."""
+        # '한' = U+D55C, 'A' = U+0041
+        text_data = struct.pack('<HHH', 0xD55C, 0x0041, 13)
+        chars = self._parse_text_data(text_data)
+        codepoints = [ch for _, ch in chars]
+        assert 0xD55C in codepoints  # '한'
+        assert 0x0041 in codepoints  # 'A'
+
+    def test_orphan_high_surrogate(self):
+        """Orphan high surrogate (no low following) should produce U+FFFD."""
+        # High surrogate followed by normal char (not a low surrogate)
+        text_data = struct.pack('<HHH', 0xD83D, 0x0041, 13)  # orphan + 'A'
+        chars = self._parse_text_data(text_data)
+        codepoints = [ch for _, ch in chars]
+        assert 0xFFFD in codepoints, "Orphan high surrogate should become U+FFFD"
+        assert 0x0041 in codepoints, "'A' should still be present"
+
+    def test_orphan_high_at_end(self):
+        """High surrogate at end of text_data (no next uint16) should produce U+FFFD."""
+        text_data = struct.pack('<HH', 0xD83D, 13)  # high surrogate + PARA_END
+        chars = self._parse_text_data(text_data)
+        codepoints = [ch for _, ch in chars]
+        assert 0xFFFD in codepoints, "High surrogate at end should become U+FFFD"
+
+    def test_multiple_emoji(self):
+        """Multiple surrogate pairs should all be decoded correctly."""
+        # U+1F600 = 0xD83D 0xDE00, U+1F60A = 0xD83D 0xDE0A
+        text_data = (
+            struct.pack('<HH', 0xD83D, 0xDE00) +  # U+1F600
+            struct.pack('<HH', 0xD83D, 0xDE0A) +  # U+1F60A
+            struct.pack('<H', 13)                  # PARA_END
+        )
+        chars = self._parse_text_data(text_data)
+        codepoints = [ch for _, ch in chars]
+        assert 0x1F600 in codepoints
+        assert 0x1F60A in codepoints
+
+    def test_ctrl_chars_not_affected(self):
+        """Extended control chars (1-31) should not be treated as surrogates."""
+        # ch=11 (table) is NOT in surrogate range, should work as before
+        text_data = struct.pack('<H', 11) + b'\x00' * 14 + struct.pack('<H', 13)
+        chars = self._parse_text_data(text_data)
+        codepoints = [ch for _, ch in chars]
+        assert 11 in codepoints
+        assert 13 in codepoints
