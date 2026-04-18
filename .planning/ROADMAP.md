@@ -104,6 +104,24 @@ Plans:
 
 ---
 
+### Phase 2.3: 폰트 파이프라인 정비
+**Goal**: 프리뷰 폰트 일치도 향상 + 폰트 검증 자동화
+
+**Requirements**: 신규 (TS-7)
+
+**Deliverables**:
+- NanumGothic TTF를 `vendor/`에 번들 (OFL 라이선스)
+- `embed_fonts=True` 기본값으로 변경
+- `font_map`을 번들 폰트 기준으로 고정 (한글+영문+숫자 단일 폰트)
+- `python -m pyhwpxlib font-check output.hwpx` CLI 명령 추가
+  - 문서 사용 폰트 vs font_map 비교 → 미등록 폰트 경고
+- SKILL.md Rule 25: "폰트 민감하지 않은 레이아웃" 규칙
+- 레이아웃 가이드: 셀 여백 여유, 한 줄 꽉 찬 제목 지양, 줄바꿈 중요하면 문단 분리
+
+**Success**: SVG/PNG 프리뷰가 Whale 렌더링과 90%+ 일치
+
+---
+
 ### Phase 3: 동적 테마 추출 + 통합
 **Goal**: 사용자 양식에서 테마 자동 추출 → 저장 → 재사용
 
@@ -146,6 +164,8 @@ Plans:
 |-------|------|-------------|--------|
 | 1 | 테마 시스템 코어 | TS-1, TS-2 | ✅ 완료 |
 | 2 | JSON Overlay + BinData | TS-3, TS-4, CF-2, CF-3 | ✅ 완료 |
-| 2.1 | hwp2hwpx 양식 표 변환 | TS-5 (신규) | ✅ 완료 |
+| 2.1 | hwp2hwpx 양식 표 + 이모지 | TS-5 | ✅ 완료 |
+| 2.2 | BinData 이미지 복구 | TS-6 | 미시작 |
+| 2.3 | 폰트 파이프라인 정비 | TS-7 | 미시작 |
 | 3 | 동적 테마 추출 | CF-1 | 미시작 |
 | 4 | 정비 + 릴리스 | — | 미시작 |
