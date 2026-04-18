@@ -12,7 +12,6 @@ Usage:
 """
 from __future__ import annotations
 import os
-import sys
 import zipfile
 import shutil
 import tempfile
@@ -21,15 +20,6 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 BLANK_TEMPLATE = SCRIPT_DIR / "tools" / "blank.hwpx"
-
-# HWPX 네임스페이스
-NS = {
-    'hp': 'http://www.hancom.co.kr/hwpml/2011/paragraph',
-    'hs': 'http://www.hancom.co.kr/hwpml/2011/section',
-    'hh': 'http://www.hancom.co.kr/hwpml/2011/head',
-    'hc': 'http://www.hancom.co.kr/hwpml/2011/core',
-}
-
 
 def _esc(text: str) -> str:
     """XML 특수문자 이스케이프"""
@@ -281,16 +271,31 @@ class HwpxBuilder:
             if '.' not in filename:
                 filename += '.png'
 
-        tmp_dir = Path(tempfile.gettempdir()) / 'hwpx_images'
-        tmp_dir.mkdir(exist_ok=True)
-        local_path = str(tmp_dir / filename)
+        # Use unique temp file to avoid collisions and ensure cleanup
+        suffix = Path(filename).suffix or '.png'
+        tmp_fd = tempfile.NamedTemporaryFile(
+            prefix='hwpx_img_', suffix=suffix, delete=False
+        )
+        local_path = tmp_fd.name
+        tmp_fd.close()
+
+        _MAX_IMAGE_SIZE = 50 * 1024 * 1024  # 50MB limit
+        _TIMEOUT = 30  # seconds
 
         req = urllib.request.Request(url, headers={
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
         })
-        with urllib.request.urlopen(req) as resp:
-            with open(local_path, 'wb') as f:
-                f.write(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                data = resp.read(_MAX_IMAGE_SIZE + 1)
+                if len(data) > _MAX_IMAGE_SIZE:
+                    raise ValueError(f"Image exceeds {_MAX_IMAGE_SIZE // (1024*1024)}MB limit")
+                with open(local_path, 'wb') as f:
+                    f.write(data)
+        except Exception as e:
+            # Clean up temp file on failure
+            Path(local_path).unlink(missing_ok=True)
+            raise RuntimeError(f"Failed to download image from {url}: {e}") from e
 
         self._actions.append({
             'kind': 'image', 'path': local_path,
@@ -416,96 +421,13 @@ class HwpxBuilder:
         return kwargs
 
     # ── 저장 ──
-    # (legacy _build_header/_build_section 제거 — pyhwpxlib API 직접 사용)
-
-    def _build_header_legacy(self) -> str:
-        # fontfaces
-        font_face = self._theme.fonts.body_hangul
-        langs = ['HANGUL', 'LATIN', 'HANJA', 'JAPANESE', 'OTHER', 'SYMBOL', 'USER']
-        ff_lines = [f'  <hh:fontface lang="{l}"><hh:font id="0" face="{font_face}" type="TTF" /></hh:fontface>' for l in langs]
-        fontfaces = '<hh:fontfaces>\n' + '\n'.join(ff_lines) + '\n</hh:fontfaces>'
-
-        # borderFills
-        borders = '''<hh:borderFills itemCnt="1">
-  <hh:borderFill id="1" threeD="0" shadow="0" slash="0" backSlash="0" cropCell="0" fillBrush="0">
-    <hh:leftBorder type="NONE" width="0.1 mm" color="#000000" />
-    <hh:rightBorder type="NONE" width="0.1 mm" color="#000000" />
-    <hh:topBorder type="NONE" width="0.1 mm" color="#000000" />
-    <hh:bottomBorder type="NONE" width="0.1 mm" color="#000000" />
-  </hh:borderFill>
-</hh:borderFills>'''
-
-        # charProperties
-        char_xml = f'<hh:charProperties itemCnt="{len(self._char_styles)}">\n'
-        for cs in self._char_styles:
-            char_xml += f'  <hh:charPr id="{cs["id"]}" height="{cs["height"]}" textColor="{cs["textColor"]}">\n'
-            char_xml += '    <hh:fontRef hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0" />\n'
-            char_xml += '    <hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100" />\n'
-            char_xml += '    <hh:spacing hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0" />\n'
-            char_xml += '    <hh:relSz hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100" />\n'
-            char_xml += '    <hh:offset hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0" />\n'
-            if cs.get('bold'):
-                char_xml += '    <hh:bold />\n'
-            if cs.get('italic'):
-                char_xml += '    <hh:italic />\n'
-            char_xml += '    <hh:underline type="NONE" shape="NONE" color="#000000" />\n'
-            char_xml += '    <hh:strikeout shape="NONE" color="#000000" />\n'
-            char_xml += '    <hh:outline type="NONE" />\n'
-            char_xml += '    <hh:shadow type="NONE" color="#B2B2B2" offsetX="10" offsetY="10" />\n'
-            char_xml += f'  </hh:charPr>\n'
-        char_xml += '</hh:charProperties>'
-
-        # paraProperties
-        para_xml = f'<hh:paraProperties itemCnt="{len(self._para_styles)}">\n'
-        for ps in self._para_styles:
-            para_xml += f'  <hh:paraPr id="{ps["id"]}" tabPrIDRef="0" condense="{ps.get("condense",0)}" fontLineHeight="0" snapToGrid="1" suppressLineNumbers="0" checked="0">\n'
-            para_xml += f'    <hh:align horizontal="{ps["alignment"]}" vertical="BASELINE" />\n'
-            para_xml += '    <hh:heading type="NONE" idRef="0" level="0" />\n'
-            para_xml += '    <hh:breakSetting breakLatinWord="BREAK_WORD" breakNonLatinWord="KEEP_WORD" widowOrphan="0" keepWithNext="0" keepLines="0" pageBreakBefore="0" lineWrap="BREAK" />\n'
-            para_xml += '    <hh:autoSpacing eAsianEng="0" eAsianNum="0" />\n'
-            para_xml += '    <hh:margin><hc:intent value="0" unit="HWPUNIT" /><hc:left value="0" unit="HWPUNIT" /><hc:right value="0" unit="HWPUNIT" /><hc:prev value="0" unit="HWPUNIT" /><hc:next value="0" unit="HWPUNIT" /></hh:margin>\n'
-            para_xml += f'    <hh:lineSpacing type="PERCENT" value="{ps["lineSpacing"]}" unit="HWPUNIT" />\n'
-            para_xml += '    <hh:border borderFillIDRef="1" offsetLeft="0" offsetRight="0" offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0" />\n'
-            para_xml += f'  </hh:paraPr>\n'
-        para_xml += '</hh:paraProperties>'
-
-        return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-<hh:head xmlns:hh="{NS['hh']}" xmlns:hc="{NS['hc']}" xmlns:hp="{NS['hp']}" version="1.4" secCnt="1">
-  <hh:beginNum page="1" footnote="1" endnote="1" pic="1" tbl="1" equation="1" />
-  <hh:refList>
-    {fontfaces}
-    {borders}
-    {char_xml}
-    {para_xml}
-  </hh:refList>
-  <hh:compatibleDocument targetProgram="HWP201X"><hh:layoutCompatibility /></hh:compatibleDocument>
-</hh:head>'''
-
-    # ── section0.xml 생성 ──
-
-    def _build_section(self) -> str:
-        paras = '\n'.join(self._paragraphs)
-        return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-<hs:sec xmlns:hp="{NS['hp']}" xmlns:hs="{NS['hs']}" xmlns:hc="{NS['hc']}" xmlns:hh="{NS['hh']}">
-<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">
-  <hp:run charPrIDRef="0">
-    <hp:secPr textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" outlineShapeIDRef="1" memoShapeIDRef="0" textVerticalWidthHead="0">
-      <hp:pageSize width="59528" height="84188" />
-      <hp:pageMarg header="4252" footer="4252" left="8504" right="8504" top="5668" bottom="4252" />
-    </hp:secPr>
-  </hp:run>
-</hp:p>
-{paras}
-</hs:sec>'''
 
     # ── 저장 ──
 
     def save(self, output_path: str) -> str:
         """HWPX 파일 저장 — pyhwpxlib API로 생성 + 원본 XML 문자열 보존"""
-        sys.path.insert(0, str(SCRIPT_DIR.parent))
         from pyhwpxlib.api import (create_document, add_paragraph as api_add_para,
                                     add_heading as api_add_heading,
-                                    add_styled_paragraph as api_add_styled,
                                     add_table as api_add_table,
                                     _add_page_break,
                                     save as hwpx_save)
