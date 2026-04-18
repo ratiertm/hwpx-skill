@@ -32,6 +32,10 @@ pages = render_pages(output_path, '/tmp')
 3. **같은 레이아웃 반복 금지** — 표→목록→박스→인용문 순환
 4. **AI 생성 패턴 피하기** — 제목 아래 악센트 라인, 매번 같은 표지, 모든 섹션 동일 구조
 5. **QA 필수** — 생성 후 validate + 사용자에게 Whale 확인 요청. 문제가 있다고 가정하고 찾는다
+6. **문단 간격 필수** — HWPX는 기본 간격이 0이므로 `add_paragraph("")`로 빈 줄을 넣어야 한다
+   - `add_heading()` 앞뒤에 빈 줄 (첫 헤딩 앞 제외)
+   - `add_table()` 앞뒤에 빈 줄
+   - `add_image()` 앞뒤에 빈 줄
 
 ---
 
@@ -97,8 +101,19 @@ doc = HwpxBuilder(theme='custom/AFC점검양식')  # 또는 theme='forest'
 doc.add_heading(제목, level=1)  # 테마 primary 색상 + h1 사이즈 자동
 doc.add_paragraph(본문)  # 테마 body 사이즈 자동
 doc.add_table(data)  # 테마 primary 헤더 배경 자동
+
+# 이미지 — 텍스트만 있는 문서는 지루하다. 적극 활용할 것.
+doc.add_image("logo.png", width=10000, height=5000)  # 로컬 파일
+doc.add_image_from_url("https://...", filename="chart.png",  # URL 다운로드
+    width=21260, height=15000)
 doc.save(파일명)
 ```
+
+**이미지 활용 기준** — 문서에 이미지가 필요한 경우 빠뜨리지 않는다:
+- 사용자가 이미지 파일을 제공하면 → `add_image()`로 삽입
+- 사용자가 이미지 URL을 언급하면 → `add_image_from_url()`로 다운로드+삽입
+- 로고, 직인, 사진이 필요한 문서 유형이면 → 사용자에게 이미지 파일을 요청
+- 기존 문서에 이미지 추가 → `insert_image_to_existing(hwpx, image, output)`
 Step E: `pyhwpxlib validate 파일명`
 Step F: **시각 검토 (생략 금지)** — HWPX → PNG → Read tool로 직접 본다
 ```python

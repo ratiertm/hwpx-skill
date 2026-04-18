@@ -427,6 +427,35 @@ subprocess.run(["pyhwpxlib", "themes", "delete", "-n", "사내양식"])
 3. **같은 레이아웃 반복 금지** — 표→목록→박스→인용문 순환
 4. **이미지 적극 활용** — 사용자가 이미지를 제공하면 반드시 삽입
 5. **검증 필수** — 생성 후 validate + lint 실행
+6. **문단 간격 (매우 중요)** — 헤딩과 본문 사이, 섹션 사이에 빈 줄을 넣어 시각적 여유를 만든다
+
+### 문단 간격 규칙
+
+HWPX는 기본 문단 간격이 0이라서, 의식적으로 간격을 만들어야 한다.
+간격 없이 빽빽하게 쓰면 읽기 어려운 문서가 된다.
+
+```python
+doc.add_heading("제1장 개요", level=1)
+doc.add_paragraph("")                    # ← 헤딩 뒤 빈 줄 (필수)
+doc.add_paragraph("본문 내용...")
+
+doc.add_paragraph("")                    # ← 섹션 전환 전 빈 줄
+doc.add_heading("제2장 분석", level=1)
+doc.add_paragraph("")                    # ← 헤딩 뒤 빈 줄
+doc.add_paragraph("분석 내용...")
+
+doc.add_paragraph("")                    # ← 표 앞 빈 줄
+doc.add_table([["항목", "값"], ["A", "100"]])
+doc.add_paragraph("")                    # ← 표 뒤 빈 줄
+doc.add_paragraph("표에 대한 설명...")
+```
+
+**간격 삽입 위치 체크리스트:**
+- `add_heading()` 뒤에 → `add_paragraph("")` (필수)
+- `add_heading()` 앞에 → `add_paragraph("")` (첫 헤딩 제외)
+- `add_table()` 앞뒤에 → `add_paragraph("")`
+- `add_image()` 앞뒤에 → `add_paragraph("")`
+- 긴 본문 단락 사이 → 논리적 단위로 구분 시 빈 줄
 
 ---
 
