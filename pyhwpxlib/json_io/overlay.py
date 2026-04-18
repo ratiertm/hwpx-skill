@@ -168,8 +168,8 @@ def _extract_table(
     cells = []
     for ri, tr_el in enumerate(tbl_el.findall(f"{_HP}tr")):
         for ci, tc_el in enumerate(tr_el.findall(f"{_HP}tc")):
-            # 셀 텍스트 + 파트
-            cell_text, cell_parts = _extract_cell_parts(tc_el)
+            # 셀 텍스트 + 파트 + run 경계
+            cell_text, cell_parts, cell_runs = _extract_cell_parts(tc_el)
 
             # 셀 역할 추정
             role = _guess_cell_role(cell_text, ri, ci)
@@ -180,6 +180,7 @@ def _extract_table(
                 "value": cell_text,
                 "original": cell_text,
                 "original_parts": cell_parts,
+                "original_runs": cell_runs,
                 "role": role,
                 "editable": role != "header",
             }
@@ -290,18 +291,36 @@ def _extract_cell_full_text(tc_el) -> str:
     return "".join(parts).strip()
 
 
-def _extract_cell_parts(tc_el) -> tuple[str, list[str]]:
-    """셀 내부 모든 <hp:t> 텍스트와 개별 파트를 반환.
+def _extract_cell_parts(tc_el) -> tuple[str, list[str], list[dict]]:
+    """셀 내부 모든 <hp:t> 텍스트, 파트, run 경계 정보를 반환.
 
     Returns
     -------
-    tuple[str, list[str]]
-        (joined_text, individual_hp_t_parts)
+    tuple[str, list[str], list[dict]]
+        (joined_text, individual_hp_t_parts, run_boundaries)
+        run_boundaries: [{"charPr": "18", "parts": ["텍스트"], "offset": 0, "length": 7}, ...]
     """
     parts = []
-    for t_el in tc_el.findall(f".//{_HP}t"):
-        parts.append(_collect_t_text(t_el))
-    return "".join(parts).strip(), parts
+    runs = []
+    offset = 0
+    for p_el in tc_el.findall(f".//{_HP}p"):
+        for run_el in p_el.findall(f"{_HP}run"):
+            char_pr = run_el.get("charPrIDRef", "0")
+            run_parts = []
+            for t_el in run_el.findall(f"{_HP}t"):
+                t_text = _collect_t_text(t_el)
+                run_parts.append(t_text)
+                parts.append(t_text)
+            if run_parts:
+                run_text = "".join(run_parts)
+                runs.append({
+                    "charPr": char_pr,
+                    "parts": run_parts,
+                    "offset": offset,
+                    "length": len(run_text),
+                })
+                offset += len(run_text)
+    return "".join(parts).strip(), parts, runs
 
 
 def _guess_cell_role(text: str, row: int, col: int) -> str:
@@ -399,6 +418,169 @@ def _replace_text_in_xml(xml_str: str, original_parts: list[str], new_value: str
     return re.sub(full_pattern, replacement, xml_str, count=1)
 
 
+def _replace_cell_parts_individually(
+    xml_str: str,
+    original_parts: list[str],
+    original_joined: str,
+    new_value: str,
+    original_runs: list[dict] | None = None,
+) -> str:
+    """셀의 파트가 다른 <hp:run>에 걸칠 때 run 단위로 교체.
+
+    original_runs가 있으면 run 경계 정보를 사용하여
+    new_value를 각 run에 정확히 분배합니다.
+    """
+    if original_runs:
+        return _replace_by_runs(xml_str, original_runs, original_joined, new_value)
+
+    # fallback — run 정보 없으면 파트별 단순 교체
+    for part in original_parts:
+        part_stripped = part.strip()
+        if not part_stripped:
+            continue
+        old_fragment = f">{_xml_escape(part)}<"
+        if old_fragment in xml_str and part_stripped not in new_value:
+            # 변경된 파트 — 빈 문자열로 교체 (첫 run에 전체 텍스트를 넣는 방식)
+            xml_str = xml_str.replace(old_fragment, f"><", 1)
+    return xml_str
+
+
+def _replace_by_runs(
+    xml_str: str,
+    original_runs: list[dict],
+    original_joined: str,
+    new_value: str,
+) -> str:
+    """run 경계 정보를 사용하여 각 run의 텍스트를 개별 교체.
+
+    각 run의 원본 텍스트에서 해당 run에 적용해야 할 교체를
+    원본→수정 매핑에서 개별 추출하여 적용합니다.
+    """
+    # 각 run에 대해 개별 diff 계산
+    # original_joined에서 이 run이 차지하는 범위의 텍스트와
+    # new_value에서 대응하는 범위를 비교
+
+    # 1단계: 각 run의 원본 텍스트 → new_value에서 대응하는 텍스트 계산
+    #         방법: run별 개별 교체값 = apply_same_replacements(run_text)
+    #         이를 위해 원본→수정 diff를 run 단위로 분해
+
+    # 원본과 수정 값을 run offset으로 정렬
+    # new_value에서 각 run에 대응하는 부분을 역산
+    run_new_texts = _distribute_new_value_to_runs(original_runs, original_joined, new_value)
+
+    for i, run in enumerate(original_runs):
+        run_text = "".join(run["parts"])
+        if not run_text.strip():
+            continue
+
+        new_run_text = run_new_texts.get(i, run_text)
+
+        # 보호: 원본 run 텍스트가 new_value에 그대로 포함되면 변경하지 않음
+        # (변경되지 않은 run을 비례 분배가 깨뜨리는 것 방지)
+        if run_text.strip() in new_value and new_run_text != run_text:
+            # 원본이 그대로 있으니 건드리지 않음
+            continue
+
+        if new_run_text != run_text:
+            for part in run["parts"]:
+                old_fragment = f">{_xml_escape(part)}<"
+                if old_fragment in xml_str:
+                    new_fragment = f">{_xml_escape(new_run_text)}<"
+                    xml_str = xml_str.replace(old_fragment, new_fragment, 1)
+                    new_run_text = ""
+
+    return xml_str
+
+
+def _distribute_new_value_to_runs(
+    original_runs: list[dict],
+    original_joined: str,
+    new_value: str,
+) -> dict[int, str]:
+    """각 run에 대응하는 new_value 부분을 계산.
+
+    difflib.SequenceMatcher로 original_joined과 new_value의
+    문자 매핑을 구하고, 각 run의 offset 범위에 해당하는
+    new_value 문자들을 추출합니다.
+    """
+    import difflib
+
+    # character-level 매핑: original[i] → new_value[j]
+    sm = difflib.SequenceMatcher(None, original_joined, new_value)
+    opcodes = sm.get_opcodes()
+
+    # original의 각 문자 위치 → new_value에서의 대응 범위
+    # char_map[orig_pos] = (new_start, new_end)
+    orig_to_new: dict[int, tuple[int, int]] = {}
+    for op, i1, i2, j1, j2 in opcodes:
+        if op == 'equal':
+            for k in range(i2 - i1):
+                orig_to_new[i1 + k] = (j1 + k, j1 + k + 1)
+        elif op == 'replace':
+            # 비례 배분
+            old_len = i2 - i1
+            new_len = j2 - j1
+            for k in range(old_len):
+                ns = j1 + int(k * new_len / old_len)
+                ne = j1 + int((k + 1) * new_len / old_len)
+                orig_to_new[i1 + k] = (ns, ne)
+        elif op == 'delete':
+            for k in range(i2 - i1):
+                orig_to_new[i1 + k] = (j1, j1)  # 삭제됨
+        # insert는 original에 대응 없음
+
+    # 각 run의 offset → new_value 범위 추출
+    result = {}
+    for idx, run in enumerate(original_runs):
+        offset = run["offset"]
+        length = run["length"]
+        if length == 0:
+            continue
+
+        # 이 run이 매핑되는 new_value 범위
+        new_positions = set()
+        for k in range(offset, offset + length):
+            if k in orig_to_new:
+                ns, ne = orig_to_new[k]
+                for p in range(ns, ne):
+                    new_positions.add(p)
+
+        if new_positions:
+            new_start = min(new_positions)
+            new_end = max(new_positions) + 1
+            result[idx] = new_value[new_start:new_end]
+        else:
+            result[idx] = ""  # 이 run은 삭제됨
+
+    return result
+
+
+def _build_diff_map(original: str, new_value: str) -> list[tuple[str, str]]:
+    """단어 단위 diff로 변경 부분을 (old, new) 쌍 리스트로 추출.
+
+    한글/영문/숫자를 토큰 단위로 비교하여 정확한 교체 쌍을 생성합니다.
+    예: "울산중부소방서 119재난대응과 ☎ 052) 210-4462"
+      → [("울산중부소방서", "강남구청"), ("119재난대응과", "생활안전과"), ...]
+    """
+    import difflib
+
+    def _tokenize(s: str) -> list[str]:
+        return re.findall(r'[\w]+|[^\w\s]|\s+', s)
+
+    old_tokens = _tokenize(original)
+    new_tokens = _tokenize(new_value)
+
+    sm = difflib.SequenceMatcher(None, old_tokens, new_tokens)
+    diffs = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op in ('replace', 'delete', 'insert'):
+            old_chunk = ''.join(old_tokens[i1:i2])
+            new_chunk = ''.join(new_tokens[j1:j2])
+            if old_chunk or new_chunk:
+                diffs.append((old_chunk, new_chunk))
+    return diffs
+
+
 # ─────────────────────────────────────────────
 # apply_overlay
 # ─────────────────────────────────────────────
@@ -453,14 +635,23 @@ def apply_overlay(
                 parts = field.get("original_parts", [original])
                 xml_str = _replace_text_in_xml(xml_str, parts, new_value)
 
-        # 표 셀 교체
+        # 표 셀 교체 — 셀은 여러 <hp:run>에 걸치므로 파트별 개별 교체
         for tbl in overlay.get("tables", []):
             for cell in tbl.get("cells", []):
                 original = cell.get("original", "")
                 new_value = cell.get("value", "")
                 if original and original != new_value:
                     parts = cell.get("original_parts", [original])
+                    # 먼저 multi-part regex 시도
+                    before = xml_str
                     xml_str = _replace_text_in_xml(xml_str, parts, new_value)
+                    if xml_str == before and len(parts) > 1:
+                        # regex 실패 — 파트가 다른 <hp:run>에 걸침
+                        # run 경계 정보로 정밀 교체
+                        xml_str = _replace_cell_parts_individually(
+                            xml_str, parts, original, new_value,
+                            original_runs=cell.get("original_runs"),
+                        )
 
         # 출력 ZIP 작성 — 엔트리 순서 및 압축 방식 보존
         out = Path(output_path)
