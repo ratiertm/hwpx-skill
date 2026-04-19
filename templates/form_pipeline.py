@@ -337,6 +337,8 @@ def _extract_single_table(tbl, ppr_map):
             cell = _extract_cell(tc, ppr_map)
             cells.append(cell)
 
+    cells = _normalize_logical_cells(cells)
+
     # 그리드 역산
     col_widths, row_heights = _reverse_grid(cells, cols, rows)
 
@@ -438,6 +440,8 @@ def _extract_tables(sroot, hroot):
         cells = []
         for tc in tbl.findall(f'.//{_HP}tc'):
             cells.append(_extract_cell(tc, ppr_map))
+
+        cells = _normalize_logical_cells(cells)
 
         # 그리드 역산
         col_widths, row_heights = _reverse_grid(cells, cols, rows)
@@ -577,6 +581,36 @@ def _extract_merges(cells):
                 'c2': c['col'] + c['colSpan'] - 1,
             })
     return merges
+
+
+def _normalize_logical_cells(cells):
+    """Drop covered cells that are implied by an earlier merged anchor cell.
+
+    Some runtimes materialize full grid cells even after a merge operation.
+    For round-trip comparisons we want the logical cell model: one anchor cell
+    with rowSpan/colSpan, not the covered placeholder cells inside that span.
+    """
+    normalized = []
+    covered = set()
+
+    for cell in sorted(cells, key=lambda item: (item['row'], item['col'])):
+        pos = (cell['row'], cell['col'])
+        if pos in covered:
+            continue
+
+        normalized.append(cell)
+
+        row_span = max(int(cell.get('rowSpan', 1)), 1)
+        col_span = max(int(cell.get('colSpan', 1)), 1)
+        if row_span == 1 and col_span == 1:
+            continue
+
+        for rr in range(cell['row'], cell['row'] + row_span):
+            for cc in range(cell['col'], cell['col'] + col_span):
+                if (rr, cc) != pos:
+                    covered.add((rr, cc))
+
+    return normalized
 
 
 # ============================================================
