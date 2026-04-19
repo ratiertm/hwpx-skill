@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyhwpxlib"
-version = "0.8.4"
+version = "0.8.5"
 description = "Python library for creating and editing HWPX (Hancom Office) documents without Hancom Office"
 readme = "README.md"
 license = "Apache-2.0"
@@ -62,3 +62,19 @@ pyhwpxlib = [
     "vendor/NOTICE.*",
     "vendor/OFL-*",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    "tests/output",
+    "references",
+    "cli-anything-original",
+    "hwpx-harness",
+]
+markers = [
+    "smoke: fast, high-signal checks for core functionality",
+    "integration: multi-module integration tests",
+    "regression: sample-heavy regression coverage",
+    "slow: slower tests that use larger fixtures or conversions",
+]
+addopts = "--strict-markers"

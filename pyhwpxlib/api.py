@@ -2100,45 +2100,30 @@ def fill_template(
         Path for the filled output .hwpx file.
     """
     import shutil
-    import zipfile
-    import xml.etree.ElementTree as ET
 
     # Namespace normalization
     from .reader import _normalize_ns, _SECTION_RE
+    from .package_ops import read_zip_archive, update_entries, write_zip_archive
 
     if not data:
         # Nothing to replace — just copy the file
         shutil.copy2(template_path, output_path)
         return
 
-    # Work on a copy
-    shutil.copy2(template_path, output_path)
-
-    with zipfile.ZipFile(template_path, "r") as zf_in:
-        names = zf_in.namelist()
-        section_names = sorted(n for n in names if _SECTION_RE.match(n))
-
-        if not section_names:
-            return
-
-        # Read all files into memory
-        file_data: dict[str, bytes] = {}
-        for name in names:
-            file_data[name] = zf_in.read(name)
+    archive = read_zip_archive(template_path)
+    section_names = sorted(n for n in archive.files if _SECTION_RE.match(n))
+    if not section_names:
+        shutil.copy2(template_path, output_path)
+        return
 
     # Replace text inside <hp:t> nodes only — delegated to xml_ops
     from .xml_ops import replace_text_nodes
-
-    for sec_name in section_names:
-        raw = file_data[sec_name]
-        xml_str = raw.decode("utf-8")
-        xml_str = replace_text_nodes(xml_str, data)
-        file_data[sec_name] = xml_str.encode("utf-8")
-
-    # Write the modified ZIP
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf_out:
-        for name in names:
-            zf_out.writestr(name, file_data[name])
+    archive = update_entries(
+        archive,
+        section_names,
+        lambda _name, raw: replace_text_nodes(raw.decode("utf-8"), data).encode("utf-8"),
+    )
+    write_zip_archive(output_path, archive)
 
 
 def fill_template_checkbox(
@@ -2170,22 +2155,17 @@ def fill_template_checkbox(
         Path to the created file.
     """
     import shutil
-    import zipfile
 
     if not output_path:
         base, ext = _pathlib.Path(template_path).stem, _pathlib.Path(template_path).suffix
         output_path = str(_pathlib.Path(template_path).parent / f"{base}_filled{ext}")
 
-    shutil.copy2(template_path, output_path)
-
-    with zipfile.ZipFile(output_path, "r") as zf:
-        all_files = {name: zf.read(name) for name in zf.namelist()}
-
-    # Find section files
-    section_names = [n for n in all_files if 'section' in n and n.endswith('.xml')]
+    from .package_ops import read_zip_archive, write_zip_archive
+    archive = read_zip_archive(template_path)
+    section_names = [n for n in archive.files if 'section' in n and n.endswith('.xml')]
 
     for sec_name in section_names:
-        text = all_files[sec_name].decode("utf-8")
+        text = archive.files[sec_name].decode("utf-8")
 
         # 1. Text replacements — only inside <hp:t> nodes
         if data:
@@ -2236,11 +2216,9 @@ def fill_template_checkbox(
                             replaced = True
                             break
 
-        all_files[sec_name] = text.encode("utf-8")
+        archive.files[sec_name] = text.encode("utf-8")
 
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name, content in all_files.items():
-            zf.writestr(name, content)
+    write_zip_archive(output_path, archive)
 
     return output_path
 

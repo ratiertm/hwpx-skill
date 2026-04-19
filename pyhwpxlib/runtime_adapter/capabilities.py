@@ -13,6 +13,7 @@ class RuntimeCapabilities:
     table_set_in_margin: bool = False
     cell_set_margin: bool = False
     cell_set_size: bool = False
+    cell_set_border_fill: bool = False
     hwpx_version: str = "unknown"
 
 
@@ -41,13 +42,14 @@ def detect_capabilities() -> RuntimeCapabilities:
         from hwpx.oxml.table import HwpxOxmlCell
         caps.cell_set_margin = hasattr(HwpxOxmlCell, 'set_margin')
         caps.cell_set_size = hasattr(HwpxOxmlCell, 'set_size')
+        caps.cell_set_border_fill = hasattr(HwpxOxmlCell, 'set_border_fill_id')
     except ImportError:
         pass
 
     logger.debug(
-        "python-hwpx %s capabilities: set_in_margin=%s, cell_set_margin=%s, cell_set_size=%s",
+        "python-hwpx %s capabilities: set_in_margin=%s, cell_set_margin=%s, cell_set_size=%s, cell_set_border_fill=%s",
         caps.hwpx_version, caps.table_set_in_margin,
-        caps.cell_set_margin, caps.cell_set_size,
+        caps.cell_set_margin, caps.cell_set_size, caps.cell_set_border_fill,
     )
     return caps
 

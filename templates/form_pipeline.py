@@ -25,40 +25,61 @@ def _get_adapter():
         return None
 
 
+def _table_adapter(table):
+    """Return a table adapter instance when available."""
+    Adapter = _get_adapter()
+    return Adapter(table) if Adapter else None
+
+
 def _set_in_margin_compat(table, left=0, right=0, top=0, bottom=0):
     """Set table inMargin via runtime adapter."""
-    Adapter = _get_adapter()
-    if Adapter:
-        Adapter(table).set_in_margin(left=left, right=right, top=top, bottom=bottom)
+    adapter = _table_adapter(table)
+    if adapter is not None:
+        adapter.set_in_margin(left=left, right=right, top=top, bottom=bottom)
     elif hasattr(table, 'set_in_margin'):
         table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
 
 
 def _set_cell_size_compat(cell, width=0, height=0):
     """Set cell size via runtime adapter."""
-    Adapter = _get_adapter()
-    if Adapter:
-        Adapter.set_cell_size(cell, width=width, height=height)
+    adapter = _get_adapter()
+    if adapter:
+        adapter.set_cell_size(cell, width=width, height=height)
     elif hasattr(cell, 'set_size'):
         cell.set_size(width=width, height=height)
 
 
 def _set_cell_margin_compat(cell, left=0, right=0, top=0, bottom=0):
     """Set cell margin via runtime adapter."""
-    Adapter = _get_adapter()
-    if Adapter:
-        Adapter.set_cell_margin(cell, left=left, right=right, top=top, bottom=bottom)
+    adapter = _get_adapter()
+    if adapter:
+        adapter.set_cell_margin(cell, left=left, right=right, top=top, bottom=bottom)
     elif hasattr(cell, 'set_margin'):
         cell.set_margin(left=left, right=right, top=top, bottom=bottom)
 
 
 def _set_cell_border_fill_compat(cell, border_fill_id):
     """Set cell borderFillIDRef via runtime adapter."""
-    Adapter = _get_adapter()
-    if Adapter:
-        Adapter.set_cell_border_fill_id(cell, border_fill_id)
+    adapter = _get_adapter()
+    if adapter:
+        adapter.set_cell_border_fill_id(cell, border_fill_id)
     elif hasattr(cell, 'set_border_fill_id'):
         cell.set_border_fill_id(border_fill_id)
+
+
+def _set_out_margin_compat(table, left=0, right=0, top=0, bottom=0):
+    """Set table outMargin via runtime adapter."""
+    adapter = _table_adapter(table)
+    if adapter is not None:
+        adapter.set_out_margin(left=left, right=right, top=top, bottom=bottom)
+        return
+
+    el = table.element.find(f"{_HP}outMargin")
+    if el is not None:
+        el.set("left", str(left))
+        el.set("right", str(right))
+        el.set("top", str(top))
+        el.set("bottom", str(bottom))
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
@@ -1241,10 +1262,7 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
 
     # 표 마진
     _set_in_margin_compat(table, left=in_margin, right=in_margin, top=in_margin, bottom=in_margin)
-    om = table.element.find(f"{_HP}outMargin")
-    if om is not None:
-        for k in ["left", "right", "top", "bottom"]:
-            om.set(k, str(out_margin))
+    _set_out_margin_compat(table, left=out_margin, right=out_margin, top=out_margin, bottom=out_margin)
 
     # 셀 크기 + 마진
     for r in range(rows):
@@ -1480,7 +1498,7 @@ def fill_by_labels(hwpx_path: str, mappings: dict, output_path: str) -> dict:
     Returns:
         dict with applied/failed counts and details.
     """
-    import subprocess
+    from pyhwpxlib.xml_ops import safe_xml_escape
 
     form_data = extract_form(hwpx_path)
     applied = []
@@ -1507,7 +1525,7 @@ def fill_by_labels(hwpx_path: str, mappings: dict, output_path: str) -> dict:
             # Empty cell — use cellAddr-anchored patch
             target_col = result['target_cell']['col']
             target_row = result['target_cell']['row']
-            escaped = value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            escaped = safe_xml_escape(value)
             empty_cell_patches.append((target_col, target_row, escaped))
             applied.append({
                 'path': path,
@@ -1524,32 +1542,20 @@ def fill_by_labels(hwpx_path: str, mappings: dict, output_path: str) -> dict:
             'new_value': value,
         })
 
-    # Apply replacements + empty cell patches via unpack → edit → pack
+    # Apply replacements + empty cell patches directly on section XML in the archive
     if replacements or empty_cell_patches:
-        import shutil, tempfile
-        work = tempfile.mkdtemp(prefix='fill_labels_')
-        try:
-            subprocess.run(
-                [sys.executable, '-m', 'pyhwpxlib', 'unpack', hwpx_path, '-o', work],
-                check=True, capture_output=True,
-            )
-            sec = os.path.join(work, 'Contents', 'section0.xml')
-            with open(sec, 'r', encoding='utf-8') as f:
-                xml = f.read()
-            for old, new in replacements.items():
-                xml = xml.replace(old, new, 1)
-            for col, row, value in empty_cell_patches:
-                xml = _patch_empty_cell(xml, col, row, value)
-            with open(sec, 'w', encoding='utf-8') as f:
-                f.write(xml)
-            if os.path.exists(output_path):
-                os.unlink(output_path)
-            subprocess.run(
-                [sys.executable, '-m', 'pyhwpxlib', 'pack', work, '-o', output_path],
-                check=True, capture_output=True,
-            )
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
+        from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
+        archive = read_zip_archive(hwpx_path)
+        sec_name = 'Contents/section0.xml'
+        xml = archive.files[sec_name].decode('utf-8')
+        for old, new in replacements.items():
+            xml = xml.replace(old, new, 1)
+        for col, row, value in empty_cell_patches:
+            xml = _patch_empty_cell(xml, col, row, value)
+        archive.files[sec_name] = xml.encode('utf-8')
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        write_zip_archive(output_path, archive)
 
     return {
         'applied': applied,

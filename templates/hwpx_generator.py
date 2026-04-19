@@ -9,6 +9,8 @@ import zipfile, json, sys, os
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement
 
+from pyhwpxlib.package_ops import ZipArchive, read_zip_archive, write_zip_archive
+
 NS = {
     'ha': 'http://www.hancom.co.kr/hwpml/2011/app',
     'hp': 'http://www.hancom.co.kr/hwpml/2011/paragraph',
@@ -38,16 +40,15 @@ def extract_all(hwpx_path):
     """HWPX 파일에서 재생성에 필요한 모든 정보를 JSON으로 추출"""
     data = {'_source': os.path.basename(hwpx_path), 'files': {}}
 
-    with zipfile.ZipFile(hwpx_path) as z:
-        for name in z.namelist():
-            raw = z.read(name)
-            try:
-                text = raw.decode('utf-8')
-                data['files'][name] = text
-            except:
-                # binary → base64
-                import base64
-                data['files'][name] = {'_binary': True, '_b64': base64.b64encode(raw).decode('ascii')}
+    archive = read_zip_archive(hwpx_path)
+    for name, raw in archive.files.items():
+        try:
+            text = raw.decode('utf-8')
+            data['files'][name] = text
+        except Exception:
+            # binary → base64
+            import base64
+            data['files'][name] = {'_binary': True, '_b64': base64.b64encode(raw).decode('ascii')}
 
     return data
 
@@ -60,13 +61,23 @@ def generate_hwpx(data, output_path):
     """JSON 데이터로부터 HWPX 파일 생성"""
     import base64
 
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
-        for name, content in data['files'].items():
-            if isinstance(content, dict) and content.get('_binary'):
-                raw = base64.b64decode(content['_b64'])
-                zout.writestr(name, raw)
-            else:
-                zout.writestr(name, content.encode('utf-8'))
+    files = {}
+    infos = []
+    for idx, (name, content) in enumerate(data['files'].items()):
+        if isinstance(content, dict) and content.get('_binary'):
+            raw = base64.b64decode(content['_b64'])
+            files[name] = raw
+        else:
+            files[name] = content.encode('utf-8')
+
+        info = zipfile.ZipInfo(name)
+        if idx == 0 and name == "mimetype":
+            info.compress_type = zipfile.ZIP_STORED
+        else:
+            info.compress_type = zipfile.ZIP_DEFLATED
+        infos.append(info)
+
+    write_zip_archive(output_path, ZipArchive(infos=infos, files=files))
 
 
 # ============================================================

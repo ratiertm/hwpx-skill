@@ -14,6 +14,8 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
+from ..package_ops import read_zip_archive, write_zip_archive
+
 _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
@@ -623,52 +625,48 @@ def apply_overlay(
 
     sec_path = overlay.get("section_path", f"Contents/section{overlay.get('section_idx', 0)}.xml")
 
-    with zipfile.ZipFile(source_hwpx, "r") as zin:
-        xml_bytes = zin.read(sec_path)
-        xml_str = xml_bytes.decode("utf-8")
+    archive = read_zip_archive(source_hwpx)
+    xml_str = archive.files[sec_path].decode("utf-8")
 
-        # 텍스트 교체
-        for field in overlay.get("texts", []):
-            original = field.get("original", "")
-            new_value = field.get("value", "")
+    # 텍스트 교체
+    for field in overlay.get("texts", []):
+        original = field.get("original", "")
+        new_value = field.get("value", "")
+        if original and original != new_value:
+            parts = field.get("original_parts", [original])
+            xml_str = _replace_text_in_xml(xml_str, parts, new_value)
+
+    # 표 셀 교체 — 셀은 여러 <hp:run>에 걸치므로 파트별 개별 교체
+    for tbl in overlay.get("tables", []):
+        for cell in tbl.get("cells", []):
+            original = cell.get("original", "")
+            new_value = cell.get("value", "")
             if original and original != new_value:
-                parts = field.get("original_parts", [original])
+                parts = cell.get("original_parts", [original])
+                # 먼저 multi-part regex 시도
+                before = xml_str
                 xml_str = _replace_text_in_xml(xml_str, parts, new_value)
+                if xml_str == before and len(parts) > 1:
+                    # regex 실패 — 파트가 다른 <hp:run>에 걸침
+                    # run 경계 정보로 정밀 교체
+                    xml_str = _replace_cell_parts_individually(
+                        xml_str, parts, original, new_value,
+                        original_runs=cell.get("original_runs"),
+                    )
 
-        # 표 셀 교체 — 셀은 여러 <hp:run>에 걸치므로 파트별 개별 교체
-        for tbl in overlay.get("tables", []):
-            for cell in tbl.get("cells", []):
-                original = cell.get("original", "")
-                new_value = cell.get("value", "")
-                if original and original != new_value:
-                    parts = cell.get("original_parts", [original])
-                    # 먼저 multi-part regex 시도
-                    before = xml_str
-                    xml_str = _replace_text_in_xml(xml_str, parts, new_value)
-                    if xml_str == before and len(parts) > 1:
-                        # regex 실패 — 파트가 다른 <hp:run>에 걸침
-                        # run 경계 정보로 정밀 교체
-                        xml_str = _replace_cell_parts_individually(
-                            xml_str, parts, original, new_value,
-                            original_runs=cell.get("original_runs"),
-                        )
+    archive.files[sec_path] = xml_str.encode("utf-8")
 
-        # 출력 ZIP 작성 — 엔트리 순서 및 압축 방식 보존
-        out = Path(output_path)
-        if out.exists():
-            out.unlink()
+    if image_replacements:
+        for info in archive.infos:
+            if not info.filename.startswith("BinData/"):
+                continue
+            bin_stem = Path(info.filename).stem
+            if bin_stem in image_replacements:
+                archive.files[info.filename] = image_replacements[bin_stem]
 
-        with zipfile.ZipFile(output_path, "w") as zout:
-            for item in zin.infolist():
-                if item.filename == sec_path:
-                    zout.writestr(item, xml_str.encode("utf-8"))
-                elif image_replacements and item.filename.startswith("BinData/"):
-                    bin_stem = Path(item.filename).stem
-                    if bin_stem in image_replacements:
-                        zout.writestr(item, image_replacements[bin_stem])
-                    else:
-                        zout.writestr(item, zin.read(item.filename))
-                else:
-                    zout.writestr(item, zin.read(item.filename))
+    out = Path(output_path)
+    if out.exists():
+        out.unlink()
+    write_zip_archive(output_path, archive)
 
     return output_path

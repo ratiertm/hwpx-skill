@@ -12,8 +12,9 @@ Usage::
 from __future__ import annotations
 
 import re
-import zipfile
 from xml.sax.saxutils import escape as _sax_escape
+
+from .package_ops import iter_section_entries as _iter_section_entries
 
 
 def safe_xml_escape(text: str) -> str:
@@ -29,11 +30,7 @@ def safe_xml_escape(text: str) -> str:
 
 def iter_section_entries(hwpx_path: str) -> list[str]:
     """List section XML entry names in a HWPX ZIP, sorted."""
-    with zipfile.ZipFile(hwpx_path) as z:
-        return sorted(
-            n for n in z.namelist()
-            if n.startswith('Contents/section') and n.endswith('.xml')
-        )
+    return _iter_section_entries(hwpx_path)
 
 
 # Matches <hp:t>text</hp:t> and <hp:t attr="val">text</hp:t>
