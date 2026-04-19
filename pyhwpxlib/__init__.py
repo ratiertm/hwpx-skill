@@ -25,7 +25,7 @@ CRITICAL RULES (violating these breaks Whale/Hancom rendering):
 """
 import logging
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

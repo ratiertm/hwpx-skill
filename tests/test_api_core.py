@@ -234,6 +234,49 @@ class TestFillTemplate:
         fill_template(template_path, {"존재함": "값"}, output_path)
         assert os.path.exists(output_path)
 
+    def test_fill_exact_result_not_just_contains(self, tmp_path):
+        """Verify exact replacement, not just 'value in text'."""
+        template_path = str(tmp_path / "tmpl.hwpx")
+        output_path = str(tmp_path / "filled.hwpx")
+
+        doc = create_document()
+        add_paragraph(doc, "Name: {{name}}")
+        save(doc, template_path)
+
+        fill_template(template_path, {"name": "홍길동"}, output_path)
+        text = extract_text(output_path)
+        assert "Name: 홍길동" in text
+        assert "{{name}}" not in text
+        assert "{{홍길동}}" not in text
+
+    def test_fill_placeholder_repeated_twice(self, tmp_path):
+        """Same placeholder appearing twice should both be replaced."""
+        template_path = str(tmp_path / "tmpl.hwpx")
+        output_path = str(tmp_path / "filled.hwpx")
+
+        doc = create_document()
+        add_paragraph(doc, "{{x}} and {{x}}")
+        save(doc, template_path)
+
+        fill_template(template_path, {"x": "OK"}, output_path)
+        text = extract_text(output_path)
+        assert text.strip() == "OK and OK"
+        assert "{{" not in text
+
+    def test_fill_keeps_xml_valid_with_all_special_chars(self, tmp_path):
+        """Values with &, <, >, quotes must produce valid XML."""
+        template_path = str(tmp_path / "tmpl.hwpx")
+        output_path = str(tmp_path / "filled.hwpx")
+
+        doc = create_document()
+        add_paragraph(doc, "{{val}}")
+        save(doc, template_path)
+
+        fill_template(template_path, {"val": 'A&B <"C"> \'D\''}, output_path)
+        text = extract_text(output_path)  # would throw ParseError if XML broken
+        assert "A&B" in text
+        assert "<" in text or "&lt;" not in text  # unescaped in text output
+
 
 # ============================================================
 # merge_documents

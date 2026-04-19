@@ -74,14 +74,16 @@ def replace_text_nodes(
     >>> replace_text_nodes('<hp:t>A&amp;B</hp:t>', {"A&B": "X&Y"})
     '<hp:t>X&amp;Y</hp:t>'
     """
-    # Build expanded replacement list
+    # Build replacement list
     expanded: list[tuple[str, str]] = []
     for placeholder, value in replacements.items():
-        if support_braced_keys:
-            # {{key}} → value (longer match, tried first)
+        if support_braced_keys and '{{' not in placeholder:
+            # In braced mode: match {{key}} only, not bare "key"
+            # This prevents short keys like "이름" from matching "이름:" in text
             expanded.append((f'{{{{{placeholder}}}}}', value))
-        # literal key → value
-        expanded.append((placeholder, value))
+        else:
+            # Literal mode or key already contains braces
+            expanded.append((placeholder, value))
 
     # Sort by escaped-placeholder length descending so longer patterns match first
     expanded.sort(key=lambda pair: len(safe_xml_escape(pair[0])), reverse=True)
