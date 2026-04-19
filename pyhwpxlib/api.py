@@ -565,7 +565,7 @@ def add_bullet_list(
     paras: list[Para] = []
     for item in items:
         para = add_paragraph(
-            hwpx_file, _sanitize_text(item),
+            hwpx_file, item,  # add_paragraph handles sanitization
             section_index=section_index,
             para_pr_id_ref=para_pr_id,
             char_pr_id_ref=char_pr_id_ref,
@@ -606,7 +606,7 @@ def add_numbered_list(
     paras: list[Para] = []
     for item in items:
         para = add_paragraph(
-            hwpx_file, _sanitize_text(item),
+            hwpx_file, item,  # add_paragraph handles sanitization
             section_index=section_index,
             para_pr_id_ref=para_pr_id,
             char_pr_id_ref=char_pr_id_ref,
@@ -1085,7 +1085,7 @@ def add_nested_bullet_list(
             _level_cache[level] = para_pr_id
 
         para = add_paragraph(
-            hwpx_file, _sanitize_text(text),
+            hwpx_file, text,  # add_paragraph handles sanitization
             section_index=section_index,
             para_pr_id_ref=_level_cache[level],
             char_pr_id_ref=char_pr_id_ref,
@@ -1184,7 +1184,7 @@ def add_nested_numbered_list(
     paras: list[Para] = []
     for level, text in items:
         para = add_paragraph(
-            hwpx_file, _sanitize_text(text),
+            hwpx_file, text,  # add_paragraph handles sanitization
             section_index=section_index,
             para_pr_id_ref=_level_para_pr[level],
             char_pr_id_ref=char_pr_id_ref,
@@ -2136,8 +2136,6 @@ def fill_template(
                 .replace("'", "&apos;")
             )
             text = text.replace(xml_safe_placeholder, xml_safe_value)
-            # Also try the raw placeholder (in case it's not escaped)
-            text = text.replace(placeholder, value)
 
         file_data[sec_name] = text.encode("utf-8")
 
