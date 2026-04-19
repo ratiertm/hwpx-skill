@@ -132,11 +132,7 @@ async def form_clone(
             os.unlink(input_path)
 
     stem = Path(file.filename or "form").stem
-    return FileResponse(
-        output_path,
-        media_type="application/octet-stream",
-        filename=f"{stem}_clone.hwpx",
-    )
+    return _file_response_with_cleanup(output_path, f"{stem}_clone.hwpx")
 
 
 # ============================================================

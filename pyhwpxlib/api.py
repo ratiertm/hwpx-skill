@@ -513,15 +513,14 @@ _ILLEGAL_XML_CHARS = _re.compile(
 
 
 def _sanitize_text(value: str) -> str:
-    """Remove control characters and escape XML special characters.
+    """Remove control characters that are invalid in XML text nodes.
 
-    Handles both illegal XML chars (control characters) and characters
-    that must be escaped in XML text nodes (&, <, >, ", ').
-    Without escaping, text like "A&B" or "x < y" would break the XML.
+    Only strips illegal XML chars (control characters).
+    XML special characters (&, <, >) are NOT escaped here —
+    the serialization layer (lxml/python-hwpx) handles escaping
+    automatically when writing element text content.
     """
-    from xml.sax.saxutils import escape
-    cleaned = _ILLEGAL_XML_CHARS.sub("", value)
-    return escape(cleaned)
+    return _ILLEGAL_XML_CHARS.sub("", value)
 
 
 def _new_raw_para(hwpx_file: HWPXFile, section_index: int = 0) -> Para:
@@ -2017,36 +2016,44 @@ def merge_documents(hwpx_paths: list[str], output_path: str) -> None:
     for path in hwpx_paths:
         src = HwpxDocument.open(path)
 
-        for section in src.sections:
-            if not first_file:
-                _add_page_break(doc)
+        # Parse section XML directly to preserve block order
+        import zipfile
+        import xml.etree.ElementTree as _ET
+        _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 
-            # Iterate in document order — paragraphs and tables interleaved
-            _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
-            for child in section.element:
-                tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
-                if tag == 'p':
-                    # Extract text from paragraph runs
-                    texts = []
-                    for t_el in child.iter(f'{{{_HP_NS}}}t'):
-                        if t_el.text:
-                            texts.append(t_el.text)
-                    text = ''.join(texts).strip()
-                    if text:
-                        add_paragraph(doc, text)
-                elif tag == 'tbl':
-                    # Find matching table object
-                    for table in section.tables:
-                        if table.element is child:
-                            grid = table.to_2d()
+        with zipfile.ZipFile(path) as zf:
+            sec_names = sorted(n for n in zf.namelist()
+                              if n.startswith('Contents/section') and n.endswith('.xml'))
+
+            for sec_idx, sec_name in enumerate(sec_names):
+                if not first_file:
+                    _add_page_break(doc)
+
+                sec_root = _ET.fromstring(zf.read(sec_name).decode('utf-8'))
+                tables = src.sections[sec_idx].tables if sec_idx < len(src.sections) else []
+                tbl_idx = 0
+
+                for child in sec_root:
+                    tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                    if tag == 'p':
+                        texts = []
+                        for t_el in child.iter(f'{{{_HP_NS}}}t'):
+                            if t_el.text:
+                                texts.append(t_el.text)
+                        text = ''.join(texts).strip()
+                        if text:
+                            add_paragraph(doc, text)
+                    elif tag == 'tbl':
+                        if tbl_idx < len(tables):
+                            grid = tables[tbl_idx].to_2d()
                             if grid:
                                 rows = len(grid)
                                 cols = max(len(r) for r in grid) if grid else 0
                                 padded = [r + [""] * (cols - len(r)) for r in grid]
                                 add_table(doc, rows, cols, data=padded)
-                            break
+                            tbl_idx += 1
 
-            first_file = False
+                first_file = False
 
     save(doc, output_path)
 
