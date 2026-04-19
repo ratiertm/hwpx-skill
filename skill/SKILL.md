@@ -121,6 +121,11 @@ from pyhwpxlib.preview import render_pages
 pages = render_pages(파일명, '/tmp')  # embed_fonts=True 기본
 # 반환값의 png 경로를 Read tool로 실제로 열어라.
 ```
+**rhwp 프리뷰 알려진 한계** (Whale에서는 정상):
+- 이미지와 텍스트 겹침 — rhwp가 `textWrap="TOP_AND_BOTTOM"` 미지원, 이미지 높이만큼 텍스트를 밀어내지 못함
+- linesegarray 불일치 — 텍스트 교체 후 줄 배치가 뭉칠 수 있음 (Whale은 자동 재계산)
+- 프리뷰에서 이미지 겹침이 보여도 **Whale에서 정상이면 문제 없음**
+
 그 다음 반드시 아래 7가지 비주얼 체크포인트를 글로 적어 스스로 확인한다.
 **문제가 없다고 판단했으면 더 비판적으로 다시 본다. 첫 렌더는 거의 항상 문제가 있다.**
 
