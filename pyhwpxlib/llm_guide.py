@@ -34,13 +34,17 @@ doc.add_paragraph("")
 doc.save("output.hwpx")
 ```
 
-### Image Size Reference (A4 content width = 42520)
-| Use | width | height |
-|-----|-------|--------|
-| Full width 16:9 | 42520 | 23918 |
-| Full width 4:3 | 42520 | 31890 |
-| Half width | 21260 | 15945 |
-| Logo/icon | 8000-12000 | proportional |
+### Image Size Rule
+Default width is ALWAYS **42520** (full A4 width). Calculate height to preserve ratio:
+```python
+from PIL import Image
+img = Image.open("photo.png")
+w, h = img.size
+width = 42520  # ALWAYS use full width for photos/charts
+height = int(42520 * h / w)  # preserve aspect ratio
+doc.add_image("photo.png", width=width, height=height)
+```
+Only use smaller width (8000-12000) for logos/icons.
 
 ## 2. Available Themes (10)
 | Theme | Color | Best For |
