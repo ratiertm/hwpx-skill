@@ -2019,24 +2019,32 @@ def merge_documents(hwpx_paths: list[str], output_path: str) -> None:
 
         for section in src.sections:
             if not first_file:
-                # Insert a page-break paragraph between documents
                 _add_page_break(doc)
 
-            for para in section.paragraphs:
-                text = para.text
-                if text:
-                    add_paragraph(doc, text)
-
-            for table in section.tables:
-                grid = table.to_2d()
-                if grid:
-                    rows = len(grid)
-                    cols = max(len(r) for r in grid) if grid else 0
-                    # Pad rows to uniform width
-                    padded = [
-                        r + [""] * (cols - len(r)) for r in grid
-                    ]
-                    add_table(doc, rows, cols, data=padded)
+            # Iterate in document order — paragraphs and tables interleaved
+            _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+            for child in section.element:
+                tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                if tag == 'p':
+                    # Extract text from paragraph runs
+                    texts = []
+                    for t_el in child.iter(f'{{{_HP_NS}}}t'):
+                        if t_el.text:
+                            texts.append(t_el.text)
+                    text = ''.join(texts).strip()
+                    if text:
+                        add_paragraph(doc, text)
+                elif tag == 'tbl':
+                    # Find matching table object
+                    for table in section.tables:
+                        if table.element is child:
+                            grid = table.to_2d()
+                            if grid:
+                                rows = len(grid)
+                                cols = max(len(r) for r in grid) if grid else 0
+                                padded = [r + [""] * (cols - len(r)) for r in grid]
+                                add_table(doc, rows, cols, data=padded)
+                            break
 
             first_file = False
 

@@ -40,6 +40,21 @@ def _tmp(suffix: str) -> str:
     return str(_TMP_DIR / f"{uuid.uuid4().hex}{suffix}")
 
 
+def _file_response_with_cleanup(output_path: str, filename: str) -> FileResponse:
+    """Return FileResponse with background cleanup of the output file."""
+    from starlette.background import BackgroundTask
+
+    def _cleanup():
+        Path(output_path).unlink(missing_ok=True)
+
+    return FileResponse(
+        output_path,
+        media_type="application/octet-stream",
+        filename=filename if filename.endswith(".hwpx") else filename + ".hwpx",
+        background=BackgroundTask(_cleanup),
+    )
+
+
 # ============================================================
 # /convert/md-to-hwpx
 # ============================================================
@@ -70,11 +85,7 @@ async def convert_md_to_hwpx(
         logger.error("md-to-hwpx conversion failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
 
-    return FileResponse(
-        output_path,
-        media_type="application/octet-stream",
-        filename=filename if filename.endswith(".hwpx") else filename + ".hwpx",
-    )
+    return _file_response_with_cleanup(output_path, filename)
 
 
 # ============================================================
@@ -182,11 +193,7 @@ async def form_fill(
         if os.path.exists(input_path):
             os.unlink(input_path)
 
-    return FileResponse(
-        output_path,
-        media_type="application/octet-stream",
-        filename=filename if filename.endswith(".hwpx") else filename + ".hwpx",
-    )
+    return _file_response_with_cleanup(output_path, filename)
 
 
 # ============================================================

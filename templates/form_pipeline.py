@@ -14,6 +14,22 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+
+
+def _set_in_margin_compat(table, left=0, right=0, top=0, bottom=0):
+    """Set table inMargin, compatible with python-hwpx 2.8.x and 2.9.x."""
+    if hasattr(table, 'set_in_margin'):
+        table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
+    else:
+        # python-hwpx 2.9.0+: set_in_margin removed, manipulate XML directly
+        from lxml import etree
+        el = table.element.find(f"{_HP}inMargin")
+        if el is None:
+            el = etree.SubElement(table.element, f"{_HP}inMargin")
+        el.set("left", str(left))
+        el.set("right", str(right))
+        el.set("top", str(top))
+        el.set("bottom", str(bottom))
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
@@ -1001,7 +1017,7 @@ def _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or
                 if nom_el is not None:
                     for k in ["left","right","top","bottom"]:
                         nom_el.set(k, str(n_om))
-                temp_tbl.set_in_margin(left=n_im, right=n_im, top=CELL_MARGIN, bottom=CELL_MARGIN)
+                _set_in_margin_compat(temp_tbl, left=n_im, right=n_im, top=CELL_MARGIN, bottom=CELL_MARGIN)
 
                 ncol_widths = ntbl_data.get('col_widths', [])
                 nrow_heights = ntbl_data.get('row_heights', [])
@@ -1161,7 +1177,7 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
         logger.warning("sz element not found in table; skipping size assignment (tw=%s, th=%s)", tw, th)
 
     # 표 마진
-    table.set_in_margin(left=in_margin, right=in_margin, top=in_margin, bottom=in_margin)
+    _set_in_margin_compat(table, left=in_margin, right=in_margin, top=in_margin, bottom=in_margin)
     om = table.element.find(f"{_HP}outMargin")
     if om is not None:
         for k in ["left", "right", "top", "bottom"]:
