@@ -2131,18 +2131,28 @@ def fill_template(
     from xml.sax.saxutils import escape as _xml_escape
 
     def _replace_in_t_nodes(xml_str: str, replacements: dict[str, str]) -> str:
-        """Replace text only inside <hp:t>...</hp:t> nodes, not in attributes."""
+        """Replace text only inside <hp:t>...</hp:t> nodes, not in attributes.
+
+        Supports both literal placeholders and {{key}} patterns:
+        - data={"old": "new"} matches "old" in text
+        - data={"name": "홍길동"} matches both "name" and "{{name}}" in text
+        """
+        # Build expanded replacements: for each key, also try {{key}}
+        expanded: dict[str, str] = {}
+        for placeholder, value in replacements.items():
+            # {{key}} → value (try this first, longer match wins)
+            expanded[f'{{{{{placeholder}}}}}'] = value
+            # literal key → value
+            expanded[placeholder] = value
+
         def _replacer(match):
             content = match.group(1)
-            for placeholder, value in replacements.items():
-                # Placeholder in XML is already escaped
+            # Sort by length descending so longer patterns match first
+            for placeholder in sorted(expanded, key=len, reverse=True):
+                value = expanded[placeholder]
                 xml_placeholder = _xml_escape(placeholder)
                 xml_value = _xml_escape(value)
                 content = content.replace(xml_placeholder, xml_value)
-                # Also try raw placeholder (for placeholders without special chars)
-                if xml_placeholder == placeholder:
-                    continue  # already tried
-                content = content.replace(placeholder, xml_value)
             return f'<hp:t>{content}</hp:t>'
 
         return _fill_re.sub(r'<hp:t>([^<]*)</hp:t>', _replacer, xml_str)
