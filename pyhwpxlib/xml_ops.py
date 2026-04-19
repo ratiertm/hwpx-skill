@@ -36,7 +36,8 @@ def iter_section_entries(hwpx_path: str) -> list[str]:
         )
 
 
-_T_NODE_RE = re.compile(r'<hp:t>([^<]*)</hp:t>')
+# Matches <hp:t>text</hp:t> and <hp:t attr="val">text</hp:t>
+_T_NODE_RE = re.compile(r'(<hp:t(?:\s[^>]*)?>)([^<]*)(</hp:t>)')
 
 
 def replace_text_nodes(
@@ -89,11 +90,13 @@ def replace_text_nodes(
     expanded.sort(key=lambda pair: len(safe_xml_escape(pair[0])), reverse=True)
 
     def _replacer(match: re.Match) -> str:
-        content = match.group(1)
+        open_tag = match.group(1)   # e.g. '<hp:t>' or '<hp:t textpos="0">'
+        content = match.group(2)    # text content
+        close_tag = match.group(3)  # '</hp:t>'
         for placeholder, value in expanded:
             xml_placeholder = safe_xml_escape(placeholder)
             xml_value = safe_xml_escape(value)
             content = content.replace(xml_placeholder, xml_value)
-        return f'<hp:t>{content}</hp:t>'
+        return f'{open_tag}{content}{close_tag}'
 
     return _T_NODE_RE.sub(_replacer, xml_text)

@@ -100,3 +100,14 @@ class TableAdapter:
                 if el is not None:
                     el.set("width", str(width))
                     el.set("height", str(height))
+
+    @staticmethod
+    def set_cell_border_fill_id(cell, border_fill_id: int | str) -> None:
+        """Set cell borderFillIDRef.
+
+        Uses native method if available, falls back to XML attribute.
+        """
+        if hasattr(cell, 'set_border_fill_id'):
+            cell.set_border_fill_id(border_fill_id)
+        else:
+            cell.element.set("borderFillIDRef", str(border_fill_id))

@@ -16,24 +16,49 @@ logger = logging.getLogger(__name__)
 _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
-def _set_in_margin_compat(table, left=0, right=0, top=0, bottom=0):
-    """Set table inMargin via runtime adapter (python-hwpx version-agnostic)."""
+def _get_adapter():
+    """Get TableAdapter class (lazy import, fallback-safe)."""
     try:
         from pyhwpxlib.runtime_adapter import TableAdapter
-        TableAdapter(table).set_in_margin(left=left, right=right, top=top, bottom=bottom)
+        return TableAdapter
     except ImportError:
-        # Fallback if pyhwpxlib not installed (standalone form_pipeline usage)
-        if hasattr(table, 'set_in_margin'):
-            table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
-        else:
-            from lxml import etree
-            el = table.element.find(f"{_HP}inMargin")
-            if el is None:
-                el = etree.SubElement(table.element, f"{_HP}inMargin")
-            el.set("left", str(left))
-            el.set("right", str(right))
-            el.set("top", str(top))
-            el.set("bottom", str(bottom))
+        return None
+
+
+def _set_in_margin_compat(table, left=0, right=0, top=0, bottom=0):
+    """Set table inMargin via runtime adapter."""
+    Adapter = _get_adapter()
+    if Adapter:
+        Adapter(table).set_in_margin(left=left, right=right, top=top, bottom=bottom)
+    elif hasattr(table, 'set_in_margin'):
+        table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
+
+
+def _set_cell_size_compat(cell, width=0, height=0):
+    """Set cell size via runtime adapter."""
+    Adapter = _get_adapter()
+    if Adapter:
+        Adapter.set_cell_size(cell, width=width, height=height)
+    elif hasattr(cell, 'set_size'):
+        cell.set_size(width=width, height=height)
+
+
+def _set_cell_margin_compat(cell, left=0, right=0, top=0, bottom=0):
+    """Set cell margin via runtime adapter."""
+    Adapter = _get_adapter()
+    if Adapter:
+        Adapter.set_cell_margin(cell, left=left, right=right, top=top, bottom=bottom)
+    elif hasattr(cell, 'set_margin'):
+        cell.set_margin(left=left, right=right, top=top, bottom=bottom)
+
+
+def _set_cell_border_fill_compat(cell, border_fill_id):
+    """Set cell borderFillIDRef via runtime adapter."""
+    Adapter = _get_adapter()
+    if Adapter:
+        Adapter.set_cell_border_fill_id(cell, border_fill_id)
+    elif hasattr(cell, 'set_border_fill_id'):
+        cell.set_border_fill_id(border_fill_id)
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
@@ -928,7 +953,7 @@ def _apply_merges(table, tbl, rows, cols):
             continue
         try:
             cell = table.cell(r, c)
-            cell.set_size(width=cell_data['width'], height=cell_data['height'])
+            _set_cell_size_compat(cell, width=cell_data['width'], height=cell_data['height'])
         except Exception as e:
             logger.warning("Failed to reset cell size after merge [row=%s, col=%s]: %s", r, c, e)
 
@@ -1031,7 +1056,7 @@ def _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or
                             ncell = temp_tbl.cell(nr, nc)
                             cw = ncol_widths[nc] if nc < len(ncol_widths) and ncol_widths[nc] else ntbl_w // ntbl_cols
                             rh = nrow_heights[nr] if nr < len(nrow_heights) and nrow_heights[nr] else ROW_HEIGHT
-                            ncell.set_size(width=cw, height=rh)
+                            _set_cell_size_compat(ncell, width=cw, height=rh)
                         except Exception as e:
                             logger.warning("Failed to set nested cell size [row=%s, col=%s]: %s", nr, nc, e)
 
@@ -1066,7 +1091,7 @@ def _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or
 
                         orig_bf = ncell_data.get('borderFillIDRef', '1')
                         new_bf = bf_map.get(orig_bf, '1')
-                        ncell.set_border_fill_id(new_bf)
+                        _set_cell_border_fill_compat(ncell, new_bf)
 
                         cm_el = ncell.element.find(f"{_HP}cellMargin")
                         if cm_el is not None:
@@ -1100,7 +1125,7 @@ def _generate_nested_tables(doc, table, tbl, rows, cols, cpr_map, bf_map, get_or
                         continue
                     try:
                         ncell = temp_tbl.cell(nr, nc)
-                        ncell.set_size(width=ncell_data['width'], height=ncell_data['height'])
+                        _set_cell_size_compat(ncell, width=ncell_data['width'], height=ncell_data['height'])
                     except Exception as e:
                         logger.warning("Failed to reset nested cell size [row=%s, col=%s]: %s", nr, nc, e)
 
@@ -1194,9 +1219,9 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
                 cell = table.cell(r, c)
                 cw = col_widths[c] if c < len(col_widths) and col_widths[c] is not None else tw // cols
                 rh = row_heights[r] if r < len(row_heights) and row_heights[r] is not None else ROW_HEIGHT
-                cell.set_size(width=cw, height=rh)
+                _set_cell_size_compat(cell, width=cw, height=rh)
                 cm = tbl['cells'][0].get('cellMargin', CELL_MARGIN) if tbl['cells'] else CELL_MARGIN
-                cell.set_margin(left=cm, right=cm, top=cm, bottom=cm)
+                _set_cell_margin_compat(cell, left=cm, right=cm, top=cm, bottom=cm)
             except Exception as e:
                 logger.warning("Failed to set cell size/margin [row=%s, col=%s]: %s", r, c, e)
 
@@ -1291,7 +1316,7 @@ def _generate_table(doc, tbl, cpr_map, bf_map, get_or_create_paraPr):
             # borderFill 적용
             orig_bf = cell_data.get('borderFillIDRef', '1')
             new_bf = bf_map.get(orig_bf, '1')
-            cell.set_border_fill_id(new_bf)
+            _set_cell_border_fill_compat(cell, new_bf)
         except Exception as e:
             logger.warning("Failed to apply cell style [row=%s, col=%s]: %s", r, c, e)
 
