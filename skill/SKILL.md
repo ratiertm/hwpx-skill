@@ -684,11 +684,24 @@ pyhwpxlib pack unpacked/ -o output.hwpx
 ```
 Creates HWPX with mimetype STORED as first entry.
 
-### Validation
+### Validation + Lint
 ```bash
-pyhwpxlib validate output.hwpx
+pyhwpxlib validate output.hwpx          # 구조 검증 (ZIP, 필수 파일, XML 파싱)
+pyhwpxlib lint output.hwpx              # 렌더링 위험 검사 (5개 규칙)
+pyhwpxlib font-check output.hwpx        # 폰트 해상 확인
+
+# JSON 출력 (자동화/MCP/LLM용)
+pyhwpxlib validate output.hwpx --json
+pyhwpxlib lint output.hwpx --json
+pyhwpxlib font-check output.hwpx --json
 ```
-Checks: ZIP validity, required files, mimetype, XML parsing, namespaces.
+
+lint 규칙:
+- `TEXT_NEWLINE_IN_RUN`: `<hp:t>` 안 `\n` → Whale 에러
+- `EMPTY_FIRST_PARAGRAPH`: 빈 첫 문단 → 렌더링 문제
+- `LONG_TEXT_RUN`: 500자+ run → 넘침 위험
+- `UNESCAPED_AMPERSAND`: 이스케이프 안 된 `&`
+- `FONT_NOT_IN_MAP`: fallback 폰트 사용
 
 ---
 
@@ -835,11 +848,17 @@ pyhwpxlib validate output.hwpx                 # 검증
 
 ### 5. 양식 자동 채우기
 ```python
-from pyhwpxlib.api import fill_template_checkbox
+from pyhwpxlib.api import fill_template, fill_template_checkbox
 
+# {{key}} 패턴 — 권장 (안전하고 명확)
+fill_template("양식.hwpx",
+    data={"이름": "홍길동", "회사": "A&B Corp"},  # {{이름}} → 홍길동
+    output_path="완성.hwpx")
+
+# 체크박스 포함
 fill_template_checkbox("양식.hwpx",
-    data={">성 명<": ">성 명  홍길동<"},
-    checks=["동의함"],
+    data={"이름": "홍길동"},
+    checks=["동의함"],  # □ → ■
     output_path="완성.hwpx")
 ```
 
