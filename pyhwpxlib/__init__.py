@@ -25,15 +25,17 @@ CRITICAL RULES (violating these breaks Whale/Hancom rendering):
 """
 import logging
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 from pyhwpxlib.builder import HwpxBuilder, DS, TABLE_PRESETS
 from pyhwpxlib.themes import Theme, BUILTIN_THEMES, extract_theme, save_theme, load_theme
+from pyhwpxlib.api import insert_image_to_existing
 
 __all__ = [
     "HwpxBuilder", "DS", "TABLE_PRESETS",
     "Theme", "BUILTIN_THEMES",
     "extract_theme", "save_theme", "load_theme",
+    "insert_image_to_existing",
 ]
