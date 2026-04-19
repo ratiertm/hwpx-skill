@@ -4,25 +4,34 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib — LLM Quick Reference Guide
+# pyhwpxlib v0.7.1 — LLM Quick Reference Guide
 
 ## Installation
 ```
-pip install pyhwpxlib[preview]
+pip install pyhwpxlib
 ```
 
 ## 1. Create a New Document
 ```python
-from pyhwpxlib import HwpxBuilder, BUILTIN_THEMES
+from pyhwpxlib import HwpxBuilder
 
 doc = HwpxBuilder(theme='forest')  # Choose from 10 themes
 doc.add_heading("Title", level=1)
+doc.add_paragraph("")  # spacing after heading (REQUIRED)
 doc.add_paragraph("Body text.")
+doc.add_paragraph("")  # spacing before table
 doc.add_table([["Col A", "Col B"], ["1", "2"]])
+doc.add_paragraph("")  # spacing after table
+
+# Images
+doc.add_image("photo.png", width=21260, height=15000)
+doc.add_image_from_url("https://example.com/img.png",
+    filename="img.png", width=21260, height=15000)
+
 doc.save("output.hwpx")
 ```
 
-## 2. Available Themes
+## 2. Available Themes (10)
 | Theme | Color | Best For |
 |-------|-------|----------|
 | default | Blue #395da2 | Corporate, government |
@@ -36,20 +45,13 @@ doc.save("output.hwpx")
 | sage_calm | Sage #84B59F | Wellness |
 | cherry_bold | Red #990011 | Warning, strong claims |
 
-## 3. Custom Theme (Fonts & Sizes)
+## 3. Extract & Reuse Theme from Existing Document
 ```python
-from pyhwpxlib.themes import Theme, FontSet, SizeSet, BUILTIN_THEMES
+from pyhwpxlib import extract_theme, save_theme, HwpxBuilder
 
-custom = Theme(
-    name='my_theme',
-    palette=BUILTIN_THEMES['forest'].palette,
-    fonts=FontSet(heading_hangul='NanumSquareBold', heading_latin='Arial',
-                  body_hangul='NanumMyeongjo', body_latin='Times New Roman',
-                  caption_hangul='MalgunGothic', caption_latin='Verdana'),
-    sizes=SizeSet(h1=28, h2=22, h3=18, h4=16, body=14, caption=11),
-    margins=BUILTIN_THEMES['forest'].margins,
-)
-doc = HwpxBuilder(theme=custom)
+theme = extract_theme("reference.hwpx", name="my_style")
+save_theme(theme)  # ~/.pyhwpxlib/themes/my_style.json
+doc = HwpxBuilder(theme='custom/my_style')
 ```
 
 ## 4. HwpxBuilder API
@@ -57,14 +59,15 @@ doc = HwpxBuilder(theme=custom)
 |--------|---------|
 | add_heading(text, level=1) | Heading (1-4) |
 | add_paragraph(text, bold, italic, font_size, text_color, alignment) | Paragraph |
+| add_paragraph("") | **Spacing between elements (REQUIRED)** |
 | add_table(data, header_bg, cell_colors, col_widths, row_heights) | Table |
 | add_bullet_list(items) | Bullet list |
 | add_numbered_list(items) | Numbered list |
-| add_image(path, width, height) | Image |
+| add_image(path, width, height) | Local image |
+| add_image_from_url(url, filename, width, height) | Download + insert image |
 | add_page_break() | Page break |
 | add_line() | Horizontal line |
-| add_header(text) | Header |
-| add_footer(text) | Footer |
+| add_header(text) / add_footer(text) | Header / Footer |
 | add_page_number() | Page number |
 | save(path) | Save to .hwpx |
 
@@ -72,6 +75,11 @@ doc = HwpxBuilder(theme=custom)
 ```python
 from pyhwpxlib.api import extract_text
 text = extract_text("document.hwpx")
+
+# Structured extraction (text + tables + images)
+from pyhwpxlib.json_io.overlay import extract_overlay
+overlay = extract_overlay("document.hwpx")
+# overlay['texts'], overlay['tables'], overlay['images']
 ```
 
 ## 6. Convert HWP to HWPX
@@ -85,12 +93,8 @@ convert("old.hwp", "new.hwpx")
 from pyhwpxlib.json_io.overlay import extract_overlay, apply_overlay
 
 overlay = extract_overlay("template.hwpx")
-
-# Modify text fields
 for t in overlay['texts']:
     t['value'] = t['value'].replace('old_text', 'new_text')
-
-# Apply changes (preserves ALL formatting)
 apply_overlay("template.hwpx", overlay, "output.hwpx")
 ```
 
@@ -100,65 +104,64 @@ from pyhwpxlib.api import fill_template_checkbox
 
 fill_template_checkbox("form.hwpx",
     data={"old_label": "new_value"},
-    checks=["agree"],  # Check boxes near this label
+    checks=["agree"],
     output_path="filled.hwpx")
 ```
 
-## 9. Preview (SVG/PNG)
+## 9. Image Operations
 ```python
-from pyhwpxlib.rhwp_bridge import RhwpEngine
+# Insert image into EXISTING document
+from pyhwpxlib.api import insert_image_to_existing
+insert_image_to_existing("doc.hwpx", "photo.png", "output.hwpx",
+    width=21260, height=15000, position='end')
+
+# Replace image in existing document
+import base64
+from pyhwpxlib.json_io.overlay import extract_overlay, apply_overlay
+overlay = extract_overlay("doc.hwpx")
+for img in overlay['images']:
+    with open("new.png", "rb") as f:
+        img['new_data_b64'] = base64.b64encode(f.read()).decode()
+apply_overlay("doc.hwpx", overlay, "output.hwpx")
+```
+
+## 10. Validate, Lint, Font Check
+```bash
+python -m pyhwpxlib validate output.hwpx        # Structure check
+python -m pyhwpxlib lint output.hwpx             # Rendering risk check
+python -m pyhwpxlib font-check output.hwpx       # Font resolution check
+python -m pyhwpxlib themes list                  # List all themes
+
+# JSON output for automation
+python -m pyhwpxlib validate output.hwpx --json
+python -m pyhwpxlib lint output.hwpx --json
+```
+
+## 11. Preview (SVG)
+```python
+from pyhwpxlib.rhwp_bridge import RhwpEngine  # requires pip install pyhwpxlib[preview]
 engine = RhwpEngine()
 doc = engine.load("output.hwpx")
 svg = doc.render_page_svg(0, embed_fonts=True)
 ```
 
-## 10. Extract Theme from Existing Document
-```python
-from pyhwpxlib import extract_theme, save_theme, HwpxBuilder
+## CRITICAL RULES
 
-# Extract style from any HWPX file
-theme = extract_theme("reference.hwpx", name="my_style")
-save_theme(theme)  # saves to ~/.pyhwpxlib/themes/my_style.json
-
-# Reuse the extracted style
-doc = HwpxBuilder(theme='custom/my_style')
-doc.add_heading("Same style, different content", level=1)
-doc.save("new_doc.hwpx")
-```
-
-## 11. Font Check
-```bash
-python -m pyhwpxlib font-check output.hwpx
-python -m pyhwpxlib themes list
-```
-
-## CRITICAL RULES — Violating these breaks Whale/Hancom rendering
-
-1. **No newlines in text** — Never `add_paragraph("line1\nline2")`.
-   Use separate `add_paragraph()` for each line.
-
-2. **No ET.tostring()** — Never re-serialize XML with ElementTree.
-   It changes namespace prefixes and breaks Whale. Use string replacement.
-
-3. **secPr position** — HwpxBuilder handles this automatically.
-   Do NOT add empty paragraphs before your first content paragraph.
-
-4. **Table cell text** — Long text in cells needs explicit line breaks
-   via separate paragraphs, not `\n` characters.
-
-5. **Validate after creation** — Always run:
-   ```python
-   import subprocess
-   subprocess.run(["python", "-m", "pyhwpxlib", "validate", "output.hwpx"])
-   ```
+1. **No \n in text** — Use separate add_paragraph() calls
+2. **No ET.tostring()** — Breaks namespace prefixes. Use string replacement
+3. **Spacing required** — add_paragraph("") before/after headings, tables, images
+4. **Tables only when needed** — Don't force tables into narrative content
+5. **Always validate + lint** after creation
+6. **Use themes** — Never hardcode blue (#395da2) for everything
 
 ## Common Mistakes by LLMs
 
-- Creating XML directly instead of using HwpxBuilder → BROKEN FILES
-- Putting `\n` in text content → Whale error
-- Not using themes → All documents look the same (blue)
-- Using `from hwpx import ...` → Wrong package. Use `from pyhwpxlib import ...`
-- Adding paragraphs before calling save without any content → Empty secPr paragraph breaks Whale
+- Creating XML directly → Use HwpxBuilder
+- \n in text → Whale error
+- No spacing between elements → Text sticks together
+- Tables everywhere → Only use when data/comparison exists
+- `from hwpx import ...` → Wrong. Use `from pyhwpxlib import ...`
+- Ignoring validate/lint → Broken files delivered to user
 """
 
 
