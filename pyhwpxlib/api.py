@@ -2126,42 +2126,14 @@ def fill_template(
         for name in names:
             file_data[name] = zf_in.read(name)
 
-    # Process each section file — replace only inside <hp:t> text nodes
-    import re as _fill_re
-    from xml.sax.saxutils import escape as _xml_escape
-
-    def _replace_in_t_nodes(xml_str: str, replacements: dict[str, str]) -> str:
-        """Replace text only inside <hp:t>...</hp:t> nodes, not in attributes.
-
-        Supports both literal placeholders and {{key}} patterns:
-        - data={"old": "new"} matches "old" in text
-        - data={"name": "홍길동"} matches both "name" and "{{name}}" in text
-        """
-        # Build expanded replacements: for each key, also try {{key}}
-        expanded: dict[str, str] = {}
-        for placeholder, value in replacements.items():
-            # {{key}} → value (try this first, longer match wins)
-            expanded[f'{{{{{placeholder}}}}}'] = value
-            # literal key → value
-            expanded[placeholder] = value
-
-        def _replacer(match):
-            content = match.group(1)
-            # Sort by length descending so longer patterns match first
-            for placeholder in sorted(expanded, key=len, reverse=True):
-                value = expanded[placeholder]
-                xml_placeholder = _xml_escape(placeholder)
-                xml_value = _xml_escape(value)
-                content = content.replace(xml_placeholder, xml_value)
-            return f'<hp:t>{content}</hp:t>'
-
-        return _fill_re.sub(r'<hp:t>([^<]*)</hp:t>', _replacer, xml_str)
+    # Replace text inside <hp:t> nodes only — delegated to xml_ops
+    from .xml_ops import replace_text_nodes
 
     for sec_name in section_names:
         raw = file_data[sec_name]
-        text = raw.decode("utf-8")
-        text = _replace_in_t_nodes(text, data)
-        file_data[sec_name] = text.encode("utf-8")
+        xml_str = raw.decode("utf-8")
+        xml_str = replace_text_nodes(xml_str, data)
+        file_data[sec_name] = xml_str.encode("utf-8")
 
     # Write the modified ZIP
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf_out:
@@ -2215,10 +2187,10 @@ def fill_template_checkbox(
     for sec_name in section_names:
         text = all_files[sec_name].decode("utf-8")
 
-        # 1. Text replacements
+        # 1. Text replacements — only inside <hp:t> nodes
         if data:
-            for old, new in data.items():
-                text = text.replace(old, new, 1)
+            from .xml_ops import replace_text_nodes
+            text = replace_text_nodes(text, data, support_braced_keys=False)
 
         # 2. Checkbox marks — 4가지 패턴 지원
         # □ (U+25A1) → ■ (U+25A0)
