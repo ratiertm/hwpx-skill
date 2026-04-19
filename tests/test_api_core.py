@@ -206,6 +206,22 @@ class TestFillTemplate:
         text = extract_text(output_path)
         assert "홍길동" in text
         assert "30" in text
+        assert "{{" not in text, f"Curly braces should be removed: {text}"
+
+    def test_fill_special_chars(self, tmp_path):
+        """fill_template must handle &, <, > in values without breaking XML."""
+        template_path = str(tmp_path / "tmpl.hwpx")
+        output_path = str(tmp_path / "filled.hwpx")
+
+        doc = create_document()
+        add_paragraph(doc, "회사: {{company}}")
+        save(doc, template_path)
+
+        fill_template(template_path, {"company": "A&B < Corp"}, output_path)
+
+        text = extract_text(output_path)
+        assert "A&B < Corp" in text
+        assert "{{" not in text
 
     def test_missing_placeholder_is_ignored(self, tmp_path):
         template_path = str(tmp_path / "tmpl.hwpx")
