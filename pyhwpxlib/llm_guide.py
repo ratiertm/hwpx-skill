@@ -23,13 +23,24 @@ doc.add_paragraph("")  # spacing before table
 doc.add_table([["Col A", "Col B"], ["1", "2"]])
 doc.add_paragraph("")  # spacing after table
 
-# Images
-doc.add_image("photo.png", width=21260, height=15000)
+# Images — ALWAYS add empty paragraphs before/after (prevents overlap)
+doc.add_paragraph("")
+doc.add_image("photo.png", width=42520, height=23918)  # full A4 width, 16:9
+doc.add_paragraph("")
 doc.add_image_from_url("https://example.com/img.png",
-    filename="img.png", width=21260, height=15000)
+    filename="img.png", width=42520, height=23918)
+doc.add_paragraph("")
 
 doc.save("output.hwpx")
 ```
+
+### Image Size Reference (A4 content width = 42520)
+| Use | width | height |
+|-----|-------|--------|
+| Full width 16:9 | 42520 | 23918 |
+| Full width 4:3 | 42520 | 31890 |
+| Half width | 21260 | 15945 |
+| Logo/icon | 8000-12000 | proportional |
 
 ## 2. Available Themes (10)
 | Theme | Color | Best For |
