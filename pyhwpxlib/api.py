@@ -2126,32 +2126,31 @@ def fill_template(
         for name in names:
             file_data[name] = zf_in.read(name)
 
-    # Process each section file
+    # Process each section file — replace only inside <hp:t> text nodes
+    import re as _fill_re
+    from xml.sax.saxutils import escape as _xml_escape
+
+    def _replace_in_t_nodes(xml_str: str, replacements: dict[str, str]) -> str:
+        """Replace text only inside <hp:t>...</hp:t> nodes, not in attributes."""
+        def _replacer(match):
+            content = match.group(1)
+            for placeholder, value in replacements.items():
+                # Placeholder in XML is already escaped
+                xml_placeholder = _xml_escape(placeholder)
+                xml_value = _xml_escape(value)
+                content = content.replace(xml_placeholder, xml_value)
+                # Also try raw placeholder (for placeholders without special chars)
+                if xml_placeholder == placeholder:
+                    continue  # already tried
+                content = content.replace(placeholder, xml_value)
+            return f'<hp:t>{content}</hp:t>'
+
+        return _fill_re.sub(r'<hp:t>([^<]*)</hp:t>', _replacer, xml_str)
+
     for sec_name in section_names:
         raw = file_data[sec_name]
         text = raw.decode("utf-8")
-
-        # Perform text replacements in the raw XML
-        for placeholder, value in data.items():
-            # Escape the replacement value for XML
-            xml_safe_value = (
-                value.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&apos;")
-            )
-            # Also escape the placeholder for matching in XML context
-            # (the placeholder itself might contain special chars)
-            xml_safe_placeholder = (
-                placeholder.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&apos;")
-            )
-            text = text.replace(xml_safe_placeholder, xml_safe_value)
-
+        text = _replace_in_t_nodes(text, data)
         file_data[sec_name] = text.encode("utf-8")
 
     # Write the modified ZIP
