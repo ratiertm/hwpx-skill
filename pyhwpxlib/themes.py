@@ -43,51 +43,55 @@ class Palette:
 class FontSet:
     """Font names for heading, body, and caption text.
 
-    Default is '나눔고딕' (NanumGothic), bundled in vendor/.
-    Cross-platform: works on macOS, Linux, and Windows without
-    requiring Hancom Office fonts.
+    Default is '맑은 고딕' (Malgun Gothic) — 2022년 6월 이후 공문서 표준.
+    Fallback: 번들된 NanumGothic (vendor/).
     """
-    heading_hangul: str = '나눔고딕'
-    heading_latin: str = '나눔고딕'
-    body_hangul: str = '나눔고딕'
-    body_latin: str = '나눔고딕'
-    caption_hangul: str = '나눔고딕'
-    caption_latin: str = '나눔고딕'
+    heading_hangul: str = '맑은 고딕'
+    heading_latin: str = '맑은 고딕'
+    body_hangul: str = '맑은 고딕'
+    body_latin: str = '맑은 고딕'
+    caption_hangul: str = '맑은 고딕'
+    caption_latin: str = '맑은 고딕'
 
 
 @dataclass(frozen=True)
 class SizeSet:
-    """Font sizes in pt."""
-    h1: int = 24
-    h2: int = 18
-    h3: int = 16
-    h4: int = 14
-    body: int = 12
-    caption: int = 10
+    """Font sizes in pt (한국 공문서 표준 기준).
+
+    공문서: 제목 20pt, 작은제목 17pt, 내부제목 15pt, 본문 15pt, 표 11pt.
+    """
+    h1: int = 20
+    h2: int = 17
+    h3: int = 15
+    h4: int = 15
+    body: int = 15
+    caption: int = 11
 
 
 @dataclass(frozen=True)
 class Margins:
-    """Page margins in HWPX units (1mm ~ 283)."""
-    left: int = 8504
-    right: int = 8504
-    top: int = 5668
-    bottom: int = 4252
-    header: int = 4252
-    footer: int = 4252
+    """Page margins in HWPX units (1mm ~ 283).
+
+    공문서 표준: 위 15mm, 아래 15mm, 좌 20mm, 우 20mm, 머리말 10mm, 꼬리말 10mm.
+    """
+    left: int = 5660     # 20mm
+    right: int = 5660    # 20mm
+    top: int = 4245      # 15mm
+    bottom: int = 4245   # 15mm
+    header: int = 2830   # 10mm
+    footer: int = 2830   # 10mm
 
 
 @dataclass(frozen=True)
 class Density:
     """Document density — line spacing, alignment, cell padding.
 
-    line_spacing: percent (e.g. 160 = 160%)
-    align: default horizontal alignment ('JUSTIFY', 'LEFT', 'CENTER', 'RIGHT')
-    cell_padding: table cell padding in HWPX units (1mm ~ 283)
+    공문서 표준: 줄간격 160%, 자간 -5~-10%, 정렬 JUSTIFY.
     """
     line_spacing: int = 160
     align: str = 'JUSTIFY'
     cell_padding: int = 283
+    char_spacing: int = -5  # 자간 (%, 음수=촘촘)
 
 
 @dataclass(frozen=True)

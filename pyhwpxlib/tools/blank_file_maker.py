@@ -258,10 +258,10 @@ def _fontfaces(ref_list: RefList, font_set=None) -> None:
 
 
 def _add_font_pair(fontface) -> None:
-    # Font 0: 나눔고딕 (bundled in vendor/)
+    # Font 0: 맑은 고딕 (공문서 표준, 2022.06~)
     f1 = fontface.add_new_font()
     f1.id = "0"
-    f1.face = "나눔고딕"
+    f1.face = "맑은 고딕"
     f1.type = FontType.TTF
     f1.isEmbedded = False
     ti1 = f1.create_type_info()

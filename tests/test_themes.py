@@ -89,8 +89,8 @@ class TestDefaultFontSet:
 
         fs = FontSet()
         for f in dataclasses.fields(fs):
-            assert getattr(fs, f.name) == '나눔고딕', \
-                f"FontSet().{f.name} != '나눔고딕'"
+            assert getattr(fs, f.name) == '맑은 고딕', \
+                f"FontSet().{f.name} != '맑은 고딕'"
 
 
 class TestDefaultSizeSet:
@@ -100,12 +100,12 @@ class TestDefaultSizeSet:
         from pyhwpxlib.themes import SizeSet
 
         ss = SizeSet()
-        assert ss.h1 == 24
-        assert ss.h2 == 18
-        assert ss.h3 == 16
-        assert ss.h4 == 14
-        assert ss.body == 12
-        assert ss.caption == 10
+        assert ss.h1 == 20
+        assert ss.h2 == 17
+        assert ss.h3 == 15
+        assert ss.h4 == 15
+        assert ss.body == 15
+        assert ss.caption == 11
 
 
 class TestMakeTablePresets:
@@ -238,7 +238,7 @@ class TestFontSystem:
         # Find the heading charPr (height=2400, has bold)
         heading_cp = None
         for cp in char_prs:
-            if cp.get('height') == '2400' and cp.find('hh:bold', ns) is not None:
+            if cp.get('height') == '2000' and cp.find('hh:bold', ns) is not None:
                 heading_cp = cp
                 break
         assert heading_cp is not None, "Heading charPr not found"
@@ -307,7 +307,7 @@ class TestThemeIntegration:
         char_prs = root.findall('.//hh:charPr', ns)
         heading_cp = None
         for cp in char_prs:
-            if cp.get('height') == '2400' and cp.find('hh:bold', ns) is not None:
+            if cp.get('height') == '2000' and cp.find('hh:bold', ns) is not None:
                 heading_cp = cp
                 break
         assert heading_cp is not None, "Heading charPr not found"
@@ -346,13 +346,13 @@ class TestThemeIntegration:
         # Header XML is deterministic and contains charPr/paraPr/fontfaces
         assert header1 == header2, "Header XML differs between HwpxBuilder() and HwpxBuilder(theme='default')"
 
-        # Verify both use the same fontfaces (나눔고딕/나눔명조)
+        # Verify both use the same fontfaces (맑은 고딕/나눔명조)
         ns = {'hh': 'http://www.hancom.co.kr/hwpml/2011/head'}
         root = ET.fromstring(header1)
         hangul_ff = root.find('.//hh:fontface[@lang="HANGUL"]', ns)
         fonts = [f.get('face') for f in hangul_ff.findall('hh:font', ns)]
-        assert fonts == ['나눔고딕', '나눔명조'], \
-            f"Default theme should use NanumGothic/NanumMyeongjo, got {fonts}"
+        assert fonts == ['맑은 고딕', '나눔명조'], \
+            f"Default theme should use Malgun Gothic/NanumMyeongjo, got {fonts}"
 
     def test_all_themes_generate_valid_hwpx(self):
         """All 10 built-in themes produce valid HWPX (ZIP) files with required entries."""
