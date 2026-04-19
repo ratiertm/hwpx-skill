@@ -17,19 +17,23 @@ _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
 def _set_in_margin_compat(table, left=0, right=0, top=0, bottom=0):
-    """Set table inMargin, compatible with python-hwpx 2.8.x and 2.9.x."""
-    if hasattr(table, 'set_in_margin'):
-        table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
-    else:
-        # python-hwpx 2.9.0+: set_in_margin removed, manipulate XML directly
-        from lxml import etree
-        el = table.element.find(f"{_HP}inMargin")
-        if el is None:
-            el = etree.SubElement(table.element, f"{_HP}inMargin")
-        el.set("left", str(left))
-        el.set("right", str(right))
-        el.set("top", str(top))
-        el.set("bottom", str(bottom))
+    """Set table inMargin via runtime adapter (python-hwpx version-agnostic)."""
+    try:
+        from pyhwpxlib.runtime_adapter import TableAdapter
+        TableAdapter(table).set_in_margin(left=left, right=right, top=top, bottom=bottom)
+    except ImportError:
+        # Fallback if pyhwpxlib not installed (standalone form_pipeline usage)
+        if hasattr(table, 'set_in_margin'):
+            table.set_in_margin(left=left, right=right, top=top, bottom=bottom)
+        else:
+            from lxml import etree
+            el = table.element.find(f"{_HP}inMargin")
+            if el is None:
+                el = etree.SubElement(table.element, f"{_HP}inMargin")
+            el.set("left", str(left))
+            el.set("right", str(right))
+            el.set("top", str(top))
+            el.set("bottom", str(bottom))
 _HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
 _HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 _HS = "{http://www.hancom.co.kr/hwpml/2011/section}"
