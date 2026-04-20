@@ -86,6 +86,33 @@ Korean 한/글 document tools (HWPX/OWPML).
 5. preview.png_base64 확인
 ```
 
+### D. 공문(기안문) 생성 — 편람 2025 준수 (v0.10.0+)
+행정안전부 「2025 행정업무운영 편람」 규정 자동 준수.
+MCP 도구 대신 `pyhwpxlib.gongmun` 파이썬 모듈 사용 권장:
+
+```python
+from pyhwpxlib.gongmun import Gongmun, GongmunBuilder, signer, validate_file
+
+doc = Gongmun(
+    기관명="OO부", 수신="내부결재", 제목="...",
+    본문=[
+        "도입 문단",
+        ("계약 개요", ["계약명: ...", "계약 금액: ..."]),  # 자동 가./나./다.
+    ],
+    붙임=["계획서 1부."],                              # 자동 '끝.'
+    기안자=signer("행정사무관", "김OO"),
+    결재권자=signer("과장", "박OO", 전결=True),
+    시행_처리과명="OO과", 시행_일련번호="000",
+    시행일="2025. 9. 20.", 공개구분="대국민공개",
+)
+GongmunBuilder(doc).save("output.hwpx")
+print(validate_file("output.hwpx"))  # 규정 검증
+```
+
+자동 적용: 편람 표준 여백(상30/하15/좌우20/머꼬10) · 8단계 항목기호 · 2타 들여쓰기 ·
+"끝" 표시 · 내부결재 시 발신명의 생략 · 기안자·결재권자 용어 생략.
+자동 검사: 날짜 포맷 · 위압적 어투 · 차별적 표현 · 두음법칙 · 외래어 · 한글호환영역 특수문자.
+
 ## 시작할 때
 
 처음 HWPX 관련 작업을 시작하면 **hwpx_guide()를 호출**하여 최신 가이드를 읽는다.

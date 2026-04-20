@@ -257,6 +257,55 @@ doc.add_hyperlink("Click here", "https://example.com")
 doc.save_to_path("report.hwpx")
 ```
 
+## Korean Official Documents (공문/기안문) — v0.10.0+
+
+Auto-generate Korean government/corporate 공문 compliant with
+the **2025 행정업무운영 편람** (Administrative Business Handbook) from
+the Ministry of the Interior and Safety.
+
+```python
+from pyhwpxlib.gongmun import Gongmun, GongmunBuilder, signer, validate_file
+
+doc = Gongmun(
+    기관명="OO 주식회사",
+    수신="내부결재",                       # or "OOO장관"
+    제목="용역 계약 체결(안)",
+    본문=[
+        "계약을 아래와 같이 체결하고자 ...",
+        ("계약 개요", [                     # auto level-2: 가./나./다./라.
+            "계약명: ...",
+            "계약 금액: ...",
+            "계약 기간: 2025. 5. 1. ~ 2026. 4. 30.",
+        ]),
+    ],
+    붙임=["계약서(안) 1부."],               # auto "끝." marker
+    기안자=signer("팀장", "김OO"),
+    결재권자=signer("본부장", "박OO"),
+    시행_처리과명="OO본부", 시행_일련번호="2026-001",
+    시행일="2026. 4. 21.", 공개구분="비공개",
+)
+GongmunBuilder(doc).save("output.hwpx")
+
+# Compliance check (10 rules)
+print(validate_file("output.hwpx"))
+```
+
+**Automated standards** (편람 준수):
+- Date `2025. 9. 20.`, Money `금113,560원(금일십일만삼천오백육십원)`
+- 8-level item markers `1.→가.→1)→가)→(1)→(가)→①→㉮` + 2-tab indent
+- "끝." marker (2 spaces + 끝.)
+- Sender name auto-omitted for internal decisions (영 §13③)
+- Standard margins: top 30 / bottom 15 / L·R 20 / header·footer 10 mm
+
+**Automated checks** (10 rules):
+- ERROR: DATE_FORMAT, DISCRIMINATORY_TERM, DUEUM_ERROR
+- WARNING: AUTHORITATIVE_TONE ("할 것", "~바람"), AUTHORITATIVE_TERM, LOANWORD_ERROR, END_MARKER_MISSING
+- INFO: HANGUL_COMPAT_CHAR (㉮, ㎕), ENGLISH_ABBREV
+
+Four document types supported: **일반기안문** (external) / **간이기안문** (internal) / **일괄기안** / **공동기안**.
+
+See [`pyhwpxlib/gongmun/rules.yaml`](pyhwpxlib/gongmun/rules.yaml) for the full machine-readable rule set.
+
 ## What is HWPX?
 
 HWPX is the modern document format for Hancom Office, the standard office suite in South Korea. It is a ZIP archive containing XML files following the OWPML specification -- similar in concept to `.docx` for Microsoft Word.
