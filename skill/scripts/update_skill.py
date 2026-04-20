@@ -33,6 +33,7 @@ from datetime import datetime
 # Paths
 INSTALLED = Path.home() / ".claude" / "skills" / "hwpx"
 PROJECT = Path(__file__).resolve().parent.parent  # skill/ directory in project
+COMMANDS_DIR = Path.home() / ".claude" / "commands"   # slash commands location
 
 # GitHub config
 DEFAULT_REPO = "ratiertm/hwpx-skill"
@@ -70,6 +71,12 @@ SYNC_FILES = [
     "scripts/hwpx_helper.py",
     "scripts/update_skill.py",
     "evals/evals.json",
+]
+
+# 슬래시 커맨드 — ~/.claude/commands/ 로 배포 (skill 밖)
+# upgrade 시: 프로젝트 skill/commands/{name}.md → ~/.claude/commands/{name}.md
+COMMAND_FILES = [
+    "hwpx-update.md",
 ]
 
 
@@ -114,6 +121,29 @@ def status(src, dst, direction="→"):
         else:
             print(f"  {rel:<43} ✓ same")
 
+    # 슬래시 커맨드: src/commands/{name}.md vs ~/.claude/commands/{name}.md
+    for name in COMMAND_FILES:
+        s = src / "commands" / name
+        d = COMMANDS_DIR / name
+        sh = file_hash(s)
+        dh = file_hash(d)
+        label = f"commands/{name}"
+        if sh is None and dh is None:
+            continue
+        elif sh is None:
+            print(f"  {label:<43} ✗ missing in project")
+            changes += 1
+        elif dh is None:
+            print(f"  {label:<43} + new (not in ~/.claude/commands/)")
+            changes += 1
+        elif sh != dh:
+            diff = s.stat().st_size - d.stat().st_size
+            sign = "+" if diff > 0 else ""
+            print(f"  {label:<43} ≠ changed ({sign}{diff} bytes)")
+            changes += 1
+        else:
+            print(f"  {label:<43} ✓ same")
+
     print(f"\n{'─' * 60}")
     if changes == 0:
         print("✅ All files in sync.")
@@ -123,7 +153,11 @@ def status(src, dst, direction="→"):
 
 
 def sync(src, dst, label):
-    """Copy files from src to dst."""
+    """Copy files from src to dst.
+
+    Also syncs slash commands: src/commands/{name}.md → COMMANDS_DIR/{name}.md
+    (skipped on pull direction — commands are project → user only).
+    """
     copied = 0
     skipped = 0
     for rel in SYNC_FILES:
@@ -138,6 +172,22 @@ def sync(src, dst, label):
         shutil.copy2(s, d)
         copied += 1
         print(f"  {label}: {rel}")
+
+    # 슬래시 커맨드 sync (push 방향: 프로젝트 skill/commands → ~/.claude/commands)
+    is_push = (label == "→")
+    if is_push:
+        for name in COMMAND_FILES:
+            s = src / "commands" / name
+            d = COMMANDS_DIR / name
+            if not s.exists():
+                continue
+            if file_hash(s) == file_hash(d):
+                skipped += 1
+                continue
+            d.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(s, d)
+            copied += 1
+            print(f"  {label}: commands/{name} → ~/.claude/commands/")
 
     print(f"\n✅ {copied} file(s) copied, {skipped} unchanged.")
     return copied
@@ -195,8 +245,11 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
     # 1. Download to temp
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        downloaded = []
+        downloaded = []   # SYNC_FILES (relative paths under skill/)
+        downloaded_cmds = []   # COMMAND_FILES (relative names)
         missing = []
+
+        # 일반 sync 파일
         for rel in SYNC_FILES:
             url = RAW_URL_TMPL.format(repo=repo, ref=ref, path=rel)
             try:
@@ -212,6 +265,22 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
             dst.write_bytes(buf)
             downloaded.append(rel)
 
+        # 슬래시 커맨드 (skill/commands/{name}.md)
+        for name in COMMAND_FILES:
+            url = RAW_URL_TMPL.format(repo=repo, ref=ref, path=f"commands/{name}")
+            try:
+                buf = _download(url)
+            except urllib.error.URLError as e:
+                print(f"\n❌ Network error: {e}")
+                return 2
+            if buf is None:
+                missing.append(f"commands/{name}")
+                continue
+            dst = tmp_dir / "commands" / name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(buf)
+            downloaded_cmds.append(name)
+
         if not downloaded:
             print(f"\n❌ Nothing downloaded. Check repo/ref: {repo}@{ref}")
             return 3
@@ -225,7 +294,9 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
 
         print(f"\n{'File':<45} {'Status'}")
         print("─" * 60)
-        changes = []
+        changes = []          # SYNC_FILES updates
+        changes_cmds = []     # COMMAND_FILES updates
+
         for rel in downloaded:
             remote = tmp_dir / rel
             local = INSTALLED / rel
@@ -242,12 +313,32 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
             else:
                 print(f"  {rel:<43} ✓ same")
 
+        # 슬래시 커맨드 diff
+        for name in downloaded_cmds:
+            remote = tmp_dir / "commands" / name
+            local = COMMANDS_DIR / name
+            rh = bytes_hash(remote.read_bytes())
+            lh = file_hash(local)
+            label = f"commands/{name} (~/.claude/commands/)"
+            if lh is None:
+                print(f"  {label:<43} + new")
+                changes_cmds.append(name)
+            elif rh != lh:
+                diff = remote.stat().st_size - local.stat().st_size
+                sign = "+" if diff > 0 else ""
+                print(f"  {label:<43} ≠ changed ({sign}{diff} bytes)")
+                changes_cmds.append(name)
+            else:
+                print(f"  {label:<43} ✓ same")
+
         print("─" * 60)
-        if not changes:
+        if not changes and not changes_cmds:
             print("✅ Already up to date.")
             return 0
 
-        print(f"\n⚠️  {len(changes)} file(s) will be updated.")
+        total = len(changes) + len(changes_cmds)
+        print(f"\n⚠️  {total} file(s) will be updated "
+              f"({len(changes)} skill, {len(changes_cmds)} command).")
 
         # 3. Confirm
         if not yes:
@@ -266,7 +357,7 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
             print("❌ Backup failed. Aborting.")
             return 4
 
-        # 5. Install
+        # 5. Install — skill files
         print()
         installed_count = 0
         for rel in changes:
@@ -276,6 +367,15 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
             shutil.copy2(src, dst)
             installed_count += 1
             print(f"  → {rel}")
+
+        # Install — slash commands
+        for name in changes_cmds:
+            src = tmp_dir / "commands" / name
+            dst = COMMANDS_DIR / name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            installed_count += 1
+            print(f"  → commands/{name} → ~/.claude/commands/")
 
         print(f"\n✅ Upgraded {installed_count} file(s) from github.com/{repo}@{ref}.")
         if backup_dir:
