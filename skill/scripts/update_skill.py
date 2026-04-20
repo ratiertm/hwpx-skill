@@ -144,12 +144,18 @@ def sync(src, dst, label):
 
 
 def backup():
-    """Create timestamped backup of installed skill."""
+    """Create timestamped backup of installed skill.
+
+    Stores OUTSIDE ~/.claude/skills/ to avoid the backup being
+    auto-registered as a skill by Claude Code.
+    """
     if not INSTALLED.exists():
         print("❌ No installed skill to backup.")
         return None
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = INSTALLED.parent / f"hwpx_backup_{ts}"
+    backup_root = Path.home() / ".claude" / "skill_backups" / "hwpx"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    backup_dir = backup_root / ts
     shutil.copytree(INSTALLED, backup_dir)
     print(f"✅ Backup created: {backup_dir}")
     return backup_dir
