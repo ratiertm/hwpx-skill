@@ -19,3 +19,7 @@ hwpx-workspace/
 ratiertm-hwpx/
 python-hwpx-fork/
 hwpxlib/
+.mcp-token
+
+# 외부 참조 레포 (개인 작업용 — 필요 시 직접 clone)
+references/
