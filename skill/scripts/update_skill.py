@@ -43,18 +43,17 @@ def find_project_skill():
 
 SYNC_FILES = [
     "SKILL.md",
+    "chatgpt_hwpx_guide.md",
     "references/HWPX_RULEBOOK.md",
     "references/api_reference.md",
     "references/api_full.md",
     "references/document_types.md",
+    "references/design_guide.md",
+    "references/editing.md",
     "references/form_automation.md",
-    "scripts/create.py",
-    "scripts/unpack.py",
-    "scripts/pack.py",
-    "scripts/validate.py",
+    "references/gongmun.md",
     "scripts/hwpx_helper.py",
     "scripts/update_skill.py",
-    "scripts/templates/blank.hwpx",
     "evals/evals.json",
 ]
 
