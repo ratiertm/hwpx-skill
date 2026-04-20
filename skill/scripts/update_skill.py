@@ -230,6 +230,22 @@ def _download(url: str, timeout: int = 15) -> bytes | None:
         raise
 
 
+def _detect_dev_environment() -> Path | None:
+    """Detect if user is running upgrade from a project clone.
+
+    Returns the project skill/ Path if detected, else None.
+    Checks: cwd contains skill/ with SKILL.md, AND a .git directory at parent.
+    """
+    project = find_project_skill()
+    if project is None:
+        return None
+    # Verify it's a real git checkout (not just a stray skill/ dir)
+    repo_root = project.parent
+    if (repo_root / ".git").exists():
+        return project
+    return None
+
+
 def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
             yes: bool = False) -> int:
     """Upgrade installed skill from GitHub.
@@ -239,6 +255,31 @@ def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
 
     Returns exit code (0 on success, non-zero on abort/error).
     """
+    # 안전장치: 개발자 환경에서 잘못 호출했는지 감지
+    project = _detect_dev_environment()
+    if project is not None:
+        print("⚠️  WARNING: Project clone detected at:")
+        print(f"      {project.parent}")
+        print()
+        print("    You appear to be running upgrade from a development checkout.")
+        print("    For local development, prefer:")
+        print("      git pull origin main")
+        print(f"      python {project}/scripts/update_skill.py push")
+        print()
+        print("    `upgrade` will overwrite the INSTALLED skill with GitHub's main")
+        print("    branch — your uncommitted local changes WILL NOT be touched in")
+        print("    the project, but the installed skill may diverge from your repo.")
+        print()
+        if not yes:
+            try:
+                ans = input("Continue with upgrade anyway? [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                ans = ""
+            if ans not in ("y", "yes"):
+                print("❎ Aborted. Use git pull + push for development workflow.")
+                return 1
+        print()
+
     print(f"🌐 Upgrade source: github.com/{repo} @ {ref}")
     print(f"📍 Target:         {INSTALLED}")
 
