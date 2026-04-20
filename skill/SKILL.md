@@ -147,7 +147,42 @@ from pyhwpxlib.api import convert_html_file_to_hwpx  # HTML→HWPX
 
 ---
 
-## 워크플로우 [5] 문서 분석
+## 워크플로우 [5] 공문(기안문) 생성 — 편람 준수
+
+행정안전부 「2025 행정업무운영 편람」 규정 자동 준수. 일반기안문 / 간이기안문 / 일괄기안 / 공동기안 지원.
+
+```python
+from pyhwpxlib.gongmun import Gongmun, GongmunBuilder, signer, validate_file
+
+doc = Gongmun(
+    기관명="행정안전부",
+    수신="수신자 참조",           # "내부결재" 가능
+    제목="2024년 정보공개 종합평가 계획 안내",
+    본문=["...", "..."],           # 자동 1. 2. 3. 번호
+    붙임=["계획서 1부."],          # 자동 "끝." 표시
+    발신명의="행정안전부장관",
+    기안자=signer("행정사무관", "김OO"),
+    결재권자=signer("정보공개과장", "김OO", 전결=True, 서명일자="2025. 9. 30."),
+    시행_처리과명="정보공개과", 시행_일련번호="000", 시행일="2025. 9. 30.",
+    우편번호="30112", 도로명주소="세종특별자치시 도움6로 42",
+    전화="(044)205-0000", 공개구분="대국민공개",
+)
+GongmunBuilder(doc).save("output.hwpx")
+
+# 규정 검증 (ERROR/WARNING/INFO)
+from pyhwpxlib.gongmun import format_report
+print(format_report(validate_file("output.hwpx")))
+```
+
+자동 적용: 날짜 포맷(`2025. 9. 20.`) · 2타 들여쓰기 · 항목기호 8단계 · 끝표시 · 두문/본문/결문 순서 · '기안자·결재권자' 용어 생략 · 회색 구분선.
+
+자동 검사: 위압적 어투("할 것", "~바람") · 권위적 표현("치하했다") · 차별적 표현("결손가정") · 한글호환영역 특수문자(㉮ 등) · 두음법칙 오류 · 외래어 오표기 · 끝표시 누락.
+
+> 상세: [references/gongmun.md](references/gongmun.md) · 편람 규칙 YAML: [pyhwpxlib/gongmun/rules.yaml](../pyhwpxlib/gongmun/rules.yaml)
+
+---
+
+## 워크플로우 [6] 문서 분석
 
 ```python
 from pyhwpxlib.json_io.overlay import extract_overlay
@@ -163,6 +198,8 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 | Task | Approach |
 |------|----------|
 | 새 문서 | `HwpxBuilder(theme='forest')` |
+| 공문(기안문) | `GongmunBuilder(Gongmun(...)).save()` (편람 준수) |
+| 공문 규정 검증 | `validate_file("doc.hwpx")` (ERROR/WARNING/INFO) |
 | 텍스트 읽기 | `extract_text()` |
 | 편집 | `unpack → replace → pack` |
 | 양식 채우기 | `fill_template(data={"key": "val"})` — {{key}} 패턴 |
@@ -236,4 +273,5 @@ doc.add_image("photo.png", width=width, height=height)
 | [references/editing.md](references/editing.md) | unpack/pack 상세, XML 규칙, 고급 편집 |
 | [references/form_automation.md](references/form_automation.md) | fill_template, batch, schema, checkbox |
 | [references/document_types.md](references/document_types.md) | 문서 유형, 프리셋, 표지, 결문 |
+| [references/gongmun.md](references/gongmun.md) | 공문 생성 (편람 준수) — 일반/간이/일괄/공동기안 + validator |
 | [references/HWPX_RULEBOOK.md](references/HWPX_RULEBOOK.md) | Critical Rules 전체 + 상세 설명 |
