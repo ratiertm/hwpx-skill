@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""hwpx skill updater — sync between project and installed skill.
+"""hwpx skill updater — sync between project, installed skill, and GitHub.
 
 Usage:
-    # Push: project → installed skill
+    # Upgrade: GitHub → installed skill (no project clone needed)
+    python scripts/update_skill.py upgrade
+    python scripts/update_skill.py upgrade --ref v0.10.0
+    python scripts/update_skill.py upgrade --repo user/fork
+    python scripts/update_skill.py upgrade --yes         # no prompt
+
+    # Push: local project → installed skill
     python scripts/update_skill.py push
 
-    # Pull: installed skill → project
+    # Pull: installed skill → local project
     python scripts/update_skill.py pull
 
     # Status: show diff between project and installed
@@ -18,12 +24,21 @@ import sys
 import os
 import shutil
 import hashlib
+import tempfile
+import urllib.request
+import urllib.error
 from pathlib import Path
 from datetime import datetime
 
 # Paths
 INSTALLED = Path.home() / ".claude" / "skills" / "hwpx"
 PROJECT = Path(__file__).resolve().parent.parent  # skill/ directory in project
+
+# GitHub config
+DEFAULT_REPO = "ratiertm/hwpx-skill"
+DEFAULT_REF = "main"
+RAW_URL_TMPL = "https://raw.githubusercontent.com/{repo}/{ref}/skill/{path}"
+
 
 # If running from installed skill, find project skill/ via cwd
 def find_project_skill():
@@ -63,6 +78,10 @@ def file_hash(path):
     if not path.exists():
         return None
     return hashlib.md5(path.read_bytes()).hexdigest()
+
+
+def bytes_hash(buf: bytes) -> str:
+    return hashlib.md5(buf).hexdigest()
 
 
 def status(src, dst, direction="→"):
@@ -128,12 +147,153 @@ def backup():
     """Create timestamped backup of installed skill."""
     if not INSTALLED.exists():
         print("❌ No installed skill to backup.")
-        return
+        return None
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_dir = INSTALLED.parent / f"hwpx_backup_{ts}"
     shutil.copytree(INSTALLED, backup_dir)
     print(f"✅ Backup created: {backup_dir}")
     return backup_dir
+
+
+# ──────────────────────────────────────────────────────────
+# GitHub upgrade
+# ──────────────────────────────────────────────────────────
+
+def _download(url: str, timeout: int = 15) -> bytes | None:
+    """Download URL, return bytes. None on 404."""
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "hwpx-skill-updater/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def upgrade(repo: str = DEFAULT_REPO, ref: str = DEFAULT_REF,
+            yes: bool = False) -> int:
+    """Upgrade installed skill from GitHub.
+
+    Downloads SYNC_FILES from raw.githubusercontent.com to a temp directory,
+    shows diff, asks confirmation, then backs up and installs.
+
+    Returns exit code (0 on success, non-zero on abort/error).
+    """
+    print(f"🌐 Upgrade source: github.com/{repo} @ {ref}")
+    print(f"📍 Target:         {INSTALLED}")
+
+    # 1. Download to temp
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        downloaded = []
+        missing = []
+        for rel in SYNC_FILES:
+            url = RAW_URL_TMPL.format(repo=repo, ref=ref, path=rel)
+            try:
+                buf = _download(url)
+            except urllib.error.URLError as e:
+                print(f"\n❌ Network error: {e}")
+                return 2
+            if buf is None:
+                missing.append(rel)
+                continue
+            dst = tmp_dir / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(buf)
+            downloaded.append(rel)
+
+        if not downloaded:
+            print(f"\n❌ Nothing downloaded. Check repo/ref: {repo}@{ref}")
+            return 3
+
+        # 2. Diff preview
+        print(f"\n📥 Downloaded {len(downloaded)} file(s) from GitHub.")
+        if missing:
+            print(f"ℹ️  {len(missing)} file(s) not present on remote "
+                  f"(OK if older version): {', '.join(missing[:5])}"
+                  + (f" +{len(missing) - 5} more" if len(missing) > 5 else ""))
+
+        print(f"\n{'File':<45} {'Status'}")
+        print("─" * 60)
+        changes = []
+        for rel in downloaded:
+            remote = tmp_dir / rel
+            local = INSTALLED / rel
+            rh = bytes_hash(remote.read_bytes())
+            lh = file_hash(local)
+            if lh is None:
+                print(f"  {rel:<43} + new")
+                changes.append(rel)
+            elif rh != lh:
+                diff = remote.stat().st_size - local.stat().st_size
+                sign = "+" if diff > 0 else ""
+                print(f"  {rel:<43} ≠ changed ({sign}{diff} bytes)")
+                changes.append(rel)
+            else:
+                print(f"  {rel:<43} ✓ same")
+
+        print("─" * 60)
+        if not changes:
+            print("✅ Already up to date.")
+            return 0
+
+        print(f"\n⚠️  {len(changes)} file(s) will be updated.")
+
+        # 3. Confirm
+        if not yes:
+            try:
+                answer = input("Proceed? [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+            if answer not in ("y", "yes"):
+                print("❎ Aborted. No changes made.")
+                return 1
+
+        # 4. Backup
+        print()
+        backup_dir = backup() if INSTALLED.exists() else None
+        if backup_dir is None and INSTALLED.exists():
+            print("❌ Backup failed. Aborting.")
+            return 4
+
+        # 5. Install
+        print()
+        installed_count = 0
+        for rel in changes:
+            src = tmp_dir / rel
+            dst = INSTALLED / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            installed_count += 1
+            print(f"  → {rel}")
+
+        print(f"\n✅ Upgraded {installed_count} file(s) from github.com/{repo}@{ref}.")
+        if backup_dir:
+            print(f"💾 Backup: {backup_dir}")
+            print(f"   Rollback: rm -rf {INSTALLED} && mv {backup_dir} {INSTALLED}")
+        return 0
+
+
+def _parse_flags(argv: list[str]) -> dict:
+    """Parse --key value / --flag / positional args."""
+    flags = {"repo": DEFAULT_REPO, "ref": DEFAULT_REF, "yes": False}
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--yes", "-y"):
+            flags["yes"] = True
+        elif a == "--ref" and i + 1 < len(argv):
+            flags["ref"] = argv[i + 1]
+            i += 1
+        elif a == "--repo" and i + 1 < len(argv):
+            flags["repo"] = argv[i + 1]
+            i += 1
+        i += 1
+    return flags
 
 
 def main():
@@ -168,6 +328,10 @@ def main():
 
     elif cmd == "backup":
         backup()
+
+    elif cmd in ("upgrade", "update"):
+        flags = _parse_flags(sys.argv[2:])
+        sys.exit(upgrade(repo=flags["repo"], ref=flags["ref"], yes=flags["yes"]))
 
     else:
         print(f"Unknown command: {cmd}")
