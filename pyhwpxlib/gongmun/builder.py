@@ -97,7 +97,55 @@ class GongmunBuilder:
         out = self._builder.save(str(output_path))
         # Post-save: 공문 표준 여백 적용
         self._apply_margins(out)
+        # Post-save: 저작권 라이선스(공공누리/CCL) 주입
+        if isinstance(self.data, Gongmun):
+            self._apply_license(out)
         return out
+
+    def _apply_license(self, path: str) -> None:
+        """Inject KOGL(공공누리) / CCL license mark into header.xml.
+
+        데이터 모델에 `라이선스_종류` + `라이선스_유형`이 설정된 경우,
+        header.xml의 <hh:docOption> 안에 <hh:licensemark> 요소를 삽입한다.
+
+        편람 §제2절 서식 + 행정안전부 공공누리 적용 지침:
+        - 정부 공개 문서는 KOGL 제1유형(출처표시) 원칙
+        - 비공개/내부결재는 라이선스 미적용
+        """
+        import zipfile, re, shutil
+
+        d = self.data
+        if not isinstance(d, Gongmun):
+            return
+        if not d.라이선스_종류:
+            return
+
+        flag = d.라이선스_유형 if d.라이선스_유형 is not None else 1
+        lm_xml = (
+            f'<hh:licensemark type="{d.라이선스_종류}" flag="{flag}" lang="1042"/>'
+        )
+
+        tmp = path + ".tmp"
+        with zipfile.ZipFile(path, 'r') as zin, \
+             zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                buf = zin.read(item.filename)
+                if item.filename == 'Contents/header.xml':
+                    text = buf.decode('utf-8')
+                    # docOption 내부에 licensemark 삽입 (linkinfo 뒤)
+                    if '<hh:licensemark' not in text:
+                        text = re.sub(
+                            r'(<hh:linkinfo[^/]*/>)',
+                            r'\1' + lm_xml,
+                            text,
+                            count=1,
+                        )
+                    buf = text.encode('utf-8')
+                if item.filename == 'mimetype':
+                    zout.writestr(item, buf, zipfile.ZIP_STORED)
+                else:
+                    zout.writestr(item, buf)
+        shutil.move(tmp, path)
 
     def _apply_margins(self, path: str) -> None:
         """Override page margins in saved HWPX.

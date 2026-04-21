@@ -126,6 +126,28 @@ class FWSpace(TItem):
         return ObjectType.hp_fwSpace
 
 
+@dataclass
+class MetaTag(RunItem):
+    """Meta tag inside a run or paragraph (hp:metaTag)."""
+
+    name: Optional[str] = None
+    _buffer: str = field(default="", repr=False)
+
+    def _object_type(self) -> ObjectType:
+        return ObjectType.hp_metaTag
+
+    def text(self) -> str:
+        return self._buffer
+
+    def add_text(self, text: str) -> None:
+        self._buffer += text
+
+    def clone(self) -> MetaTag:
+        cloned = MetaTag(name=self.name)
+        cloned.add_text(self._buffer)
+        return cloned
+
+
 # --- Track change markers ---
 
 @dataclass
@@ -747,6 +769,11 @@ class Run(SwitchableObject):
         self._item_list.append(mb)
         return mb
 
+    def add_new_meta_tag(self) -> MetaTag:
+        mt = MetaTag()
+        self._item_list.append(mt)
+        return mt
+
 
 # ============================================================
 # Para (paragraph)
@@ -764,11 +791,19 @@ class Para(SwitchableObject):
     merged: Optional[bool] = None
     para_tc_id: Optional[str] = None
     raw_xml_content: Optional[str] = field(default=None, repr=False)
+    meta_tag: Optional[MetaTag] = None
     _run_list: List[Run] = field(default_factory=list)
     line_seg_array: Optional[ObjectList[LineSeg]] = field(default=None, repr=False)
 
     def _object_type(self) -> ObjectType:
         return ObjectType.hp_p
+
+    def create_meta_tag(self) -> MetaTag:
+        self.meta_tag = MetaTag()
+        return self.meta_tag
+
+    def remove_meta_tag(self) -> None:
+        self.meta_tag = None
 
     # --- Run list management ---
 

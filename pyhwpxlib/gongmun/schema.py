@@ -31,6 +31,19 @@ class Signer:
 
 DisclosureKind = Literal["공개", "부분공개", "비공개", "대국민공개"]
 
+LicenseKind = Literal["KOGL", "CCL", None]
+"""저작권 라이선스 종류.
+
+- KOGL (공공누리): 공공저작물 자유이용 허락 — 정부 공개 문서 표준
+    유형 1: 출처표시
+    유형 2: 출처표시 + 상업적 이용금지
+    유형 3: 출처표시 + 변경금지
+    유형 4: 출처표시 + 상업적 이용금지 + 변경금지
+- CCL (Creative Commons): 국제 표준 라이선스
+    flag는 BY(1) + SA(2) + NC(4) + ND(8) 비트마스크 조합
+- None: 라이선스 미적용 (내부 비공개 문서)
+"""
+
 
 # ──────────────────────────────────────────────────────────
 # 일반기안문 (규칙 제3조제1항, 별지 제1호서식)
@@ -92,6 +105,11 @@ class Gongmun:
     공개구분: DisclosureKind = "공개"
     관인생략: bool = False
     서명생략: bool = False
+
+    # 저작권 라이선스 (공공누리/CCL)
+    # 편람 대응: 공공기관 문서는 공공누리 제1유형(KOGL 1)을 원칙으로 표기
+    라이선스_종류: LicenseKind = None   # "KOGL" / "CCL" / None
+    라이선스_유형: Optional[int] = None  # KOGL: 1~4 / CCL: BY+SA+NC+ND 비트마스크
 
     def is_internal_decision(self) -> bool:
         """내부결재문서 여부."""

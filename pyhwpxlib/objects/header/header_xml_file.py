@@ -14,6 +14,7 @@ from ...base import HWPXObject, ObjectList, SwitchableObject
 from ...object_type import ObjectType
 from ..common.base_objects import HasOnlyText
 from .enum_types import TargetProgramSort
+from ..section.enum_types import LicenseType
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +79,25 @@ class LinkInfo(HWPXObject):
 
 
 # ---------------------------------------------------------------------------
+# LicenseMark
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LicenseMark(HWPXObject):
+    """License mark info (CCL, KOGL)."""
+
+    type: Optional[LicenseType] = None
+    flag: Optional[int] = None
+    lang: Optional[int] = None
+
+    def _object_type(self) -> ObjectType:
+        return ObjectType.hh_licensemark
+
+    def clone(self) -> LicenseMark:
+        return copy.deepcopy(self)
+
+
+# ---------------------------------------------------------------------------
 # DocOption
 # ---------------------------------------------------------------------------
 
@@ -86,6 +106,7 @@ class DocOption(SwitchableObject):
     """Document option containing link info."""
 
     linkinfo: Optional[LinkInfo] = None
+    licensemark: Optional[LicenseMark] = None
 
     def _object_type(self) -> ObjectType:
         return ObjectType.hh_docOption
@@ -96,6 +117,13 @@ class DocOption(SwitchableObject):
 
     def remove_linkinfo(self) -> None:
         self.linkinfo = None
+
+    def create_licensemark(self) -> LicenseMark:
+        self.licensemark = LicenseMark()
+        return self.licensemark
+
+    def remove_licensemark(self) -> None:
+        self.licensemark = None
 
     def clone(self) -> DocOption:
         return copy.deepcopy(self)

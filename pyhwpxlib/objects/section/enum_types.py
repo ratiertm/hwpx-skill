@@ -542,3 +542,69 @@ class WidthRelTo(Enum):
     COLUMN = "COLUMN"
     PARA = "PARA"
     ABSOLUTE = "ABSOLUTE"
+
+
+class LicenseType(Enum):
+    """License type (hp:licenseType) - CCL, KOGL."""
+    CCL = "CCL"
+    KOGL = "KOGL"
+
+
+class CompatibleDocType(Enum):
+    """Compatible document type."""
+    HWP201X = "HWP201X"
+    HWP200X = "HWP200X"
+    MS_WORD = "MS_WORD"
+    HUNMIN = "Hunmin"
+
+
+class SymbolMarkType(Enum):
+    """Symbol mark type."""
+    NONE = "NONE"
+    DOT_ABOVE = "DOT_ABOVE"
+    RING_ABOVE = "RING_ABOVE"
+    TILDE = "TILDE"
+    CARON = "CARON"
+    SIDE = "SIDE"
+    COLON = "COLON"
+    GRAVE_ACCENT = "GRAVE_ACCENT"
+    ACUTE_ACCENT = "ACUTE_ACCENT"
+    CIRCUMFLEX = "CIRCUMFLEX"
+    MACRON = "MACRON"
+    HOOK_ABOVE = "HOOK_ABOVE"
+    DOT_BELOW = "DOT_BELOW"
+
+
+class StyleType(Enum):
+    """Style type."""
+    PARA = "PARA"
+    CHAR = "CHAR"
+
+
+class MemoShapeType(Enum):
+    """Memo shape type."""
+    NORMAL = "NORMAL"
+    USER_INSERT = "USER_INSERT"
+    USER_DELETE = "USER_DELETE"
+    USER_UPDATE = "USER_UPDATE"
+
+
+class LineEndCapType(Enum):
+    """Line end cap type."""
+    ROUND = "ROUND"
+    FLAT = "FLAT"
+
+
+class TrackChangeType(Enum):
+    """Track change type."""
+    UNKNOWN = "Unknown"
+    INSERT = "Insert"
+    DELETE = "Delete"
+    CHARSHAPE = "CharShape"
+    PARASHAPE = "ParaShape"
+
+
+class PresentationApplyTo(Enum):
+    """Presentation apply to."""
+    WHOLE_DOCUMENT = "WholeDoc"
+    NEWSECTION = "NewSection"

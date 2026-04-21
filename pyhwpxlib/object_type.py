@@ -130,6 +130,7 @@ class ObjectType(Enum):
     hh_docOption = auto()
     hh_linkinfo = auto()
     hh_metaTag = auto()
+    hh_licensemark = auto()
     hh_trackchageConfig = auto()
 
     # Contents/section0.xml

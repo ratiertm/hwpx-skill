@@ -46,6 +46,7 @@ from .schema import (
     signer,
 )
 from .builder import GongmunBuilder
+from .reader import read_license, license_summary
 from .validator import (
     Finding,
     Severity,
@@ -82,6 +83,9 @@ __all__ = [
     "signer",
     # Builder
     "GongmunBuilder",
+    # Reader
+    "read_license",
+    "license_summary",
     # Validator
     "Finding",
     "Severity",

@@ -94,6 +94,13 @@ def extract_overlay(
             style_map, include_images, prefix=f"p{pi}",
         )
 
+    # 공문 라이선스 메타데이터 (공공누리/CCL) — 있으면 summary에 노출
+    try:
+        from ..gongmun.reader import license_summary
+        _license = license_summary(path)
+    except Exception:
+        _license = None
+
     overlay = {
         "format": FORMAT_VERSION,
         "source": path.name,
@@ -104,6 +111,7 @@ def extract_overlay(
             "texts": len(texts),
             "tables": len(tables),
             "images": len(images),
+            "license": _license,   # "KOGL-1" / "CCL-BY-SA" / None
         },
         "texts": texts,
         "tables": tables,

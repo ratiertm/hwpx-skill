@@ -291,6 +291,12 @@ class LineType2(Enum):
     SLIM_THICK = ("SLIM_THICK", 9)
     THICK_SLIM = ("THICK_SLIM", 10)
     SLIM_THICK_SLIM = ("SLIM_THICK_SLIM", 11)
+    WAVE = ("WAVE", 12)
+    DOUBLEWAVE = ("DOUBLEWAVE", 13)
+    THICK3D = ("THICK3D", 14)
+    THICKREV3D = ("THICKREV3D", 15)
+    _3D = ("3D", 16)
+    REV3D = ("REV3D", 17)
 
     def __init__(self, str_val: str, index: int):
         self.str = str_val
