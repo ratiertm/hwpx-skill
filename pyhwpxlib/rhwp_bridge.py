@@ -555,6 +555,9 @@ class RhwpDocument:
         exports = engine._exports
         self._page_count_fn = exports["hwpdocument_pageCount"]
         self._render_fn = exports["hwpdocument_renderPageSvg"]
+        self._render_html_fn = exports.get("hwpdocument_renderPageHtml")
+        self._render_tree_fn = exports.get("hwpdocument_getPageRenderTree")
+        self._render_canvas_fn = exports.get("hwpdocument_renderPageCanvas")
         self._free_fn = exports["__wbg_hwpdocument_free"]
         self._wb_free = exports["__wbindgen_free"]
 
@@ -596,6 +599,77 @@ class RhwpDocument:
         """Render every page to SVG strings."""
         return [self.render_page_svg(i, embed_fonts=embed_fonts)
                 for i in range(self.page_count)]
+
+    def render_page_html(self, page: int) -> str:
+        """Render a single page to an HTML fragment string.
+
+        Useful for web embedding and for compact previews (smaller than
+        base64 PNG). Requires the bundled rhwp WASM to export
+        ``hwpdocument_renderPageHtml``.
+        """
+        self._check()
+        if self._render_html_fn is None:
+            raise RhwpError("bundled rhwp WASM does not export renderPageHtml")
+        if page < 0 or page >= self.page_count:
+            raise IndexError(f"page {page} out of range (0..{self.page_count - 1})")
+        ptr, length, _err_ptr, is_err = self._render_html_fn(
+            self._engine._store, self._handle, page
+        )
+        if is_err:
+            raise RhwpError(f"renderPageHtml failed for page {page} of {self.name}")
+        data = self._engine._mem_read(ptr, length)
+        try:
+            self._wb_free(self._engine._store, ptr, length, 1)
+        except Exception:
+            pass
+        return data.decode("utf-8", errors="replace")
+
+    def get_page_render_tree(self, page: int) -> dict:
+        """Return the layout render tree for a page as a Python dict.
+
+        The tree exposes bounding boxes and types (paragraph, table, image, ...)
+        for every node — ideal for automated layout assertions such as
+        "does the closing block fit on page 1?" without visual inspection.
+        """
+        self._check()
+        if self._render_tree_fn is None:
+            raise RhwpError("bundled rhwp WASM does not export getPageRenderTree")
+        if page < 0 or page >= self.page_count:
+            raise IndexError(f"page {page} out of range (0..{self.page_count - 1})")
+        ptr, length, _err_ptr, is_err = self._render_tree_fn(
+            self._engine._store, self._handle, page
+        )
+        if is_err:
+            raise RhwpError(f"getPageRenderTree failed for page {page} of {self.name}")
+        data = self._engine._mem_read(ptr, length)
+        try:
+            self._wb_free(self._engine._store, ptr, length, 1)
+        except Exception:
+            pass
+        import json
+        return json.loads(data.decode("utf-8", errors="replace"))
+
+    def render_page_canvas_count(self, page: int) -> int:
+        """Return the number of Canvas 2D drawing commands the renderer would emit.
+
+        The bundled WASM's ``renderPageCanvas`` export produces only this count;
+        real bitmap output requires a browser ``HtmlCanvasElement`` via
+        ``renderPageToCanvas`` which is not accessible from Python.
+
+        The count is still useful as a cheap sanity check (non-zero means the
+        page has renderable content) and as a crude layout-complexity proxy.
+        """
+        self._check()
+        if self._render_canvas_fn is None:
+            raise RhwpError("bundled rhwp WASM does not export renderPageCanvas")
+        if page < 0 or page >= self.page_count:
+            raise IndexError(f"page {page} out of range (0..{self.page_count - 1})")
+        count, _err_ptr, is_err = self._render_canvas_fn(
+            self._engine._store, self._handle, page
+        )
+        if is_err:
+            raise RhwpError(f"renderPageCanvas failed for page {page} of {self.name}")
+        return int(count)
 
     def close(self) -> None:
         if self._closed:
