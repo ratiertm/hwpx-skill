@@ -66,7 +66,8 @@ class GongmunBuilder:
                  theme: str = "default",
                  항목간_공백: bool = True,
                  compact: bool = False,
-                 margins_mm: tuple[int, int, int, int, int, int] = (30, 15, 20, 20, 10, 10)):
+                 margins_mm: tuple[int, int, int, int, int, int] = (20, 15, 20, 20, 0, 10),
+                 autofit: bool = False):
         """
         Args:
             항목간_공백: 본문 항목 사이에 빈 줄 1개 추가 (편람 p52 허용 범위).
@@ -75,14 +76,20 @@ class GongmunBuilder:
                      본문 앞·결문 앞 여백 최소화, 붙임 앞 빈 줄 제거.
                      편람 §4 p68 "1건 1매 주의" 원칙 준수에 유리.
             margins_mm: (상, 하, 좌, 우, 머리말, 꼬리말) mm 단위.
-                        기본값은 실무 공문 표준: 상 30 / 하 15 / 좌우 20 / 머/꼬리 10.
+                        기본값: 상 20 / 하 15 / 좌우 20 / 머리말 0 / 꼬리말 10
+                        (공문은 머리말 없음이 일반적 — 상단 여백 축소).
         """
         self.data = data
+        self.theme = theme
         self._builder = HwpxBuilder(theme=theme)
         self.compact = compact
         # compact는 결문/붙임 주변 여백만 줄이고, 항목간 공백은 사용자 제어를 유지
         self.항목간_공백 = 항목간_공백
         self.margins_mm = margins_mm
+        # autofit (0.12.0): rhwp RenderTree 기반 1페이지 자동 맞춤
+        self.autofit = autofit
+        self._spacer_pt: int = 6              # 본문 사이 빈 줄 pt (shrink step 0)
+        self._line_spacing_ratio: float = 1.0 # lineSpacing 비례 축소 계수 (shrink step 1)
 
     # ───────────────────────────────────────────────────
     # Public
@@ -90,17 +97,62 @@ class GongmunBuilder:
 
     def save(self, output_path: Union[str, Path]) -> str:
         """Build and save to output_path."""
+        out = self._build_and_save_once(output_path)
+        if self.autofit:
+            from .autofit import fit_to_one_page
+            fit_to_one_page(out, self)
+        return out
+
+    def _build_and_save_once(self, output_path: Union[str, Path]) -> str:
+        """현재 builder 상태로 1회 빌드+저장. autofit 루프에서 재호출됨."""
+        # HwpxBuilder 를 새로 만들어 이전 상태를 리셋 (autofit 재빌드 시 필요)
+        self._builder = HwpxBuilder(theme=self.theme)
         if isinstance(self.data, GongmunSimple):
             self._build_simple()
         else:
             self._build_general()
         out = self._builder.save(str(output_path))
-        # Post-save: 공문 표준 여백 적용
         self._apply_margins(out)
-        # Post-save: 저작권 라이선스(공공누리/CCL) 주입
+        if self._line_spacing_ratio < 1.0:
+            self._apply_line_spacing(out)
         if isinstance(self.data, Gongmun):
             self._apply_license(out)
         return out
+
+    def _apply_line_spacing(self, path: str) -> None:
+        """header.xml의 모든 <hh:lineSpacing value="N"/> 에 ratio를 곱한다.
+
+        Q2 실증: lineSpacing은 160/150/130% 등 3종 혼재. 단일 replace 불가.
+        정규식으로 value 속성을 모두 순회하며 비례 축소 (하한 120).
+        """
+        import zipfile, re, shutil
+
+        ratio = self._line_spacing_ratio
+        if ratio >= 1.0:
+            return
+
+        tmp = path + ".tmp"
+        with zipfile.ZipFile(path, 'r') as zin, \
+             zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                buf = zin.read(item.filename)
+                if item.filename == 'Contents/header.xml':
+                    text = buf.decode('utf-8')
+                    text = re.sub(
+                        r'<hh:lineSpacing([^/]*?)value="(\d+)"([^/]*?)/>',
+                        lambda m: (
+                            f'<hh:lineSpacing{m.group(1)}'
+                            f'value="{max(120, round(int(m.group(2)) * ratio))}"'
+                            f'{m.group(3)}/>'
+                        ),
+                        text,
+                    )
+                    buf = text.encode('utf-8')
+                if item.filename == 'mimetype':
+                    zout.writestr(item, buf, zipfile.ZIP_STORED)
+                else:
+                    zout.writestr(item, buf)
+        shutil.move(tmp, path)
 
     def _apply_license(self, path: str) -> None:
         """Inject KOGL(공공누리) / CCL license mark into header.xml.
@@ -279,7 +331,7 @@ class GongmunBuilder:
                 # 항목 간 공백 — compact 시 작은 공백 사용 (half-line 효과)
                 if self.항목간_공백 and i < n - 1:
                     if self.compact:
-                        self._builder.add_paragraph("", font_size=6)
+                        self._builder.add_paragraph("", font_size=self._spacer_pt)
                     else:
                         self._builder.add_paragraph("")
 
