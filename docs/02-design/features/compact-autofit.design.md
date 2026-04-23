@@ -115,7 +115,7 @@ _SPACER_FONT_SIZE_MIN = 4        # 빈 줄 pt 하한
 | Step | 조작 대상 | 1회 감소량 | 하한 |
 |:----:|-----------|-----------|------|
 | 0 | `self._spacer_pt` | −2pt | `_SPACER_FONT_SIZE_MIN` (=4) |
-| 1 | 전역 `lineSpacing value` **×0.90 비례 축소** (Q2) | × 0.90 | 모든 값 ≥ 120 |
+| 1 | 전역 `lineSpacing value` **×0.90 비례 축소** (Q2) | × 0.90 | **본문 기본 160 × 누적 ratio ≥ 120**. 표·제목 등 작은 값(150/130%)은 post-save 단계 `max(120, …)` 클램프로 보호 |
 | 2 | `self.margins_mm` 의 상/하 | −2mm 씩 | **12mm** (Q3에 따라 완화) |
 
 > step 3 (compact 강제)은 **제거**. 사용자의 `compact=False` 를 autofit이 뒤집지 않음 (Q3 결정).
@@ -186,36 +186,47 @@ def _rebuild_and_save(builder, hwpx_path: str) -> None:
 
 - `fit_to_one_page` 성공: `True` + 최종 hwpx 파일에 조정 반영됨
 - 모든 스텝 소진 후에도 overflow: `False` + `logger.warning(...)` + 마지막 산출물 유지
-- RhwpEngine 예외: `False` + `logger.debug("autofit skipped", exc_info=True)` + 원본 유지
+- RhwpEngine 예외: **`True` (overflow를 0.0 으로 평가)** + `logger.debug("overflow measure failed", exc_info=True)` + 원본 유지 (rebuild 안 함)
+    - 사유(v0.3): `_measure_overflow` 는 실패 시 0.0 을 반환하므로 상위 루프 첫 분기에서 `overflow <= tolerance` 로 True 귀결.
+    - 외부 관찰 불가 (사용자는 `save()` 반환 경로만 봄). 계약상 "원본 유지 + 파이프라인 중단 없음" 은 충족.
 
 ---
 
 ## 5. Algorithm Detail
 
-### 5.1 Overflow 측정 함수
+### 5.1 Overflow 측정 함수 (v0.3: Q5 실증 반영)
+
+**Q5 실증 결과**: rhwp는 auto-paginator. page 0의 좌표는 항상 Body bbox 안에 맞춰지며, 본문이 넘치면 page_count가 2 이상으로 증가한다. 따라서 **단일 페이지 y+h 비교는 무의미**하고, page_count 기반 판정이 맞다.
 
 ```python
 def _measure_overflow(hwpx_path: str) -> float:
+    """overflow(px) 추정. page_count<=1이면 0.0. 실패 시 0.0."""
     try:
-        engine = _get_engine()            # 싱글톤
+        engine = _get_engine()
         doc = engine.load(hwpx_path)
         try:
-            tree = doc.get_page_render_tree(0)
-            body = _find_body_node(tree)
-            if body is None:
+            pc = doc.page_count
+            if pc <= 1:
                 return 0.0
-            content_end = _max_y_extent(tree, exclude={"Header", "Footer", "PageBg"})
-            limit = body["bbox"]["y"] + body["bbox"]["h"]
-            return max(0.0, content_end - limit)
+            last_tree = doc.get_page_render_tree(pc - 1)
         finally:
             doc.close()
+        body = _find_body(last_tree)
+        if body is None:
+            return float(pc - 1) * 1000.0   # fallback 근사
+        body_h = body["bbox"]["h"]
+        extents = _all_extents(body, exclude={"Header","Footer","PageBg","Page"})
+        last_content = max(extents) - body["bbox"]["y"] if extents else 0.0
+        # (마지막 페이지 초과분) + (중간 페이지들 body_h 분)
+        return last_content + (pc - 2) * body_h
     except Exception:
         logger.debug("overflow measure failed", exc_info=True)
         return 0.0
 ```
 
-`_find_body_node` 는 DFS로 `type == "Body"` 탐색.
-`_max_y_extent` 는 자식 중 type이 exclude 셋에 포함되지 않는 것들의 `y + h` 최댓값.
+- `_find_body`: root children 중 `type == "Body"` (Q1 실증 — DFS 불요)
+- `_all_extents`: Body 내부 모든 노드의 `y+h` 수집 (재귀), exclude 셋 제외
+- 예외 시 `0.0` 반환 → 상위 루프가 `overflow <= tolerance` 로 True 반환 → **원본 유지** (§4.3 참고)
 
 ### 5.2 메인 루프
 
@@ -403,6 +414,7 @@ logger = logging.getLogger(__name__)   # pyhwpxlib.gongmun.autofit
 | Q2 | lineSpacing 치환 전략 | ⚠ **해결 (보정)** — header.xml에 lineSpacing 요소 25개, **160/150/130% 3종 혼재**. 단일 값 replace 불가 → **정규식으로 모든 value를 ×0.90 비례 축소**. 하한 120 |
 | Q3 | step 3 (compact 강제) 정책 | ✅ **해결 — 제거** — 사용자 명시값 존중. 대신 step 2 하한을 15→12mm로 완화. 실패 시 WARN에 compact=True 제안 |
 | Q4 | 회귀 "바이트 일치" 가능성 | ⚠ **해결 (변경)** — 바이트 일치 **불가** (`<hp:p id>` 가 전역 카운터로 실행마다 증가). 대안: ① `extract_text()` 동등성 ② XML id 정규화 후 SHA256 |
+| Q5 | Do 단계 실증: rhwp auto-paginator 동작 | ✅ **해결 (구현 보정)** — Page 0 내에서 overflow는 항상 0. page_count>1 이 곧 overflow. `_measure_overflow`를 `(pc-2)*body_h + last_content` 근사로 재정의 (§5.1 참조) |
 
 ---
 
@@ -412,3 +424,4 @@ logger = logging.getLogger(__name__)   # pyhwpxlib.gongmun.autofit
 |---------|------|---------|--------|
 | 0.1 | 2026-04-23 | 초안 작성 (Plan 기반 algorithm 상세화) | Mindbuild |
 | 0.2 | 2026-04-23 | Q1~Q4 실증 반영: step 3 제거, lineSpacing 비례 축소, 회귀는 XML 정규화 해시 | Mindbuild |
+| 0.3 | 2026-04-23 | Act-1 (Design v0.3 bump): Q5 추가 (rhwp auto-paginator → page_count 기반), §5.1 재작성, §3.2 step 1 조건을 "본문 160 기준 + post-save 클램프"로 명확화, §4.3 예외 반환값을 True로 명시 | gap-detector + Mindbuild |

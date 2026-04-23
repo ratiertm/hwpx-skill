@@ -111,3 +111,28 @@ def test_autofit_respects_user_compact(tmp_path: Path) -> None:
     b = GongmunBuilder(_medium_doc(), compact=True, autofit=True)
     b.save(str(tmp_path / "c.hwpx"))
     assert b.compact is True
+
+
+# ---- T-04 ------------------------------------------------------
+
+def test_autofit_soft_skip_when_rhwp_unavailable(tmp_path: Path, monkeypatch, caplog) -> None:
+    """rhwp_bridge 로드/호출이 실패하면 autofit은 DEBUG 로그만 남기고 원본을 유지한다."""
+    import logging
+    from pyhwpxlib.gongmun import autofit as autofit_mod
+
+    # RhwpEngine 을 건드리는 _get_engine 이 예외를 던지도록 치환 → _measure_overflow가 0.0 반환
+    def _raise(*a, **kw):
+        raise RuntimeError("simulated: wasmtime not available")
+    monkeypatch.setattr(autofit_mod, "_get_engine", _raise)
+    # 싱글톤 캐시도 비워서 monkeypatch 가 확실히 적용되도록
+    autofit_mod._ENGINE_CACHE.clear()
+
+    out = tmp_path / "skip.hwpx"
+    with caplog.at_level(logging.DEBUG, logger="pyhwpxlib.gongmun.autofit"):
+        GongmunBuilder(_medium_doc(), 항목간_공백=True, autofit=True).save(str(out))
+
+    assert out.exists()
+    warn = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert not warn, f"expected no WARN but got: {[r.message for r in warn]}"
+    debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("overflow measure failed" in m or "autofit" in m for m in debug_msgs)
