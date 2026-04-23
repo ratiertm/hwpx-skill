@@ -429,3 +429,52 @@ height: 1000=10pt, 1600=16pt, 2000=20pt
 | 넓음 | 200 | 보고서, 공문서 |
 | 표준 | 160 | 일반 문서 |
 | 좁음 | 130 | 표 안, 양식 |
+
+---
+
+## Rhwp Preview API
+
+번들된 rhwp WASM(`pyhwpxlib/vendor/rhwp_bg.wasm`) 기반. wasmtime 필요.
+
+```python
+from pyhwpxlib.rhwp_bridge import RhwpEngine
+engine = RhwpEngine()           # 싱글톤 재사용 권장 (WASM 초기화 비용)
+doc = engine.load("output.hwpx")
+```
+
+| 메서드 | 반환 | 용도 |
+|--------|------|------|
+| `doc.page_count` | int | 페이지 수 (rhwp auto-paginate 결과) |
+| `doc.render_page_svg(i, embed_fonts=False)` | str | SVG 문자열 (PNG 변환용) |
+| `doc.render_page_html(i)` | str | HTML fragment (수십 KB, MCP 응답 경량화) |
+| `doc.get_page_render_tree(i)` | dict | `{type, bbox, children}` — **좌표 기반 레이아웃 검증** |
+| `doc.render_page_canvas_count(i)` | int | Canvas 2D 명령 개수 (sanity check) |
+| `doc.close()` | — | 핸들 해제 (with 구문 권장) |
+
+### RenderTree 구조
+
+```
+Page (root)
+├─ PageBg
+├─ Header     (bbox.h = 0 if 공문처럼 머리말 없음)
+├─ Body       ← 본문 영역. y+h = Footer 직전
+│  └─ Column/Paragraph/TextLine/TextRun ...
+└─ Footer
+```
+
+**활용 예: 1페이지 overflow 감지**
+
+```python
+def body_bbox(tree):
+    return next(c for c in tree["children"] if c["type"] == "Body")["bbox"]
+
+tree = doc.get_page_render_tree(0)
+if doc.page_count > 1:
+    print("본문이 넘침 — spacer 줄이기 / 여백 축소 필요")
+```
+
+### 한계 (2026-04 기준)
+
+- **`renderPageToCanvas`** (브라우저 HtmlCanvasElement 직접 그리기)는 Python에서 호출 불가 — 비트맵이 필요하면 `render_page_svg` → resvg → PNG 경로 사용
+- **textWrap 미지원** — 이미지와 텍스트가 겹쳐 보일 수 있음 (Whale에서는 정상)
+- **linesegarray 불일치** — 텍스트 교체 후 줄 뭉침 발생 가능

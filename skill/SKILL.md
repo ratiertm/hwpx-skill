@@ -83,6 +83,16 @@ svg = doc.render_page_svg(0, embed_fonts=True)
 - 이미지와 텍스트 겹침 — rhwp가 textWrap 미지원
 - linesegarray 불일치 — 텍스트 교체 후 줄 뭉침
 
+**보조 렌더 API** (용도별 선택):
+```python
+html = doc.render_page_html(0)               # HTML fragment — SVG/PNG보다 훨씬 가벼움(수십 KB)
+tree = doc.get_page_render_tree(0)           # {type, bbox, children} — 좌표 기반 레이아웃 검증용
+n    = doc.render_page_canvas_count(0)       # Canvas 명령 수 (sanity check)
+# tree로 "결문이 page 1 body bbox 안에 있나" 프로그래매틱 판정 가능
+# → 공문 autofit, 양식 fill 후 빈 셀 검증 등에 활용
+```
+브라우저 비트맵 렌더(`renderPageToCanvas`)는 `HtmlCanvasElement` 필요라 Python 불가.
+
 **7가지 비주얼 체크포인트**:
 
 **1. 시각적 계층 (Visual Hierarchy)**
@@ -169,6 +179,11 @@ doc = Gongmun(
 )
 GongmunBuilder(doc).save("output.hwpx")
 
+# 1페이지 자동 맞춤 (공문 1건-1매 원칙) — rhwp RenderTree 기반
+GongmunBuilder(doc, autofit=True).save("output.hwpx")
+# overflow 감지 시 spacer(6→4pt) → lineSpacing×0.9 → 상·하여백(-2mm)
+# 순서로 최대 3회 자동 조정. 실패 시 WARN 로그 + 마지막 조정본 유지.
+
 # 규정 검증 (ERROR/WARNING/INFO)
 from pyhwpxlib.gongmun import format_report
 print(format_report(validate_file("output.hwpx")))
@@ -199,6 +214,7 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 |------|----------|
 | 새 문서 | `HwpxBuilder(theme='forest')` |
 | 공문(기안문) | `GongmunBuilder(Gongmun(...)).save()` (편람 준수) |
+| 공문 1페이지 자동 맞춤 | `GongmunBuilder(doc, autofit=True).save()` |
 | 공문 규정 검증 | `validate_file("doc.hwpx")` (ERROR/WARNING/INFO) |
 | 텍스트 읽기 | `extract_text()` |
 | 편집 | `unpack → replace → pack` |
@@ -211,7 +227,9 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 | 검증 | `pyhwpxlib validate` + `lint` + `font-check` |
 | 테마 추출 | `extract_theme() → save_theme()` |
 | 테마 목록 | `pyhwpxlib themes list` |
-| 프리뷰 | `RhwpEngine().load().render_page_svg()` |
+| 프리뷰 (SVG) | `RhwpEngine().load().render_page_svg()` |
+| 프리뷰 (HTML, 경량) | `doc.render_page_html(0)` |
+| 레이아웃 검증 | `doc.get_page_render_tree(0)` → bbox 좌표로 overflow 판정 |
 
 ---
 

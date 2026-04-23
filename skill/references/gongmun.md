@@ -213,6 +213,31 @@ for f in findings:
 
 ---
 
+## 1페이지 자동 맞춤 (autofit, 0.12.0+)
+
+공문은 "1건 1매" 원칙(편람 §4 p68)이 있지만, 본문이 약간 많으면 결문이 2페이지로 밀림. `autofit=True` 로 rhwp RenderTree 기반 자동 조정:
+
+```python
+GongmunBuilder(doc, autofit=True).save("output.hwpx")
+```
+
+**조정 순서** (누적, 최대 3회 재빌드):
+
+| 단계 | 조작 | 1회당 | 하한 |
+|:---:|------|------|------|
+| 0 | spacer pt (6 → 4) | −2pt | 4pt |
+| 1 | lineSpacing 전역 × 0.90 (본문 160 기준) | × 0.90 | 120 (작은 값은 post-save 클램프) |
+| 2 | 상·하 여백 | −2mm | 12mm |
+
+- **Fail-soft**: 수렴 실패 시 `WARN` 로그("compact=True 또는 본문 축소 검토") + 마지막 조정본 유지.
+- **사용자 설정 존중**: `compact=False` 를 autofit이 뒤집지 않음. 필요하면 사용자가 명시적으로 `compact=True` 결합.
+- **수렴 불가 케이스**: 8~9 항목×서브 4개 이상 — 본문 자체를 줄여야 함.
+- **성능**: `autofit=False` 경로는 추가 비용 0 (rhwp import조차 안 함). True일 때만 WASM 싱글톤 로드.
+
+**rhwp는 auto-paginator이므로** 페이지 내부 y+h 비교로는 overflow를 알 수 없다. 구현은 `page_count > 1`을 overflow 신호로 삼는다 ([design doc §5.1](../../docs/02-design/features/compact-autofit.design.md)).
+
+---
+
 ## 보고서 vs 공문 차이
 
 | 구분 | 보고서 | 공문 |
