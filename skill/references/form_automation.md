@@ -262,12 +262,142 @@ xml = xml[:p_start] + table_xml + xml[p_start:]
 
 ---
 
+## 1매 fit 자동화 (1건 1매 표준 양식)
+
+지급조서·검수확인서·증빙 등 **1매 표준 양식**의 채움 결과가 1페이지를 넘으면 다음 순서로 압축. **빈줄 제거가 가장 효과적**, 폰트 축소는 마지막 옵션.
+
+| 우선순위 | 조작 | 효과 | 비용 |
+|:---:|------|------|------|
+| **1** | (예시) 가이드 페이지 paragraph 통째 제거 | ★★★ | 가이드 정보 손실 (의도된 결과) |
+| **2** | 표와 closing 사이 **빈 paragraph 제거** | ★★★ | 시각 변화 없음 |
+| **3** | 표 셀 height 비례 축소 (cellSz height) | ★★ | 셀 안 텍스트 잘림 위험 |
+| **4** | 셀 안 paragraph 의 lineseg vertsize/textheight 축소 | ★ | 폰트 작아짐 (가독성 ↓) |
+
+```python
+# 빈 paragraph 식별 (top-level만)
+import re
+for p_match in re.finditer(r'<hp:p\b[^>]*>(?:(?!</hp:p>).)*?</hp:p>', xml, re.DOTALL):
+    p = p_match.group(0)
+    has_text = bool(re.search(r'<hp:t>[^<]+</hp:t>', p))
+    has_table = '<hp:tbl' in p
+    if not has_text and not has_table:
+        # 빈 paragraph — 제거 후보
+        xml = xml.replace(p, '', 1)
+```
+
+**실증 사례**: 전문가활용내역서 1매 fit 시 빈줄 3개 제거만으로 2 → 1페이지 도달. 폰트 축소 불필요.
+
+> SKILL.md 워크플로우 [3] Step E 참조.
+
+---
+
+## 셀 안 이미지 삽입 (정규식 + hp:pic 패턴)
+
+`insert_image_to_existing()` 은 본문 끝에 추가하는 함수. **표 셀 안 이미지 삽입**은 별도 패턴 필요. 검수확인서·신청서의 사진 첨부란에 사용.
+
+**핵심 원칙: lxml 직렬화 회피 → 정규식 + 문자열 조작만**
+
+```python
+import zipfile, re, random
+from PIL import Image
+
+# 1) BinData/ 에 이미지 추가
+with zipfile.ZipFile(src) as z:
+    files = {n: z.read(n) for n in z.namelist()}
+files['BinData/image100.png'] = open(img_path, 'rb').read()
+
+# 2) content.hpf manifest 등록
+hpf = files['Contents/content.hpf'].decode('utf-8')
+manifest_item = '<opf:item id="image100" href="BinData/image100.png" media-type="image/png" isEmbeded="1"/>'
+if 'id="image100"' not in hpf:
+    hpf = hpf.replace('</opf:manifest>', f'  {manifest_item}\n</opf:manifest>')
+files['Contents/content.hpf'] = hpf.encode('utf-8')
+
+# 3) hp:pic paragraph 빌드 (api.py insert_image_to_existing 패턴 그대로)
+def build_pic_paragraph(bin_name, org_w, org_h, disp_w, disp_h):
+    pic_id = random.randint(1_000_000_000, 3_000_000_000)
+    inst_id = random.randint(1_000_000_000, 3_000_000_000)
+    para_id = random.randint(1_000_000_000, 3_000_000_000)
+    sx, sy = f'{disp_w/org_w:.6f}', f'{disp_h/org_h:.6f}'
+    return (
+        f'<hp:p id="{para_id}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:run charPrIDRef="0">'
+        f'<hp:pic id="{pic_id}" zOrder="0" numberingType="PICTURE" '
+        f'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+        f'dropcapstyle="None" href="" groupLevel="0" instid="{inst_id}" reverse="0">'
+        f'<hp:offset x="0" y="0"/>'
+        f'<hp:orgSz width="{org_w}" height="{org_h}"/>'
+        f'<hp:curSz width="{disp_w}" height="{disp_h}"/>'
+        f'<hp:flip horizontal="0" vertical="0"/>'
+        f'<hp:rotationInfo angle="0" centerX="{disp_w//2}" centerY="{disp_h//2}" rotateimage="1"/>'
+        f'<hp:renderingInfo>'
+        f'<hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+        f'<hc:scaMatrix e1="{sx}" e2="0" e3="0" e4="0" e5="{sy}" e6="0"/>'
+        f'<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+        f'</hp:renderingInfo>'
+        f'<hp:imgRect>'
+        f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{org_w}" y="0"/>'
+        f'<hc:pt2 x="{org_w}" y="{org_h}"/><hc:pt3 x="0" y="{org_h}"/>'
+        f'</hp:imgRect>'
+        f'<hp:imgClip left="0" top="0" right="0" bottom="0"/>'
+        f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+        f'<hp:imgDim dimwidth="{org_w}" dimheight="{org_h}"/>'
+        f'<hc:img binaryItemIDRef="{bin_name}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+        f'<hp:sz width="{disp_w}" height="{disp_h}" widthRelTo="ABSOLUTE" heightRelTo="ABSOLUTE" protect="0"/>'
+        f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="1" '
+        f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" '
+        f'vertOffset="0" horzOffset="0"/>'
+        f'<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
+        f'</hp:pic></hp:run>'
+        f'<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="{disp_h}" textheight="{disp_h}" baseline="{int(disp_h*0.85)}" spacing="600" horzpos="0" horzsize="{disp_w}" flags="393216"/></hp:linesegarray>'
+        f'</hp:p>'
+    )
+
+# 4) 셀 안 subList 내부 통째 교체 (depth-aware 정규식으로 셀 위치 찾기)
+#    셀 cellSz height 도 이미지에 맞게 갱신
+new_cell = re.sub(
+    r'(<hp:cellSz width="\d+" height=")\d+(")',
+    rf'\g<1>{disp_h + 200}\g<2>',
+    cell_text, count=1
+)
+new_cell = (cell_text[:sublist_inner_start] + pic_para + cell_text[sublist_inner_end:])
+```
+
+**중첩 표 처리**: 검수사진 셀이 메인 표 → (1,6) → 중첩 표 → (1,1) 처럼 깊이 있는 경우, depth-aware 매칭 필요:
+
+```python
+def find_balanced_tables(text, row_cnt='9'):
+    """rowCnt=N 표만 (depth-aware 끝 매칭)"""
+    results = []
+    pos = 0
+    while True:
+        m = re.search(rf'<hp:tbl[^>]*rowCnt="{row_cnt}"[^>]*>', text[pos:])
+        if not m: break
+        s = pos + m.start()
+        depth = 1; scan = pos + m.end()
+        while depth > 0:
+            o = text.find('<hp:tbl', scan)
+            c = text.find('</hp:tbl>', scan)
+            if c == -1: break
+            if o != -1 and o < c: depth += 1; scan = o + 7
+            else: depth -= 1; scan = c + 9
+        results.append((s, scan)); pos = scan
+    return results
+```
+
+**검증된 패턴**: 검수확인서 3개 표 모두 셀 안 이미지 삽입 + 한컴 정상 표시 확인.
+
+---
+
 ## Critical Rules for Form Automation
 
 - **원본 ZIP 복사 + XML 텍스트 교체** — pyhwpxlib 재생성 금지 (header 깨짐)
 - **`.replace(old, new, 1)`** — 첫 번째만 교체 (다른 페이지 보호)
 - **condense/styleIDRef/breakSetting** — 원본 paraPr을 건드리면 JUSTIFY 글자 벌어짐
 - **ET.tostring 금지** — 반드시 원본 문자열 직접 교체
-- **섹션 제거 �� content.hpf 매니페스트도 반드시 업데이트** — 누락 시 뷰어 오류
+- **lxml.etree.tostring() 도 위험** — namespace prefix·attribute 순서·self-closing 형식 변경으로 한컴 호환성 깨질 수 있음. **정규식 + 문자열 조작 우선**
+- **섹션 제거 시 content.hpf 매니페스트도 반드시 업데이트** — 누락 시 뷰어 오류
+- **이미지 추가 시 BinData/ + content.hpf manifest 둘 다 갱신** — 하나만 빠지면 깨짐
 - **다중 run 필드** — `>   <` 빈칸 패턴으로 위치 특정 후 교체
 - **표 삽입** — borderFillIDRef는 기존 문서의 ID 재사용 (보통 "2"가 테두리 있는 스타일)
+- **중첩 표 매칭** — `(?:(?!</hp:tbl>).)*?` 단순 lazy 매칭은 첫 닫는 태그에서 끊김 → depth-aware 매칭 함수 사용

@@ -163,19 +163,35 @@ new_para = f'<hp:p id="0" paraPrIDRef="{para_pr}" styleIDRef="0" pageBreak="0" c
 
 ## 흔한 실수
 
-### 1. ET.tostring 사용
+### 1. ET.tostring 사용 / lxml 직렬화
 
-**가장 흔한 실수.** Python의 xml.etree.ElementTree로 파싱 후 tostring()으로 재직렬화하면 네임스페이스 프리픽스가 바뀌어 Whale에서 열리지 않는다.
+**가장 흔한 실수.** Python의 `xml.etree.ElementTree` 또는 `lxml.etree`로 파싱 후 `tostring()`으로 재직렬화하면 다음 차이가 발생해 한컴/Whale 호환성이 깨진다:
+
+- 네임스페이스 prefix 변경 (`hp:` → `ns0:` 등)
+- attribute 순서 변경 (한컴 스펙은 일부 순서 의존)
+- self-closing 형식 변환 (`<hp:t/>` ↔ `<hp:t></hp:t>`)
+- 빈 element 자동 제거
 
 ```python
-# ❌ WRONG
+# ❌ WRONG — ET.ElementTree
 root = ET.fromstring(xml)
-# ... 수정 ...
 new_xml = ET.tostring(root, encoding='unicode')  # 네임스페이스 깨짐!
 
-# ✅ CORRECT
+# ❌ WRONG — lxml도 동일 위험
+from lxml import etree
+root = etree.fromstring(xml)
+new_xml = etree.tostring(root, encoding='utf-8')  # validate ✅ 통과해도 한컴이 거부할 수 있음
+
+# ✅ CORRECT — 정규식 + 문자열 직접 교체
 xml = xml.replace('>원래<', '>새거<', 1)
+
+# ✅ CORRECT — 복잡한 구조는 depth-aware 정규식
+def find_balanced(text, open_tag, close_tag):
+    """nested tag 안전 매칭"""
+    # 검수확인서 셀 안 이미지 삽입 사례 참조 → references/form_automation.md
 ```
+
+**실증 사례**: lxml 직렬화로 만든 검수확인서 hwpx가 validate ✅ 통과했지만 한컴에서 깨져 보임. 동일 작업을 정규식만으로 다시 작성하니 정상.
 
 ### 2. replace 횟수 미지정
 
