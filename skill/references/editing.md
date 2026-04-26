@@ -193,6 +193,31 @@ def find_balanced(text, open_tag, close_tag):
 
 **실증 사례**: lxml 직렬화로 만든 검수확인서 hwpx가 validate ✅ 통과했지만 한컴에서 깨져 보임. 동일 작업을 정규식만으로 다시 작성하니 정상.
 
+### 1.5. 한컴 보안 경고 ("문서 보안 설정을 낮춤") — linesegarray strip
+
+**증상**: AI/스크립트로 수정한 hwpx를 한컴에서 열면 *"이 문서를 불러오려면 [문서 보안 설정]을 [낮음]으로 설정해야 합니다"* 경고.
+
+**원인**: section*.xml의 `<hp:linesegarray>` 안 stored geometry(textpos/vertpos/vertsize 등)가 텍스트 길이/줄과 어긋나면 한컴이 "외부 수정"으로 판단. 한컴 본체는 lineseg를 자체 reflow하므로 stored 값은 사실상 캐시인데, 그 캐시가 부정확하면 마커처럼 잡힘.
+
+**해결**: `<hp:linesegarray>...</hp:linesegarray>` 블록을 통째로 제거 → 한컴/rhwp 모두 로드 시 자체 reflow → 손실 없음.
+
+```python
+# ✅ 자동 — pyhwpxlib v0.13+ 이상은 write_zip_archive가 default로 strip
+from pyhwpxlib.package_ops import write_zip_archive
+write_zip_archive(out_path, archive)  # strip_linesegs=True (default)
+
+# ✅ 수동 — 외부 hwpx 정리
+# CLI:  pyhwpxlib reflow-linesegs <file>
+# API:
+from pyhwpxlib.postprocess import strip_linesegarrays
+new_xml, n = strip_linesegarrays(section_xml, mode='remove')
+
+# ❌ 주의 — N개 lineseg로 분할(reflow)은 회피 실패. strip만이 안전.
+#   (분할값도 한컴 기준 부정확하면 동일 트리거 발동)
+```
+
+**검증**: `pyhwpxlib lint <file>` → `STALE_LINESEG_R3 warning` 표시되면 strip 필요.
+
 ### 2. replace 횟수 미지정
 
 ```python

@@ -295,8 +295,27 @@ doc.add_image("photo.png", width=width, height=height)
 | 5 | condense 보존 | JUSTIFY 벌어짐 방지 |
 | 6 | 헤딩/표/이미지 앞뒤 빈 줄 | 간격 없으면 붙음 |
 | 7 | 표는 필요할 때만 | 억지 삽입 금지 |
+| 8 | hwpx 편집 후 `<hp:linesegarray>` strip | 한컴 보안경고 회피 (자동) |
 
 > 상세 API, 프리셋, 표 파라미터, 편집 세부사항 → [references/](references/) 참조
+
+### 한컴 보안경고 자동 회피 (Rule 8 상세)
+
+`pyhwpxlib.package_ops.write_zip_archive`는 기본값 `strip_linesegs=True`로
+모든 section*.xml의 `<hp:linesegarray>...</hp:linesegarray>` 블록을 제거한다.
+한컴/rhwp 모두 로드 시 lineseg를 자체 reflow하므로 손실 없음.
+
+**수동 호출** (이전 버전 hwpx 정리):
+```bash
+pyhwpxlib reflow-linesegs <input.hwpx>      # 통째 제거 (default)
+pyhwpxlib reflow-linesegs <input.hwpx> --mode empty   # 빈 태그 유지
+pyhwpxlib lint <input.hwpx>                 # STALE_LINESEG_R3 경고 확인
+```
+
+**옵트아웃** (디버깅/원본 보존):
+```python
+write_zip_archive(path, archive, strip_linesegs=False)
+```
 
 ---
 

@@ -254,6 +254,59 @@ def _cmd_pack(args: argparse.Namespace) -> None:
     print(f"Packed {len(all_files)} files → {output_path} ({size:,} bytes)")
 
 
+def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
+    """Strip stale <hp:linesegarray> blocks to fix Hancom security warning."""
+    import zipfile
+
+    hwpx_path = args.input
+    output_path = args.output or hwpx_path
+    mode = args.mode
+    as_json = getattr(args, "json", False)
+
+    if not os.path.exists(hwpx_path):
+        print(f"File not found: {hwpx_path}", file=sys.stderr)
+        sys.exit(1)
+
+    from pyhwpxlib.postprocess import strip_linesegarrays, count_r3_violations
+
+    with zipfile.ZipFile(hwpx_path) as zin:
+        infos = {n: zin.getinfo(n) for n in zin.namelist()}
+        files = {n: zin.read(n) for n in zin.namelist()}
+
+    section_files = sorted(
+        n for n in files if n.startswith("Contents/section") and n.endswith(".xml")
+    )
+    total_stripped = 0
+    r3_before = 0
+    r3_after = 0
+    for sf in section_files:
+        xml = files[sf].decode("utf-8")
+        r3_before += count_r3_violations(xml)
+        new_xml, n = strip_linesegarrays(xml, mode=mode)
+        files[sf] = new_xml.encode("utf-8")
+        total_stripped += n
+        r3_after += count_r3_violations(new_xml)
+
+    with zipfile.ZipFile(output_path, "w") as zout:
+        for n, info in infos.items():
+            ni = zipfile.ZipInfo(filename=n, date_time=info.date_time)
+            ni.compress_type = info.compress_type
+            ni.external_attr = info.external_attr
+            zout.writestr(ni, files[n])
+
+    result = {
+        "command": "reflow-linesegs",
+        "ok": True,
+        "input": hwpx_path,
+        "output": output_path,
+        "mode": mode,
+        "linesegarrays_stripped": total_stripped,
+        "r3_before": r3_before,
+        "r3_after": r3_after,
+    }
+    _emit(result, as_json)
+
+
 def _cmd_validate(args: argparse.Namespace) -> None:
     import zipfile
     import xml.etree.ElementTree as ET
@@ -354,6 +407,20 @@ def _cmd_lint(args: argparse.Namespace) -> None:
                             })
                 except ET.ParseError:
                     pass  # validate catches this
+
+                # Rule 2.5: Stale <hp:linesegarray> after edits (Hancom security trigger)
+                # Detection: lineseg=1 + text>40 + no '\n' (rhwp's R3 rule)
+                # Fires Hancom's "외부 수정" security warning if stored geometry mismatches.
+                from pyhwpxlib.postprocess import count_r3_violations
+                r3_count = count_r3_violations(xml_str)
+                if r3_count > 0:
+                    issues.append({
+                        'code': 'STALE_LINESEG_R3',
+                        'severity': 'warning',
+                        'message': f'{r3_count} paragraph(s) with stale single-lineseg over long text — Hancom may show security warning.',
+                        'path': sec_file,
+                        'hint': 'Run `pyhwpxlib reflow-linesegs <file>` to strip stale linesegarrays.',
+                    })
 
                 # Rule 3: Very long single run (>500 chars) — potential overflow
                 for m in re.finditer(r'<hp:t[^>]*>([^<]{500,})</hp:t>', xml_str):
@@ -599,6 +666,21 @@ def main(argv: list[str] | None = None) -> None:
     p_fc.add_argument("input", help="Input .hwpx file")
     p_fc.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # reflow-linesegs
+    p_rls = sub.add_parser(
+        "reflow-linesegs",
+        help="Strip stale <hp:linesegarray> blocks (Hancom security fix for edited HWPX)",
+    )
+    p_rls.add_argument("input", help="Input .hwpx file")
+    p_rls.add_argument("-o", "--output", help="Output .hwpx file (default: overwrite input)")
+    p_rls.add_argument(
+        "--mode",
+        choices=["remove", "empty"],
+        default="remove",
+        help="remove: delete blocks; empty: keep <hp:linesegarray></hp:linesegarray>",
+    )
+    p_rls.add_argument("--json", action="store_true", help="Output as JSON")
+
     # themes
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
     p_th.add_argument("action", choices=["list", "extract", "delete"],
@@ -624,6 +706,7 @@ def main(argv: list[str] | None = None) -> None:
         "pack": _cmd_pack,
         "validate": _cmd_validate,
         "lint": _cmd_lint,
+        "reflow-linesegs": _cmd_reflow_linesegs,
         "font-check": _cmd_font_check,
         "themes": _cmd_themes,
     }
