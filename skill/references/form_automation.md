@@ -401,4 +401,4 @@ def find_balanced_tables(text, row_cnt='9'):
 - **다중 run 필드** — `>   <` 빈칸 패턴으로 위치 특정 후 교체
 - **표 삽입** — borderFillIDRef는 기존 문서의 ID 재사용 (보통 "2"가 테두리 있는 스타일)
 - **중첩 표 매칭** — `(?:(?!</hp:tbl>).)*?` 단순 lazy 매칭은 첫 닫는 태그에서 끊김 → depth-aware 매칭 함수 사용
-- **저장 후 한컴 보안 경고** — `<hp:linesegarray>` stored geometry mismatch 가 트리거. v0.13+ `pyhwpxlib.package_ops.write_zip_archive`는 default로 strip → 자동 회피. 외부 hwpx 정리 시 `pyhwpxlib reflow-linesegs <file>` 또는 `pyhwpxlib.postprocess.strip_linesegarrays(xml)` 호출. 상세 → [editing.md §흔한 실수 1.5](editing.md)
+- **저장 후 한컴 보안 경고** — 정확한 트리거는 `<hp:lineseg textpos="N"/>` 에서 `N > UTF-16(paragraph 텍스트)` mismatch. v0.13.2+ `pyhwpxlib.package_ops.write_zip_archive`는 default `precise` 모드로 overflow lineseg 만 제거 (다른 lineseg 보존) → 자동 회피. 외부 hwpx 정리: `pyhwpxlib reflow-linesegs <file>` (default precise). 상세 → [editing.md §흔한 실수 1.5](editing.md)

@@ -29,22 +29,46 @@ def read_zip_archive(path: str) -> ZipArchive:
 def write_zip_archive(
     path: str,
     archive: ZipArchive,
-    strip_linesegs: bool = True,
+    strip_linesegs: "bool | str" = "precise",
 ) -> None:
     """Write a ZIP archive back using the original ZipInfo metadata/order.
 
-    When ``strip_linesegs`` is True (default), every ``Contents/section*.xml``
-    has its ``<hp:linesegarray>...</hp:linesegarray>`` blocks removed before
-    write. Hancom and rhwp both re-flow linesegs at load time, so removing
-    stale stored geometry is lossless and avoids Hancom's "외부 수정" security
-    warning that fires on edit-stale linesegs. Pass ``strip_linesegs=False``
-    when round-tripping a known-good document where preserving stored
-    geometry matters (e.g. debugging).
+    The ``strip_linesegs`` argument controls Hancom's "외부 수정" security
+    warning avoidance. The real trigger (verified 2026-04-27 via binary
+    search across edit variants of an externally-modified hwpx) is::
+
+        any <hp:lineseg textpos="N"/> where N > UTF-16 length of paragraph text
+
+    Hancom interprets such a "lineseg pointing past the end of the text" as
+    evidence the text was shortened by an external tool without refreshing
+    the lineseg cache.
+
+    Modes:
+
+    * ``"precise"`` (default) — remove only the linesegs whose ``textpos``
+      overflows the paragraph's text. Keeps every other lineseg intact, so
+      external renderers (rhwp, custom previewers) keep their layout cache.
+    * ``"remove"`` — remove every ``<hp:linesegarray>`` block. Safer fallback
+      if a future Hancom version uses a wider trigger; lossless because
+      Hancom/rhwp both re-flow on load, but external renderers must reflow.
+    * ``True`` — alias for ``"precise"`` (back-compat with v0.13.0/0.13.1).
+    * ``False`` — no post-processing (round-trip a known-good document).
     """
+    if strip_linesegs is True:
+        strip_linesegs = "precise"
     files = archive.files
-    if strip_linesegs:
+    if strip_linesegs == "precise":
+        from pyhwpxlib.postprocess import fix_textpos_overflow_in_section_xmls
+        files, _ = fix_textpos_overflow_in_section_xmls(files)
+    elif strip_linesegs == "remove":
         from pyhwpxlib.postprocess import strip_linesegs_in_section_xmls
         files, _ = strip_linesegs_in_section_xmls(files, mode="remove")
+    elif strip_linesegs is False or strip_linesegs is None:
+        pass
+    else:
+        raise ValueError(
+            f"strip_linesegs must be 'precise', 'remove', True, or False; got {strip_linesegs!r}"
+        )
     with zipfile.ZipFile(path, "w") as zf:
         for info in archive.infos:
             zf.writestr(info, files[info.filename])

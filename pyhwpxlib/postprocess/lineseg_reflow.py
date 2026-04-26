@@ -242,6 +242,103 @@ def reflow_section_xml(
     return fixed
 
 
+def count_textpos_overflow(section_xml: str) -> int:
+    """Count <hp:lineseg textpos="N"/> entries where N > UTF16 length of paragraph text.
+
+    This is the *true* Hancom security trigger (verified 2026-04-27 via binary search):
+    Hancom flags the file as externally modified when stored linesegs reference
+    positions past the end of the actual text — i.e., the text was shortened by an
+    external tool but the lineseg array was not refreshed.
+    """
+    count = 0
+    for p_m in re.finditer(r'<hp:p[\s>].*?</hp:p>', section_xml, re.DOTALL):
+        p = p_m.group(0)
+        ts = re.findall(r'<hp:t[^>]*>([^<]*)</hp:t>', p)
+        text_utf16 = _utf16_len(''.join(ts))
+        for s_m in re.finditer(r'<hp:lineseg [^/]*\btextpos="(\d+)"', p):
+            if int(s_m.group(1)) > text_utf16:
+                count += 1
+    return count
+
+
+def fix_textpos_overflow(section_xml: str) -> tuple[str, int]:
+    """Remove only the linesegs whose textpos exceeds the paragraph's UTF-16 text length.
+
+    Minimally invasive Hancom-security-trigger fix: preserves all other linesegs
+    (so external renderers like rhwp keep their layout cache), only drops the
+    specific entries that mark the document as externally modified.
+
+    If a paragraph's linesegarray would become empty, a single zero-textpos lineseg
+    is left in place so the OWPML structure stays valid.
+
+    Returns
+    -------
+    (new_xml, removed_count)
+    """
+    removed_total = 0
+
+    def fix_paragraph(p: str) -> str:
+        nonlocal removed_total
+        ts = re.findall(r'<hp:t[^>]*>([^<]*)</hp:t>', p)
+        text_utf16 = _utf16_len(''.join(ts))
+
+        def lsa_repl(m: re.Match) -> str:
+            nonlocal removed_total
+            inner = m.group(1)
+            kept_segs = []
+            for s_m in re.finditer(r'<hp:lineseg [^/]*/>', inner):
+                seg = s_m.group(0)
+                tp = re.search(r'\btextpos="(\d+)"', seg)
+                if tp and int(tp.group(1)) > text_utf16:
+                    removed_total += 1
+                    continue
+                kept_segs.append(seg)
+            if not kept_segs:
+                # 전부 제거되면 OWPML 보존용으로 빈 lineseg 1개
+                kept_segs.append(
+                    '<hp:lineseg textpos="0" vertpos="0" vertsize="1000" '
+                    'textheight="1000" baseline="850" spacing="600" '
+                    'horzpos="0" horzsize="0" flags="393216"/>'
+                )
+            return f'<hp:linesegarray>{"".join(kept_segs)}</hp:linesegarray>'
+
+        return re.sub(
+            r'<hp:linesegarray>(.*?)</hp:linesegarray>',
+            lsa_repl,
+            p,
+            flags=re.DOTALL,
+        )
+
+    out = []
+    pos = 0
+    for p_m in re.finditer(r'<hp:p[\s>].*?</hp:p>', section_xml, re.DOTALL):
+        out.append(section_xml[pos:p_m.start()])
+        out.append(fix_paragraph(p_m.group(0)))
+        pos = p_m.end()
+    out.append(section_xml[pos:])
+    return ''.join(out), removed_total
+
+
+def fix_textpos_overflow_in_section_xmls(
+    section_files: dict[str, bytes],
+) -> tuple[dict[str, bytes], int]:
+    """Apply fix_textpos_overflow to every Contents/section*.xml entry."""
+    new_files = dict(section_files)
+    total = 0
+    for name, raw in section_files.items():
+        if not (name.startswith("Contents/section") and name.endswith(".xml")):
+            continue
+        try:
+            xml = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        new_xml, n = fix_textpos_overflow(xml)
+        if n > 0:
+            new_files[name] = new_xml.encode("utf-8")
+            total += n
+    return new_files, total
+
+
 def strip_linesegs_in_section_xmls(
     section_files: dict[str, bytes],
     mode: str = "remove",

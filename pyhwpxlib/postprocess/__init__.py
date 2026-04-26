@@ -10,6 +10,9 @@ from pyhwpxlib.postprocess.lineseg_reflow import (
     count_r3_violations,
     strip_linesegarrays,
     strip_linesegs_in_section_xmls,
+    count_textpos_overflow,
+    fix_textpos_overflow,
+    fix_textpos_overflow_in_section_xmls,
 )
 
 __all__ = [
@@ -18,4 +21,7 @@ __all__ = [
     "count_r3_violations",
     "strip_linesegarrays",
     "strip_linesegs_in_section_xmls",
+    "count_textpos_overflow",
+    "fix_textpos_overflow",
+    "fix_textpos_overflow_in_section_xmls",
 ]

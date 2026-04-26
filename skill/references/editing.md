@@ -193,30 +193,45 @@ def find_balanced(text, open_tag, close_tag):
 
 **실증 사례**: lxml 직렬화로 만든 검수확인서 hwpx가 validate ✅ 통과했지만 한컴에서 깨져 보임. 동일 작업을 정규식만으로 다시 작성하니 정상.
 
-### 1.5. 한컴 보안 경고 ("문서 보안 설정을 낮춤") — linesegarray strip
+### 1.5. 한컴 보안 경고 ("문서 보안 설정을 낮춤") — textpos overflow fix
 
 **증상**: AI/스크립트로 수정한 hwpx를 한컴에서 열면 *"이 문서를 불러오려면 [문서 보안 설정]을 [낮음]으로 설정해야 합니다"* 경고.
 
-**원인**: section*.xml의 `<hp:linesegarray>` 안 stored geometry(textpos/vertpos/vertsize 등)가 텍스트 길이/줄과 어긋나면 한컴이 "외부 수정"으로 판단. 한컴 본체는 lineseg를 자체 reflow하므로 stored 값은 사실상 캐시인데, 그 캐시가 부정확하면 마커처럼 잡힘.
+**진짜 원인 (확정 2026-04-27)**: section*.xml 안에서 다음 조건이 단 한 번이라도 나타날 때:
 
-**해결**: `<hp:linesegarray>...</hp:linesegarray>` 블록을 통째로 제거 → 한컴/rhwp 모두 로드 시 자체 reflow → 손실 없음.
-
-```python
-# ✅ 자동 — pyhwpxlib v0.13+ 이상은 write_zip_archive가 default로 strip
-from pyhwpxlib.package_ops import write_zip_archive
-write_zip_archive(out_path, archive)  # strip_linesegs=True (default)
-
-# ✅ 수동 — 외부 hwpx 정리
-# CLI:  pyhwpxlib reflow-linesegs <file>
-# API:
-from pyhwpxlib.postprocess import strip_linesegarrays
-new_xml, n = strip_linesegarrays(section_xml, mode='remove')
-
-# ❌ 주의 — N개 lineseg로 분할(reflow)은 회피 실패. strip만이 안전.
-#   (분할값도 한컴 기준 부정확하면 동일 트리거 발동)
+```
+<hp:lineseg textpos="N"/>  AND  N > UTF-16(paragraph hp:t 텍스트 합)
 ```
 
-**검증**: `pyhwpxlib lint <file>` → `STALE_LINESEG_R3 warning` 표시되면 strip 필요.
+외부 도구가 paragraph 의 텍스트를 짧게 바꿨는데 lineseg 캐시는 그대로(긴 텍스트 시절 위치 가리킴) 두면 한컴이 명확한 "외부 수정 시그니처"로 판정. 한컴 본체는 lineseg 를 자체 reflow 하므로 stored 값은 사실상 캐시인데, 그 캐시가 텍스트보다 길면 자가 검출됨.
+
+**해결 (정밀 fix, v0.13.2+)**: overflow 한 lineseg 만 제거. 다른 lineseg 는 모두 보존하여 rhwp 등 외부 렌더러 캐시 유지.
+
+```python
+# ✅ 자동 — pyhwpxlib v0.13.2+ default 'precise'
+from pyhwpxlib.package_ops import write_zip_archive
+write_zip_archive(out_path, archive)
+# strip_linesegs="precise" (default) — overflow lineseg만 제거
+# strip_linesegs="remove"           — 옛 망치 (전체 제거, 안전 fallback)
+# strip_linesegs=False              — 옵트아웃
+
+# ✅ 수동 — 외부 hwpx 정리
+# CLI:  pyhwpxlib reflow-linesegs <file>           # default --mode precise
+#       pyhwpxlib reflow-linesegs <file> --mode remove
+# API:
+from pyhwpxlib.postprocess import fix_textpos_overflow, count_textpos_overflow
+new_xml, n = fix_textpos_overflow(section_xml)
+# n = 제거된 overflow lineseg 개수
+```
+
+**검증**: `pyhwpxlib lint <file>`
+- `TEXTPOS_OVERFLOW` (**error**) → 한컴 보안경고 발생함, 즉시 fix 필수
+- `RHWP_R3_RENDER_RISK` (warning) → 한컴은 OK, rhwp 등 외부 렌더러 텍스트 겹침 가능
+
+**오해 주의**:
+- ❌ R3 (lineseg=1 + text>40 + no\n) 자체가 트리거 — **틀림**. R3 위반이 있어도 textpos overflow 없으면 한컴 정상 (이준구 sample이 증거).
+- ❌ "본명:" 등 키워드 기반 개인정보 스캐너 — 비현실적, 검증 불가.
+- ❌ zip timestamp / compression / entry 순서 — 무관 (B 실험 검증 완료).
 
 ### 2. replace 횟수 미지정
 

@@ -301,33 +301,45 @@ doc.add_image("photo.png", width=width, height=height)
 
 ### 한컴 보안경고 자동 회피 (Rule 8 상세)
 
+**진짜 트리거 (확정 2026-04-27)**: section*.xml 안에서 다음 조건이 단 한 번이라도
+나타나면 한컴이 "문서 보안 설정을 낮춤" 경고를 띄운다:
+
+```
+<hp:lineseg textpos="N"/>  AND  N > UTF-16(paragraph 안 hp:t 텍스트 합)
+```
+
+(외부 도구가 텍스트를 짧게 바꿨는데 lineseg 캐시는 그대로 → 한컴이 외부 수정으로 판정)
+
 **원칙**: hwpx 저장은 항상 `write_zip_archive`를 거친다. 직접 `zipfile.ZipFile()`로 쓰면
-strip이 누락되어 한컴 보안경고 위험.
+정밀 fix 가 누락되어 트리거 위험.
 
 ```python
-# ✅ 권장 — 자동 strip (default strip_linesegs=True)
+# ✅ 권장 — 자동 정밀 fix (default 'precise')
 from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 arch = read_zip_archive(input_path)
-# ... arch.files['Contents/section0.xml'] 수정 ...
 write_zip_archive(output_path, arch)
+# precise 모드 = lineseg.textpos > text_len 인 lineseg 만 제거
+# 다른 lineseg 는 모두 보존 → rhwp 등 외부 렌더러 캐시 유지
 
-# ⚠️ 직접 zipfile.ZipFile() 사용 시 — 마지막에 strip 필수
+# 🔨 강한 망치 — linesegarray 통째 제거 (옛 default)
+write_zip_archive(output_path, arch, strip_linesegs="remove")
+
+# ⚠️ 직접 zipfile.ZipFile() 사용 시 — 마지막에 후처리 필수
 import zipfile
 with zipfile.ZipFile(output_path, 'w') as zf:
     for n, info in infos.items():
         zf.writestr(info, files[n])
-# 직접 쓴 후 반드시 후처리:
 import subprocess
 subprocess.run(['python3', '-m', 'pyhwpxlib', 'reflow-linesegs', output_path])
-# 또는 in-process:
-from pyhwpxlib.postprocess import strip_linesegs_in_section_xmls
-# (zip 다시 풀고 처리 후 재패킹)
 ```
 
 **저장 후 검증** (필수 체크리스트):
 ```bash
-pyhwpxlib lint <output.hwpx>           # STALE_LINESEG_R3 경고가 없어야 정상
-pyhwpxlib reflow-linesegs <output.hwpx>  # 경고 있으면 즉시 fix
+pyhwpxlib lint <output.hwpx>
+#   TEXTPOS_OVERFLOW (error)         → 한컴 보안경고 발생, 즉시 fix 필수
+#   RHWP_R3_RENDER_RISK (warning)    → 한컴은 OK, rhwp 등 외부 렌더러만 영향
+pyhwpxlib reflow-linesegs <file>            # default --mode precise
+pyhwpxlib reflow-linesegs <file> --mode remove   # 강한 망치
 ```
 
 **옵트아웃** (디버깅/원본 보존):

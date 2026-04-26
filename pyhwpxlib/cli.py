@@ -267,7 +267,12 @@ def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
         print(f"File not found: {hwpx_path}", file=sys.stderr)
         sys.exit(1)
 
-    from pyhwpxlib.postprocess import strip_linesegarrays, count_r3_violations
+    from pyhwpxlib.postprocess import (
+        strip_linesegarrays,
+        count_r3_violations,
+        fix_textpos_overflow,
+        count_textpos_overflow,
+    )
 
     with zipfile.ZipFile(hwpx_path) as zin:
         infos = {n: zin.getinfo(n) for n in zin.namelist()}
@@ -276,15 +281,22 @@ def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
     section_files = sorted(
         n for n in files if n.startswith("Contents/section") and n.endswith(".xml")
     )
-    total_stripped = 0
+    total_changed = 0
+    overflow_before = 0
+    overflow_after = 0
     r3_before = 0
     r3_after = 0
     for sf in section_files:
         xml = files[sf].decode("utf-8")
+        overflow_before += count_textpos_overflow(xml)
         r3_before += count_r3_violations(xml)
-        new_xml, n = strip_linesegarrays(xml, mode=mode)
+        if mode == "precise":
+            new_xml, n = fix_textpos_overflow(xml)
+        else:
+            new_xml, n = strip_linesegarrays(xml, mode=mode)
         files[sf] = new_xml.encode("utf-8")
-        total_stripped += n
+        total_changed += n
+        overflow_after += count_textpos_overflow(new_xml)
         r3_after += count_r3_violations(new_xml)
 
     with zipfile.ZipFile(output_path, "w") as zout:
@@ -300,7 +312,9 @@ def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
         "input": hwpx_path,
         "output": output_path,
         "mode": mode,
-        "linesegarrays_stripped": total_stripped,
+        "changes": total_changed,
+        "textpos_overflow_before": overflow_before,
+        "textpos_overflow_after": overflow_after,
         "r3_before": r3_before,
         "r3_after": r3_after,
     }
@@ -408,18 +422,29 @@ def _cmd_lint(args: argparse.Namespace) -> None:
                 except ET.ParseError:
                     pass  # validate catches this
 
-                # Rule 2.5: Stale <hp:linesegarray> after edits (Hancom security trigger)
-                # Detection: lineseg=1 + text>40 + no '\n' (rhwp's R3 rule)
-                # Fires Hancom's "외부 수정" security warning if stored geometry mismatches.
-                from pyhwpxlib.postprocess import count_r3_violations
+                # Rule 2.5: Lineseg textpos > paragraph text length (Hancom security trigger)
+                # Verified 2026-04-27 via binary search: Hancom flags external modification
+                # when any <hp:lineseg textpos="N"/> references a position past the end of
+                # the paragraph's actual UTF-16 text length.
+                from pyhwpxlib.postprocess import count_textpos_overflow, count_r3_violations
+                tp_overflow = count_textpos_overflow(xml_str)
+                if tp_overflow > 0:
+                    issues.append({
+                        'code': 'TEXTPOS_OVERFLOW',
+                        'severity': 'error',
+                        'message': f'{tp_overflow} lineseg(s) with textpos past end of text — Hancom WILL show security warning.',
+                        'path': sec_file,
+                        'hint': 'Run `pyhwpxlib reflow-linesegs <file>` (precise mode, default).',
+                    })
+                # Rule 2.6: rhwp R3 informational (renderer-only, NOT a Hancom trigger)
                 r3_count = count_r3_violations(xml_str)
                 if r3_count > 0:
                     issues.append({
-                        'code': 'STALE_LINESEG_R3',
+                        'code': 'RHWP_R3_RENDER_RISK',
                         'severity': 'warning',
-                        'message': f'{r3_count} paragraph(s) with stale single-lineseg over long text — Hancom may show security warning.',
+                        'message': f'{r3_count} paragraph(s) with single lineseg over long text — rhwp/external renderers may overlap glyphs.',
                         'path': sec_file,
-                        'hint': 'Run `pyhwpxlib reflow-linesegs <file>` to strip stale linesegarrays.',
+                        'hint': 'Hancom itself reflows OK; only matters for external renderers.',
                     })
 
                 # Rule 3: Very long single run (>500 chars) — potential overflow
@@ -675,9 +700,11 @@ def main(argv: list[str] | None = None) -> None:
     p_rls.add_argument("-o", "--output", help="Output .hwpx file (default: overwrite input)")
     p_rls.add_argument(
         "--mode",
-        choices=["remove", "empty"],
-        default="remove",
-        help="remove: delete blocks; empty: keep <hp:linesegarray></hp:linesegarray>",
+        choices=["precise", "remove", "empty"],
+        default="precise",
+        help="precise (default): remove only linesegs with textpos > text len (Hancom-trigger fix); "
+             "remove: delete entire <hp:linesegarray> blocks; "
+             "empty: keep empty <hp:linesegarray></hp:linesegarray>",
     )
     p_rls.add_argument("--json", action="store_true", help="Output as JSON")
 
