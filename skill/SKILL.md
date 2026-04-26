@@ -301,15 +301,33 @@ doc.add_image("photo.png", width=width, height=height)
 
 ### 한컴 보안경고 자동 회피 (Rule 8 상세)
 
-`pyhwpxlib.package_ops.write_zip_archive`는 기본값 `strip_linesegs=True`로
-모든 section*.xml의 `<hp:linesegarray>...</hp:linesegarray>` 블록을 제거한다.
-한컴/rhwp 모두 로드 시 lineseg를 자체 reflow하므로 손실 없음.
+**원칙**: hwpx 저장은 항상 `write_zip_archive`를 거친다. 직접 `zipfile.ZipFile()`로 쓰면
+strip이 누락되어 한컴 보안경고 위험.
 
-**수동 호출** (이전 버전 hwpx 정리):
+```python
+# ✅ 권장 — 자동 strip (default strip_linesegs=True)
+from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
+arch = read_zip_archive(input_path)
+# ... arch.files['Contents/section0.xml'] 수정 ...
+write_zip_archive(output_path, arch)
+
+# ⚠️ 직접 zipfile.ZipFile() 사용 시 — 마지막에 strip 필수
+import zipfile
+with zipfile.ZipFile(output_path, 'w') as zf:
+    for n, info in infos.items():
+        zf.writestr(info, files[n])
+# 직접 쓴 후 반드시 후처리:
+import subprocess
+subprocess.run(['python3', '-m', 'pyhwpxlib', 'reflow-linesegs', output_path])
+# 또는 in-process:
+from pyhwpxlib.postprocess import strip_linesegs_in_section_xmls
+# (zip 다시 풀고 처리 후 재패킹)
+```
+
+**저장 후 검증** (필수 체크리스트):
 ```bash
-pyhwpxlib reflow-linesegs <input.hwpx>      # 통째 제거 (default)
-pyhwpxlib reflow-linesegs <input.hwpx> --mode empty   # 빈 태그 유지
-pyhwpxlib lint <input.hwpx>                 # STALE_LINESEG_R3 경고 확인
+pyhwpxlib lint <output.hwpx>           # STALE_LINESEG_R3 경고가 없어야 정상
+pyhwpxlib reflow-linesegs <output.hwpx>  # 경고 있으면 즉시 fix
 ```
 
 **옵트아웃** (디버깅/원본 보존):
