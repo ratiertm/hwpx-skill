@@ -254,6 +254,91 @@ def _cmd_pack(args: argparse.Namespace) -> None:
     print(f"Packed {len(all_files)} files → {output_path} ({size:,} bytes)")
 
 
+def _cmd_template(args: argparse.Namespace) -> None:
+    """Register / fill / show / list HWPX form templates."""
+    action = getattr(args, "template_action", None)
+    as_json = getattr(args, "json", False)
+    if action is None:
+        print("Usage: pyhwpxlib template {add|fill|show|list} ...", file=sys.stderr)
+        sys.exit(2)
+
+    if action == "add":
+        from pyhwpxlib.templates import add as tpl_add
+        info = tpl_add(args.input, name=args.name, shared=args.shared)
+        if as_json:
+            _emit({"command": "template add", **info}, True)
+        else:
+            print(f"Registered template '{info['name']}' ({info['source']})")
+            print(f"  hwpx:   {info['hwpx_path']}")
+            print(f"  schema: {info['schema_path']}")
+            print(f"  fields: {info['fields']} across {info['tables']} table(s)")
+            print(f"  title (kr): {info['title_kr']}")
+        return
+
+    if action == "fill":
+        from pyhwpxlib.templates import fill as tpl_fill
+        # Allow inline key=value,key=value or JSON file
+        data_arg = args.data
+        if "=" in data_arg and not os.path.exists(data_arg):
+            data = {}
+            for pair in data_arg.split(","):
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    data[k.strip()] = v.strip()
+        else:
+            import json as _json
+            data = _json.loads(open(data_arg, "r", encoding="utf-8").read())
+        summary = tpl_fill(args.name, data, args.output)
+        if as_json:
+            _emit({"command": "template fill", **summary}, True)
+        else:
+            print(f"Filled template '{args.name}' -> {summary['output']}")
+            print(f"  filled fields: {len(summary['filled'])}")
+            if summary["missing_in_data"]:
+                print(f"  missing in data: {len(summary['missing_in_data'])}: "
+                      f"{summary['missing_in_data'][:5]}{'...' if len(summary['missing_in_data'])>5 else ''}")
+            if summary["skipped"]:
+                print(f"  skipped: {len(summary['skipped'])} (cell not found etc.)")
+        return
+
+    if action == "show":
+        from pyhwpxlib.templates import show as tpl_show
+        schema = tpl_show(args.name)
+        if as_json:
+            _emit(schema, True)
+        else:
+            print(f"Template: {schema.get('name')}  ({schema.get('title','')})")
+            for tbl in schema.get("tables", []):
+                print(f"  Table[{tbl.get('index')}] {tbl.get('rows','?')}x{tbl.get('cols','?')}: "
+                      f"{len(tbl.get('fields',[]))} fields")
+                for f in tbl.get("fields", [])[:10]:
+                    cell = f.get('cell', [None, None])
+                    label = f.get('label', '')
+                    ph = f.get('placeholder', '')
+                    extra = f" placeholder={ph!r}" if ph else ""
+                    print(f"    {f['key']:<25}  cell={cell}  label={label!r}{extra}")
+                if len(tbl.get("fields", [])) > 10:
+                    print(f"    ... +{len(tbl['fields'])-10} more")
+        return
+
+    if action == "list":
+        from pyhwpxlib.templates import list_templates
+        items = list_templates()
+        if as_json:
+            _emit({"command": "template list", "templates": items}, True)
+        else:
+            if not items:
+                print("(no templates registered)")
+                return
+            for it in items:
+                src = "[skill]" if it["source"] == "skill" else "[user] "
+                print(f"  {src} {it['name']:<25}  {it['hwpx_path']}")
+        return
+
+    print(f"Unknown template action: {action}", file=sys.stderr)
+    sys.exit(2)
+
+
 def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
     """Strip stale <hp:linesegarray> blocks to fix Hancom security warning."""
     import zipfile
@@ -708,6 +793,26 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_rls.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # template
+    p_tpl = sub.add_parser("template", help="Register and reuse HWPX form templates")
+    tpl_sub = p_tpl.add_subparsers(dest="template_action")
+    tpl_add = tpl_sub.add_parser("add", help="Convert + auto-schema + register a template")
+    tpl_add.add_argument("input", help=".hwp or .hwpx file")
+    tpl_add.add_argument("--name", help="ASCII template name (default: derived from filename)")
+    tpl_add.add_argument("--shared", action="store_true",
+                         help="Save into skill/templates/ (commit-intended) instead of user dir")
+    tpl_add.add_argument("--json", action="store_true", help="JSON output")
+    tpl_fill = tpl_sub.add_parser("fill", help="Fill a registered template with data")
+    tpl_fill.add_argument("name", help="template name (or path to .hwpx)")
+    tpl_fill.add_argument("-d", "--data", required=True, help="JSON data file or 'key=value,key=value'")
+    tpl_fill.add_argument("-o", "--output", required=True, help="output .hwpx path")
+    tpl_fill.add_argument("--json", action="store_true", help="JSON output")
+    tpl_show = tpl_sub.add_parser("show", help="Show schema for a template")
+    tpl_show.add_argument("name", help="template name")
+    tpl_show.add_argument("--json", action="store_true", help="JSON output")
+    tpl_list = tpl_sub.add_parser("list", help="List all registered templates")
+    tpl_list.add_argument("--json", action="store_true", help="JSON output")
+
     # themes
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
     p_th.add_argument("action", choices=["list", "extract", "delete"],
@@ -734,6 +839,7 @@ def main(argv: list[str] | None = None) -> None:
         "validate": _cmd_validate,
         "lint": _cmd_lint,
         "reflow-linesegs": _cmd_reflow_linesegs,
+        "template": _cmd_template,
         "font-check": _cmd_font_check,
         "themes": _cmd_themes,
     }
