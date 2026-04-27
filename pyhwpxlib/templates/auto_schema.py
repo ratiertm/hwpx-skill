@@ -117,29 +117,56 @@ def _is_label(text: str, max_len: int = 20) -> bool:
     return True
 
 
-def _find_label_for(value_cell: dict, cells: list[dict]) -> Optional[str]:
+def _find_label_for(
+    value_cell: dict, cells: list[dict], *, prefer_header: bool = True
+) -> Optional[str]:
     """For a value cell, find the closest label.
 
-    Priority:
-    1. Same row, immediate left (smallest col gap > 0)
-    2. Same col, immediate above (smallest row gap > 0)
+    With ``prefer_header=True`` (default for repeated-row tables), a column
+    header in the topmost row(s) wins over a left-side row label. This makes
+    grid-style tables like
+
+        |       | 성명 | 학과 | 학번 | 서명 |
+        | 참여자 |     |     |      |      |
+        | 참여자 |     |     |      |      |
+
+    correctly bind the empty cells to ``성명`` (header) instead of ``참여자``
+    (row group label), so collisions disambiguate as ``name``, ``name_2``,
+    ``name_3`` rather than ``field_2``, ``field_3``.
     """
     row, col = value_cell["row"], value_cell["col"]
-    # 1) same row, left
-    left_candidates = [
-        c for c in cells
-        if c["row"] == row and c["col"] < col and _is_label(c["text"])
-    ]
-    if left_candidates:
-        return max(left_candidates, key=lambda c: c["col"])["text"]
-    # 2) same col, above
     above_candidates = [
         c for c in cells
         if c["col"] == col and c["row"] < row and _is_label(c["text"])
     ]
+    left_candidates = [
+        c for c in cells
+        if c["row"] == row and c["col"] < col and _is_label(c["text"])
+    ]
+    if prefer_header and above_candidates:
+        return max(above_candidates, key=lambda c: c["row"])["text"]
+    if left_candidates:
+        return max(left_candidates, key=lambda c: c["col"])["text"]
     if above_candidates:
         return max(above_candidates, key=lambda c: c["row"])["text"]
     return None
+
+
+def _detect_repeated_grid(cells: list[dict]) -> bool:
+    """Heuristic: table has ≥3 value-rows where each row has the same set of cols.
+
+    Triggers ``prefer_header=True`` for label resolution.
+    """
+    by_row = {}
+    for c in cells:
+        if not c["text"] or _is_placeholder(c["text"]):
+            by_row.setdefault(c["row"], set()).add(c["col"])
+    if len(by_row) < 3:
+        return False
+    col_sets = list(by_row.values())
+    # all value-rows share at least 3 common columns
+    common = set.intersection(*col_sets) if col_sets else set()
+    return len(common) >= 2
 
 
 def generate_schema(
@@ -178,6 +205,7 @@ def generate_schema(
         max_row = max(c["row"] for c in cells)
         max_col = max(c["col"] for c in cells)
         fields = []
+        prefer_header = _detect_repeated_grid(cells)
 
         for cell in cells:
             text = cell["text"]
@@ -185,7 +213,7 @@ def generate_schema(
             is_ph = _is_placeholder(text)
             if not (is_empty or is_ph):
                 continue  # this is a label, skip
-            label = _find_label_for(cell, cells)
+            label = _find_label_for(cell, cells, prefer_header=prefer_header)
             label_for_key = label or text or f"cell_{cell['row']}_{cell['col']}"
             fallback_index[0] += 1
             key = label_to_key(label_for_key, used_keys, fallback_index=fallback_index[0])
