@@ -358,5 +358,6 @@ write_zip_archive(path, archive, strip_linesegs=False)
 | [references/editing.md](references/editing.md) | unpack/pack 상세, XML 규칙, 고급 편집 |
 | [references/form_automation.md](references/form_automation.md) | fill_template, batch, schema, checkbox |
 | [references/document_types.md](references/document_types.md) | 문서 유형, 프리셋, 표지, 결문 |
+| [templates/README.md](templates/README.md) | 번들 양식 모음 (전정Makers 결과보고서 등) + schema |
 | [references/gongmun.md](references/gongmun.md) | 공문 생성 (편람 준수) — 일반/간이/일괄/공동기안 + validator |
 | [references/HWPX_RULEBOOK.md](references/HWPX_RULEBOOK.md) | Critical Rules 전체 + 상세 설명 |
