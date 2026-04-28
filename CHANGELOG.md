@@ -6,6 +6,65 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.15.0 — 2026-04-29
+
+> JSON path now reaches the same expressivity as direct ``HwpxBuilder``
+> calls. Solves the "단조" (monotonous) JSON output issue identified by
+> the graphify analysis: previously ``decoder.from_json`` only used 3 of
+> 19 add_* methods (16%) — it now dispatches all 16 buildable methods.
+
+### Added
+
+- `pyhwpxlib.json_io.schema` — 11 new dataclasses for rich content:
+  `Heading`, `Image`, `HeaderFooter`, `PageNumber`, `Footnote`,
+  `Equation`, `Highlight`, `BulletList`, `NumberedList`, `NestedListItem`,
+  `NestedBulletList`, `NestedNumberedList`, `Shape`.
+- `RunContent.type` extended with 11 new values:
+  `heading`, `bullet_list`, `numbered_list`, `nested_bullet_list`,
+  `nested_numbered_list`, `footnote`, `equation`, `highlight`,
+  `shape_rect`, `shape_line`, `shape_draw_line`.
+- `HwpxJsonDocument` gains `header`, `footer`, `page_number` (top-level,
+  applied last to dodge the Whale SecPr ordering bug — same deferred
+  pattern HwpxBuilder uses).
+- `pyhwpxlib.json_io.decoder._apply_run` — typed dispatch table mapping
+  each JSON `type` to the matching builder method. Unknown types raise
+  `ValueError` (rhwp-aligned: no silent skips).
+
+### JSON example (full pipeline available)
+
+```json
+{
+  "header": {"text": "Acme Corp"},
+  "page_number": {"pos": "BOTTOM_CENTER"},
+  "sections": [{
+    "paragraphs": [
+      {"runs": [{"content": {"type": "heading",
+                              "heading": {"text": "Report", "level": 1}}}]},
+      {"runs": [{"content": {"type": "bullet_list",
+                              "bullet_list": {"items": ["A", "B", "C"]}}}]},
+      {"runs": [{"content": {"type": "footnote",
+                              "footnote": {"text": "see notes"}}}]}
+    ],
+    "tables": [],
+    "page_settings": {}
+  }]
+}
+```
+
+### Tests
+
+- 28 new cases in `tests/test_json_schema_expansion.py` (T-01..T-18 +
+  11 parametric "missing nested object → ValueError" guards).
+- Total regression: 72 → **100 PASS**, zero break.
+
+### Compatibility
+
+- v0.14.0 JSON (paragraphs/tables only) continues to work unchanged —
+  all new fields are additive and optional.
+- rhwp-strict-mode default behaviour preserved (no silent fixes).
+
+---
+
 ## 0.14.0 — 2026-04-29
 
 > **Breaking change.** pyhwpxlib adopts the rhwp-aligned position on

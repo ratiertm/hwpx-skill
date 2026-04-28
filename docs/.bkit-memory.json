@@ -5,6 +5,6 @@
     "platform": "claude",
     "level": "Starter"
   },
-  "activeFeature": "rhwp-strict-mode",
-  "phase": "plan"
+  "activeFeature": "json-schema-expansion",
+  "phase": "design"
 }
