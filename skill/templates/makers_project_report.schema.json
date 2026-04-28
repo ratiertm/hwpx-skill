@@ -45,7 +45,7 @@
           "label": "참여자1 학과(부)"
         },
         {
-          "key": "member_1_id",
+          "key": "member_1_student_id",
           "cell": [
             3,
             4
@@ -57,7 +57,7 @@
           "label": "참여자1 학번"
         },
         {
-          "key": "member_1_sign",
+          "key": "member_1_signature",
           "cell": [
             3,
             6
@@ -85,7 +85,7 @@
           "label": "참여자2 학과(부)"
         },
         {
-          "key": "member_2_id",
+          "key": "member_2_student_id",
           "cell": [
             4,
             4
@@ -97,7 +97,7 @@
           "label": "참여자2 학번"
         },
         {
-          "key": "member_2_sign",
+          "key": "member_2_signature",
           "cell": [
             4,
             6
@@ -125,7 +125,7 @@
           "label": "참여자3 학과(부)"
         },
         {
-          "key": "member_3_id",
+          "key": "member_3_student_id",
           "cell": [
             5,
             4
@@ -137,7 +137,7 @@
           "label": "참여자3 학번"
         },
         {
-          "key": "member_3_sign",
+          "key": "member_3_signature",
           "cell": [
             5,
             6
@@ -165,7 +165,7 @@
           "label": "참여자4 학과(부)"
         },
         {
-          "key": "member_4_id",
+          "key": "member_4_student_id",
           "cell": [
             6,
             4
@@ -177,7 +177,7 @@
           "label": "참여자4 학번"
         },
         {
-          "key": "member_4_sign",
+          "key": "member_4_signature",
           "cell": [
             6,
             6

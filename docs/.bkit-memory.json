@@ -1,8 +1,10 @@
 {
-  "sessionCount": 12,
+  "sessionCount": 3,
   "lastSession": {
-    "startedAt": "2026-04-03T23:49:18.043Z",
+    "startedAt": "2026-04-28T13:45:56.490Z",
     "platform": "claude",
     "level": "Starter"
-  }
+  },
+  "activeFeature": "auto-schema-cellspan",
+  "phase": "design"
 }

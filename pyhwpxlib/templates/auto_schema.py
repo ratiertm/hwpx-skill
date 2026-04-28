@@ -3,26 +3,27 @@
 Heuristic
 ---------
 1. For each table, extract every cell with its (row, col) and span.
-2. Classify each cell:
-   - **label**: short text, no placeholder pattern (e.g. ``성명``, ``프로젝트명``)
-   - **value-empty**: empty cell — needs to be filled
-   - **value-placeholder**: has a placeholder text (e.g. ``2026.xx.xx.``,
-     ``0회차 활동``, ``(예시)``) — needs to be replaced
-3. For each value cell, find the **adjacent label**:
-   - same row, smaller col (left neighbor) — most common
-   - same col, smaller row (above) — vertical layouts
-4. Build field key from label via :mod:`slugify`.
+2. Detect a *grid sub-region*: contiguous run of value-only rows (≥3) sharing
+   the same column set (size ≥2). That's where repeated participants live.
+3. For each value cell:
+   - **Label cells** (short text, no placeholder): skip.
+   - **Inside grid region**: combine row-group label (rs>1 cell to the left)
+     + per-column header → ``member_1_name``, ``member_2_dept`` etc.
+   - **Outside grid region**: find adjacent label (cellSpan-aware: a header
+     with colSpan=2 covers two columns, a row-label with rowSpan=4 covers
+     four rows).
+4. Build field key from label via :mod:`slugify`, disambiguating collisions.
 
 Output schema follows the format used by ``skill/templates/*.schema.json``.
 """
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from pyhwpxlib.templates.slugify import label_to_key
+from pyhwpxlib.templates.slugify import label_to_key, slugify
 
 
 _PLACEHOLDER_PATTERNS = [
@@ -34,6 +35,21 @@ _PLACEHOLDER_PATTERNS = [
     re.compile(r"^\s*-{2,}\s*$"),
     re.compile(r"^\s*\.{3,}\s*$"),
 ]
+
+
+@dataclass
+class GridRegion:
+    """A contiguous block of value-only rows sharing the same column set."""
+    start: int
+    end: int
+    cols: frozenset
+
+    @property
+    def length(self) -> int:
+        return self.end - self.start + 1
+
+    def contains(self, row: int, col: int) -> bool:
+        return self.start <= row <= self.end and col in self.cols
 
 
 def _is_placeholder(text: str) -> bool:
@@ -52,7 +68,6 @@ def _find_balanced_tables(xml: str):
         s = pos + m.start()
         depth = 1
         scan = s + len(m.group(0))
-        # walk to matching close
         scan = xml.find(">", scan) + 1
         while depth > 0:
             o = xml.find("<hp:tbl", scan)
@@ -120,53 +135,154 @@ def _is_label(text: str, max_len: int = 20) -> bool:
 def _find_label_for(
     value_cell: dict, cells: list[dict], *, prefer_header: bool = True
 ) -> Optional[str]:
-    """For a value cell, find the closest label.
+    """For a value cell, find the closest label (cellSpan-aware).
 
-    With ``prefer_header=True`` (default for repeated-row tables), a column
-    header in the topmost row(s) wins over a left-side row label. This makes
-    grid-style tables like
+    A header at ``(r, c)`` with ``colSpan=cs`` covers columns ``[c, c+cs)``,
+    so a value cell at any of those columns matches. Same for rowSpan with
+    a row-label.
 
-        |       | 성명 | 학과 | 학번 | 서명 |
-        | 참여자 |     |     |      |      |
-        | 참여자 |     |     |      |      |
-
-    correctly bind the empty cells to ``성명`` (header) instead of ``참여자``
-    (row group label), so collisions disambiguate as ``name``, ``name_2``,
-    ``name_3`` rather than ``field_2``, ``field_3``.
+    With ``prefer_header=True`` (used inside grid sub-regions), a column
+    header in a row above wins over a left-side row label.
     """
     row, col = value_cell["row"], value_cell["col"]
-    above_candidates = [
+    above = [
         c for c in cells
-        if c["col"] == col and c["row"] < row and _is_label(c["text"])
+        if c["row"] < row
+        and c["col"] <= col < c["col"] + c["cs"]
+        and _is_label(c["text"])
     ]
-    left_candidates = [
+    left = [
         c for c in cells
-        if c["row"] == row and c["col"] < col and _is_label(c["text"])
+        if c["col"] < col
+        and c["row"] <= row < c["row"] + c["rs"]
+        and _is_label(c["text"])
     ]
-    if prefer_header and above_candidates:
-        return max(above_candidates, key=lambda c: c["row"])["text"]
-    if left_candidates:
-        return max(left_candidates, key=lambda c: c["col"])["text"]
-    if above_candidates:
-        return max(above_candidates, key=lambda c: c["row"])["text"]
+    if prefer_header and above:
+        return max(above, key=lambda c: c["row"])["text"]
+    if left:
+        return max(left, key=lambda c: c["col"])["text"]
+    if above:
+        return max(above, key=lambda c: c["row"])["text"]
     return None
 
 
-def _detect_repeated_grid(cells: list[dict]) -> bool:
-    """Heuristic: table has ≥3 value-rows where each row has the same set of cols.
+def _find_row_group_label(value_cell: dict, cells: list[dict]) -> Optional[str]:
+    """Return the rowSpan>1 group label that covers this value cell, if any.
 
-    Triggers ``prefer_header=True`` for label resolution.
+    Looks for cells to the left whose rowSpan range includes ``value_cell.row``.
+    Used to detect "참 여 자" (rs=4) row group in repeated grids.
     """
-    by_row = {}
+    row, col = value_cell["row"], value_cell["col"]
+    candidates = [
+        c for c in cells
+        if c["col"] < col
+        and c["rs"] >= 2  # only true row-group cells, not single cells to the left
+        and c["row"] <= row < c["row"] + c["rs"]
+        and _is_label(c["text"])
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda c: c["col"])["text"]
+
+
+def _find_grid_subregion(cells: list[dict]) -> Optional[GridRegion]:
+    """Find the longest contiguous run of value-only rows with identical col set.
+
+    Conditions:
+      1. Run length >= 3 rows
+      2. All rows in the run consist solely of value cells (empty/placeholder)
+         on the same set of columns
+      3. Column set size >= 2
+
+    Returns the longest such region, or ``None``.
+    """
+    by_row: dict[int, set[int]] = {}
     for c in cells:
         if not c["text"] or _is_placeholder(c["text"]):
             by_row.setdefault(c["row"], set()).add(c["col"])
-    if len(by_row) < 3:
-        return False
-    col_sets = list(by_row.values())
-    # all value-rows share at least 3 common columns
-    common = set.intersection(*col_sets) if col_sets else set()
-    return len(common) >= 2
+    if not by_row:
+        return None
+
+    rows = sorted(by_row)
+    best: Optional[GridRegion] = None
+    i = 0
+    while i < len(rows):
+        cols_i = by_row[rows[i]]
+        if len(cols_i) < 2:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(rows) and rows[j + 1] == rows[j] + 1 and by_row[rows[j + 1]] == cols_i:
+            j += 1
+        run = j - i + 1
+        if run >= 3 and (best is None or run > best.length):
+            best = GridRegion(start=rows[i], end=rows[j], cols=frozenset(cols_i))
+        i = j + 1
+    return best
+
+
+def _build_field_in_grid(
+    cell: dict, cells: list, grid: GridRegion, used_keys: set, fallback_index: list
+) -> dict:
+    """Build a field for a value cell that lies inside a grid sub-region."""
+    col_header = _find_label_for(cell, cells, prefer_header=True)
+    row_group = _find_row_group_label(cell, cells)
+    row_idx = cell["row"] - grid.start + 1  # 1-based
+
+    if row_group and col_header:
+        group_part = slugify(row_group, fallback_index=fallback_index[0])
+        field_part = slugify(col_header, fallback_index=fallback_index[0])
+        candidate = f"{group_part}_{row_idx}_{field_part}"
+        # disambiguate against used_keys
+        key = candidate
+        n = 2
+        while key in used_keys:
+            key = f"{candidate}_{n}"
+            n += 1
+        used_keys.add(key)
+        label = f"{row_group} {row_idx} {col_header}".strip()
+    elif col_header:
+        fallback_index[0] += 1
+        key = label_to_key(
+            f"{col_header}_{row_idx}", used_keys, fallback_index=fallback_index[0]
+        )
+        label = col_header
+    else:
+        fallback_index[0] += 1
+        key = f"field_{cell['row']}_{cell['col']}"
+        used_keys.add(key)
+        label = ""
+
+    field = {
+        "key": key,
+        "cell": [cell["row"], cell["col"]],
+        "label": label,
+    }
+    if (cell["rs"], cell["cs"]) != (1, 1):
+        field["span"] = [cell["rs"], cell["cs"]]
+    if _is_placeholder(cell["text"]):
+        field["placeholder"] = cell["text"]
+    return field
+
+
+def _build_field_single(
+    cell: dict, cells: list, used_keys: set, fallback_index: list
+) -> dict:
+    """Build a field for a value cell outside any grid sub-region."""
+    label = _find_label_for(cell, cells, prefer_header=False)
+    label_for_key = label or cell["text"] or f"cell_{cell['row']}_{cell['col']}"
+    fallback_index[0] += 1
+    key = label_to_key(label_for_key, used_keys, fallback_index=fallback_index[0])
+    field = {
+        "key": key,
+        "cell": [cell["row"], cell["col"]],
+        "label": label or "",
+    }
+    if (cell["rs"], cell["cs"]) != (1, 1):
+        field["span"] = [cell["rs"], cell["cs"]]
+    if _is_placeholder(cell["text"]):
+        field["placeholder"] = cell["text"]
+    return field
 
 
 def generate_schema(
@@ -176,15 +292,7 @@ def generate_schema(
     title: Optional[str] = None,
     source: Optional[str] = None,
 ) -> dict:
-    """Generate a schema dict from a section XML string.
-
-    Parameters
-    ----------
-    section_xml : full ``Contents/section0.xml`` content
-    name : ASCII template name (e.g. ``"makers_project_report"``)
-    title : human-readable title (optional)
-    source : original file path (optional)
-    """
+    """Generate a schema dict from a section XML string."""
     used_keys: set[str] = set()
     fallback_index = [0]
     schema = {
@@ -204,28 +312,20 @@ def generate_schema(
             continue
         max_row = max(c["row"] for c in cells)
         max_col = max(c["col"] for c in cells)
-        fields = []
-        prefer_header = _detect_repeated_grid(cells)
 
+        grid = _find_grid_subregion(cells)
+        fields = []
         for cell in cells:
             text = cell["text"]
             is_empty = not text
             is_ph = _is_placeholder(text)
             if not (is_empty or is_ph):
-                continue  # this is a label, skip
-            label = _find_label_for(cell, cells, prefer_header=prefer_header)
-            label_for_key = label or text or f"cell_{cell['row']}_{cell['col']}"
-            fallback_index[0] += 1
-            key = label_to_key(label_for_key, used_keys, fallback_index=fallback_index[0])
-            field = {
-                "key": key,
-                "cell": [cell["row"], cell["col"]],
-                "label": label or "",
-            }
-            if (cell["rs"], cell["cs"]) != (1, 1):
-                field["span"] = [cell["rs"], cell["cs"]]
-            if is_ph:
-                field["placeholder"] = text
+                continue  # label cell
+
+            if grid is not None and grid.contains(cell["row"], cell["col"]):
+                field = _build_field_in_grid(cell, cells, grid, used_keys, fallback_index)
+            else:
+                field = _build_field_single(cell, cells, used_keys, fallback_index)
             fields.append(field)
 
         schema["tables"].append({

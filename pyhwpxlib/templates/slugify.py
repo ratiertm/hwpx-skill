@@ -51,6 +51,12 @@ _LABEL_MAP = {
     "용역": "service",
     "경력사항": "career", "학력": "education",
     "역할": "role", "담당": "responsibility",
+    # 행 그룹 라벨 (rs > 1 셀에서 등장하는 그룹 레이블)
+    "참여자": "member", "참 여 자": "member", "참여 자": "member",
+    "회원": "member", "위원": "committee", "직원": "staff",
+    "신청인": "applicant", "신청자": "applicant",
+    "학생": "student", "응시자": "applicant",
+    "지원자": "applicant",
 }
 
 

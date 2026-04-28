@@ -98,12 +98,18 @@ def test_auto_schema_yields_two_tables():
 
 @pytest.mark.skipif(not _has(MAKERS_SAMPLE), reason="makers fixture missing")
 def test_auto_schema_extracts_known_labels():
+    """Single fields keep bare slugs; participants get member_N_* via grid detection."""
     from pyhwpxlib.templates.auto_schema import generate_schema_from_hwpx
     schema = generate_schema_from_hwpx(MAKERS_SAMPLE, name="makers_auto")
     keys = {f["key"] for tbl in schema["tables"] for f in tbl["fields"]}
-    expected = {"team_name", "name", "dept", "student_id", "project_name",
-                "period", "report_date", "signature"}
-    assert expected <= keys, f"missing keys: {expected - keys}"
+    # Single-row labels (not part of repeating grid) keep bare slugs.
+    single_expected = {"team_name", "project_name", "period", "report_date"}
+    assert single_expected <= keys, f"missing single keys: {single_expected - keys}"
+    # Grid sub-region produces member_N_<col_header> for 4 participants × 4 fields.
+    grid_expected = {f"member_{n}_{f}"
+                     for n in (1, 2, 3, 4)
+                     for f in ("name", "dept", "student_id", "signature")}
+    assert grid_expected <= keys, f"missing grid keys: {grid_expected - keys}"
 
 
 # ─── add + fill (end-to-end with isolated XDG) ─────────────────────
