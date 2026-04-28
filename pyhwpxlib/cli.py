@@ -335,6 +335,15 @@ def _cmd_template(args: argparse.Namespace) -> None:
                 print(f"  {src} {it['name']:<25}  {it['hwpx_path']}")
         return
 
+    if action == "diagnose":
+        from pyhwpxlib.templates.diagnose import main as diagnose_main
+        diagnose_argv = [args.hwpx]
+        if getattr(args, "schema", None):
+            diagnose_argv += ["--schema", args.schema]
+        if as_json:
+            diagnose_argv.append("--json")
+        sys.exit(diagnose_main(diagnose_argv))
+
     print(f"Unknown template action: {action}", file=sys.stderr)
     sys.exit(2)
 
@@ -812,6 +821,16 @@ def main(argv: list[str] | None = None) -> None:
     tpl_show.add_argument("--json", action="store_true", help="JSON output")
     tpl_list = tpl_sub.add_parser("list", help="List all registered templates")
     tpl_list.add_argument("--json", action="store_true", help="JSON output")
+    tpl_diag = tpl_sub.add_parser(
+        "diagnose",
+        help="Diagnose auto_schema heuristics on a HWPX form (incl. optional overlap vs manual schema)",
+    )
+    tpl_diag.add_argument("hwpx", help="path to .hwpx form")
+    tpl_diag.add_argument(
+        "--schema",
+        help="optional path to a manually authored schema.json for overlap comparison",
+    )
+    tpl_diag.add_argument("--json", action="store_true", help="JSON output")
 
     # themes
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
