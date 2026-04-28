@@ -145,6 +145,12 @@ def test_add_hwp_then_fill_round_trip(tmp_path, monkeypatch):
     with zipfile.ZipFile(out) as z:
         xml = z.read("Contents/section0.xml").decode("utf-8")
     assert count_textpos_overflow(xml) == 0
+    # IMPORTANT: verify values actually land in the XML, not just in summary
+    # (regression guard — earlier the regex only matched paired <hp:t></hp:t>
+    # and silently skipped the self-closing <hp:t/> form on empty cells)
+    assert "Test Alpha" in xml, "team_name (empty cell) should be filled into XML"
+    assert "WebAR Guide" in xml, "project_name (empty cell) should be filled into XML"
+    assert "2026.03.01. ~ 2026.06.30." in xml, "period (placeholder cell) should be filled"
 
 
 @pytest.mark.skipif(not _has(MAKERS_SAMPLE), reason="makers HWPX missing")

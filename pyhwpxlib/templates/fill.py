@@ -89,8 +89,16 @@ def _find_cell(tbl_xml: str, target_row: int, target_col: int) -> tuple[int, int
 
 
 def _replace_first_paragraph_text(cell_xml: str, new_text: str) -> str:
-    """Replace the first paragraph's first hp:t with new_text, blank the rest of that paragraph."""
-    # match the first <hp:p ...>...</hp:p>
+    """Replace the first paragraph's first hp:t with new_text, blank the rest of that paragraph.
+
+    Handles three text-node forms found in HWPX:
+      - ``<hp:t>existing text</hp:t>`` — typical placeholder cell
+      - ``<hp:t/>`` — self-closing empty tag, used in pristine empty cells
+      - ``<hp:t></hp:t>`` — empty paired form
+    For the first match we replace its content with ``new_text``; for any
+    subsequent ``hp:t`` in the same paragraph we keep the open/close form but
+    empty the content (so cell text stays clean across runs).
+    """
     p_match = re.search(r"<hp:p[\s>].*?</hp:p>", cell_xml, re.DOTALL)
     if not p_match:
         return cell_xml
@@ -98,13 +106,27 @@ def _replace_first_paragraph_text(cell_xml: str, new_text: str) -> str:
     first = [False]
     new_text_escaped = _escape_xml(new_text)
 
+    # Combined pattern: matches either self-closing `<hp:t .../>` (group 1) or
+    # paired `<hp:t ...>content</hp:t>` (groups 2,3,4).
+    pattern = re.compile(
+        r"(<hp:t[^>]*?/>)"                       # group 1: self-closing
+        r"|"
+        r"(<hp:t[^>]*>)([^<]*)(</hp:t>)"         # 2/3/4: paired
+    )
+
     def t_repl(m):
+        if m.group(1):  # self-closing form
+            if not first[0]:
+                first[0] = True
+                return f"<hp:t>{new_text_escaped}</hp:t>"
+            return "<hp:t></hp:t>"
+        # paired form
         if not first[0]:
             first[0] = True
-            return f"{m.group(1)}{new_text_escaped}{m.group(3)}"
-        return f"{m.group(1)}{m.group(3)}"
+            return f"{m.group(2)}{new_text_escaped}{m.group(4)}"
+        return f"{m.group(2)}{m.group(4)}"
 
-    new_p = re.sub(r"(<hp:t[^>]*>)([^<]*)(</hp:t>)", t_repl, p)
+    new_p = pattern.sub(t_repl, p)
     return cell_xml[: p_match.start()] + new_p + cell_xml[p_match.end():]
 
 
