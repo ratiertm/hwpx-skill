@@ -29,9 +29,12 @@ def read_zip_archive(path: str) -> ZipArchive:
 def write_zip_archive(
     path: str,
     archive: ZipArchive,
-    strip_linesegs: "bool | str" = "precise",
-) -> None:
+    strip_linesegs: "bool | str" = False,
+) -> int:
     """Write a ZIP archive back using the original ZipInfo metadata/order.
+
+    Returns the count of lineseg structures fixed (0 when ``strip_linesegs``
+    is False/None — no fix attempted; otherwise the actual mutation count).
 
     The ``strip_linesegs`` argument controls Hancom's "외부 수정" security
     warning avoidance. The real trigger (verified 2026-04-27 via binary
@@ -45,24 +48,39 @@ def write_zip_archive(
 
     Modes:
 
-    * ``"precise"`` (default) — remove only the linesegs whose ``textpos``
-      overflows the paragraph's text. Keeps every other lineseg intact, so
-      external renderers (rhwp, custom previewers) keep their layout cache.
+    * ``False`` (default, **as of v0.14.0**) — no post-processing. The
+      archive is written byte-for-byte, preserving any non-standard lineseg
+      values. This is the rhwp-aligned default: pyhwpxlib does not silently
+      hide non-standard structures from external renderers / validators.
+      Callers that want the precise security-trigger fix must opt in via
+      ``strip_linesegs="precise"``.
+    * ``"precise"`` — remove only the linesegs whose ``textpos`` overflows
+      the paragraph's text. Keeps every other lineseg intact, so external
+      renderers (rhwp, custom previewers) keep their layout cache.
     * ``"remove"`` — remove every ``<hp:linesegarray>`` block. Safer fallback
       if a future Hancom version uses a wider trigger; lossless because
       Hancom/rhwp both re-flow on load, but external renderers must reflow.
     * ``True`` — alias for ``"precise"`` (back-compat with v0.13.0/0.13.1).
-    * ``False`` — no post-processing (round-trip a known-good document).
+
+    Migration note (v0.13.x → v0.14.0): if your code relied on the silent
+    precise fix to avoid Hancom's security warning, pass
+    ``strip_linesegs="precise"`` explicitly. See ``pyhwpxlib doctor`` for an
+    interactive way to detect and fix non-standard lineseg in existing files.
     """
     if strip_linesegs is True:
         strip_linesegs = "precise"
     files = archive.files
+    fixed_count = 0
     if strip_linesegs == "precise":
         from pyhwpxlib.postprocess import fix_textpos_overflow_in_section_xmls
-        files, _ = fix_textpos_overflow_in_section_xmls(files)
+        files, fix_total = fix_textpos_overflow_in_section_xmls(files)
+        fixed_count = fix_total
     elif strip_linesegs == "remove":
         from pyhwpxlib.postprocess import strip_linesegs_in_section_xmls
         files, _ = strip_linesegs_in_section_xmls(files, mode="remove")
+        # remove mode reports stripped block count, not individual fixes;
+        # report 0 here to keep the precise/remove return semantics distinct.
+        fixed_count = 0
     elif strip_linesegs is False or strip_linesegs is None:
         pass
     else:
@@ -72,6 +90,7 @@ def write_zip_archive(
     with zipfile.ZipFile(path, "w") as zf:
         for info in archive.infos:
             zf.writestr(info, files[info.filename])
+    return fixed_count
 
 
 def iter_section_entries(path: str) -> list[str]:

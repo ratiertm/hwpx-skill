@@ -21,8 +21,9 @@ def add(
     *,
     shared: bool = False,
     output_dir: Optional[Path] = None,
+    fix_linesegs: bool = False,
 ) -> dict:
-    """Convert + precise-fix + auto-schema + save under user (default) or shared dir.
+    """Convert + auto-schema + save under user (default) or shared dir.
 
     Parameters
     ----------
@@ -30,6 +31,10 @@ def add(
     name : ASCII template name. If None, derived from input filename via slugify.
     shared : if True, store in skill/templates/ (commit-intended). Default user dir.
     output_dir : explicit override (advanced).
+    fix_linesegs : when True, apply the precise textpos-overflow fix on save.
+        Default False per v0.14.0 rhwp-aligned policy — register the form
+        as-is, run ``pyhwpxlib doctor`` separately if it triggers Hancom's
+        security warning at fill time.
     """
     from pyhwpxlib.templates.resolver import (
         user_templates_dir,
@@ -71,9 +76,11 @@ def add(
     else:
         raise ValueError(f"unsupported input: {src.suffix} (need .hwp or .hwpx)")
 
-    # Read + precise-fix + write to final location
+    # Write to final location. v0.14.0: do not silent-fix unless caller
+    # explicitly requests it via fix_linesegs=True.
     archive = read_zip_archive(str(intermediate))
-    write_zip_archive(str(target_hwpx), archive)  # default 'precise'
+    strip_mode = "precise" if fix_linesegs else False
+    write_zip_archive(str(target_hwpx), archive, strip_linesegs=strip_mode)
 
     # Auto-schema
     schema = generate_schema_from_hwpx(target_hwpx, name=name)

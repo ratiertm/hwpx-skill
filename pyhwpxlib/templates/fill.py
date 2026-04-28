@@ -180,6 +180,7 @@ def fill_template_file(
     output_path: str | Path,
     *,
     schema_path: str | Path | None = None,
+    fix_linesegs: bool = False,
 ) -> dict:
     """Fill a registered template (or hwpx file) with data, write to output_path.
 
@@ -190,6 +191,10 @@ def fill_template_file(
     data : dict or path/str pointing to JSON file
     output_path : where to write the filled .hwpx
     schema_path : explicit schema path. If None, resolves alongside the template.
+    fix_linesegs : when True, apply the precise textpos-overflow fix on save
+        (Hancom security trigger workaround). Default False per v0.14.0
+        rhwp-aligned policy: caller must opt in to silent corrections so
+        external renderers / validators see the original structures.
     """
     from pyhwpxlib.templates.resolver import resolve_template_path
     from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
@@ -229,8 +234,10 @@ def fill_template_file(
     new_files["Contents/section0.xml"] = new_xml.encode("utf-8")
     from pyhwpxlib.package_ops import ZipArchive
     new_archive = ZipArchive(infos=archive.infos, files=new_files)
-    write_zip_archive(str(output_path), new_archive)  # default precise
+    strip_mode = "precise" if fix_linesegs else False
+    fixed_count = write_zip_archive(str(output_path), new_archive, strip_linesegs=strip_mode)
 
     summary["template"] = str(hwpx_path)
     summary["output"] = str(output_path)
+    summary["linesegs_fixed"] = fixed_count
     return summary

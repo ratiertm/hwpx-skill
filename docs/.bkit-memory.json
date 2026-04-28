@@ -5,6 +5,6 @@
     "platform": "claude",
     "level": "Starter"
   },
-  "activeFeature": "auto-schema-cellspan",
-  "phase": "design"
+  "activeFeature": "rhwp-strict-mode",
+  "phase": "plan"
 }

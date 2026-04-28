@@ -108,21 +108,44 @@ def test_helper_strips_only_section_files():
 
 
 @pytest.mark.skipif(not _has_fixture(), reason="fixture missing")
-def test_write_zip_archive_default_eliminates_textpos_overflow(tmp_path):
-    """write_zip_archive default ('precise') — textpos_overflow=0, R3는 그대로."""
+def test_write_zip_archive_default_preserves_input_v0_14(tmp_path):
+    """v0.14.0: default is strip_linesegs=False — non-standard input is preserved.
+
+    rhwp-aligned default: pyhwpxlib does not silently fix non-standard
+    structures so external renderers / validators see exactly what was
+    saved. Callers must opt in via strip_linesegs="precise".
+    """
     from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 
     out = tmp_path / "default.hwpx"
     archive = read_zip_archive(str(SAFE_FIXTURE))
-    write_zip_archive(str(out), archive)  # default 'precise'
+    fixed = write_zip_archive(str(out), archive)  # default False (no fix)
 
     new_xml = _read_section0(out)
-    # 정밀 fix: 한컴 트리거 (textpos overflow) 만 제거
+    # 원본의 비표준 lineseg 보존 (R3 / textpos overflow 모두 그대로)
+    assert count_r3_violations(new_xml) == 3  # 원본 그대로
+    assert "<hp:linesegarray" in new_xml
+    # 반환값: fix 없을 때 0
+    assert fixed == 0
+
+
+@pytest.mark.skipif(not _has_fixture(), reason="fixture missing")
+def test_write_zip_archive_explicit_precise_fixes_overflow(tmp_path):
+    """strip_linesegs="precise" (or True) — explicit opt-in keeps prior behavior."""
+    from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
+
+    out = tmp_path / "precise.hwpx"
+    archive = read_zip_archive(str(SAFE_FIXTURE))
+    fixed = write_zip_archive(str(out), archive, strip_linesegs="precise")
+
+    new_xml = _read_section0(out)
     assert count_textpos_overflow(new_xml) == 0
     # R3 (rhwp 렌더 휴리스틱) 은 그대로 유지 (precise 의도)
     assert count_r3_violations(new_xml) > 0
     # linesegarray 는 보존
     assert "<hp:linesegarray" in new_xml
+    # 반환값: 보정한 lineseg 개수가 보고됨
+    assert fixed > 0
 
 
 @pytest.mark.skipif(not _has_fixture(), reason="fixture missing")
@@ -141,8 +164,8 @@ def test_write_zip_archive_back_compat_true(tmp_path):
 
 
 @pytest.mark.skipif(not _has_fixture(), reason="fixture missing")
-def test_write_zip_archive_opt_out(tmp_path):
-    """write_zip_archive(strip_linesegs=False) — 옵트아웃 시 보존."""
+def test_write_zip_archive_explicit_false_same_as_default(tmp_path):
+    """strip_linesegs=False — 명시적 opt-out (v0.14.0 default와 동일)."""
     from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 
     out = tmp_path / "preserved.hwpx"
@@ -257,12 +280,12 @@ def test_jicheongun_precise_fix_eliminates_overflow(tmp_path):
 
 @pytest.mark.skipif(not _has_fixture(), reason="fixture missing")
 def test_write_zip_archive_precise_mode(tmp_path):
-    """write_zip_archive default mode 'precise' — overflow만 제거."""
+    """v0.14.0: precise mode is opt-in, default no-op preserves overflow."""
     from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 
     out = tmp_path / "precise.hwpx"
     archive = read_zip_archive(str(SAFE_FIXTURE))
-    write_zip_archive(str(out), archive)  # default precise
+    write_zip_archive(str(out), archive, strip_linesegs="precise")  # explicit
 
     new_xml = _read_section0(out)
     assert count_textpos_overflow(new_xml) == 0

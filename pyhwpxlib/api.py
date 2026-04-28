@@ -2078,6 +2078,8 @@ def fill_template(
     template_path: str,
     data: dict[str, str],
     output_path: str,
+    *,
+    fix_linesegs: bool = False,
 ) -> None:
     """Fill a template HWPX with data by replacing placeholder text.
 
@@ -2098,6 +2100,11 @@ def fill_template(
         are supported.
     output_path : str
         Path for the filled output .hwpx file.
+    fix_linesegs : bool, optional (default False)
+        v0.14.0: opt-in to apply the precise textpos-overflow fix on save
+        (Hancom security trigger workaround). The default preserves the
+        template's original lineseg structures so external renderers see
+        what was actually written.
     """
     import shutil
 
@@ -2123,7 +2130,7 @@ def fill_template(
         section_names,
         lambda _name, raw: replace_text_nodes(raw.decode("utf-8"), data).encode("utf-8"),
     )
-    write_zip_archive(output_path, archive)
+    write_zip_archive(output_path, archive, strip_linesegs=("precise" if fix_linesegs else False))
 
 
 def fill_template_checkbox(
@@ -2131,6 +2138,8 @@ def fill_template_checkbox(
     data: dict[str, str],
     checks: list[str] | None = None,
     output_path: str = "",
+    *,
+    fix_linesegs: bool = False,
 ) -> str:
     """Fill a template HWPX with data and checkbox marks.
 
@@ -2218,7 +2227,7 @@ def fill_template_checkbox(
 
         archive.files[sec_name] = text.encode("utf-8")
 
-    write_zip_archive(output_path, archive)
+    write_zip_archive(output_path, archive, strip_linesegs=("precise" if fix_linesegs else False))
 
     return output_path
 

@@ -31,6 +31,36 @@ def _emit(result: dict, as_json: bool = False) -> None:
         _render_human(result)
 
 
+def _warn_if_nonstandard(hwpx_path: str) -> None:
+    """v0.14.0: rhwp 노선 — 비표준 lineseg 가 그대로 보존되었음을 사용자에게 고지.
+
+    Saves silently checked output and emits a stderr warning when the file
+    contains structures that Hancom would reflow but external renderers
+    (rhwp) would render literally. Default behaviour is to NOT auto-fix —
+    callers must opt in via --fix / fix_linesegs=True.
+    """
+    if not hwpx_path or not os.path.exists(hwpx_path):
+        return
+    try:
+        import zipfile
+        from pyhwpxlib.postprocess import count_textpos_overflow
+        with zipfile.ZipFile(hwpx_path) as z:
+            section_names = [n for n in z.namelist()
+                             if n.startswith("Contents/section") and n.endswith(".xml")]
+            total = sum(count_textpos_overflow(z.read(n).decode("utf-8"))
+                        for n in section_names)
+        if total > 0:
+            print(
+                f"[pyhwpxlib] 비표준 lineseg {total}건 (textpos > UTF-16 text). "
+                f"한컴이 보안 경고를 띄울 수 있습니다. "
+                f"보정하려면 --fix 또는 `pyhwpxlib doctor {hwpx_path} --fix`.",
+                file=sys.stderr,
+            )
+    except Exception:
+        # never let advisory warnings break the main command
+        pass
+
+
 def _render_human(result: dict) -> None:
     """Default human-readable rendering of a result dict."""
     cmd = result.get('command', '')
@@ -41,10 +71,29 @@ def _render_human(result: dict) -> None:
         print(f"\n{'=' * 50}")
         print(f"HWPX Validation: {f}")
         print(f"{'=' * 50}")
-        print(f"Result: {'✅ VALID' if ok else '❌ INVALID'}")
-        for check in result.get('checks', []):
-            icon = '✅' if check['ok'] else '❌'
-            print(f"  {icon} {check['name']}: {check.get('detail', '')}")
+        mode = result.get('mode', 'compat')
+        if mode == 'both':
+            compat = result.get('compat') or {}
+            strict = result.get('strict') or {}
+            cok = compat.get('ok', True)
+            sok = strict.get('ok', True)
+            print(f"Compat (Hancom OK): {'✅ PASS' if cok else '❌ FAIL'}")
+            for c in compat.get('checks', []):
+                icon = '✅' if c['ok'] else '❌'
+                print(f"  {icon} {c['name']}: {c.get('detail', '')}")
+            print(f"\nStrict (OWPML spec): {'✅ PASS' if sok else '⚠️  ISSUES'}")
+            for c in strict.get('checks', []):
+                icon = '✅' if c['ok'] else '⚠️ '
+                print(f"  {icon} {c['name']}: {c.get('detail', '')}")
+            if cok and not sok:
+                print("\n[pyhwpxlib] 한컴은 받아들이지만 OWPML 명세 어긋남. 외부 렌더(rhwp 등)에서 깨질 수 있음.")
+                print("  보정: `pyhwpxlib doctor <file> --fix` 또는 명시적 --fix 플래그.")
+        else:
+            print(f"Mode: {mode}")
+            print(f"Result: {'✅ VALID' if ok else '❌ INVALID'}")
+            for check in result.get('checks', []):
+                icon = '✅' if check['ok'] else '❌'
+                print(f"  {icon} {check['name']}: {check.get('detail', '')}")
 
     elif cmd == 'lint':
         issues = result.get('issues', [])
@@ -264,7 +313,10 @@ def _cmd_template(args: argparse.Namespace) -> None:
 
     if action == "add":
         from pyhwpxlib.templates import add as tpl_add
-        info = tpl_add(args.input, name=args.name, shared=args.shared)
+        info = tpl_add(
+            args.input, name=args.name, shared=args.shared,
+            fix_linesegs=getattr(args, "fix", False),
+        )
         if as_json:
             _emit({"command": "template add", **info}, True)
         else:
@@ -273,6 +325,7 @@ def _cmd_template(args: argparse.Namespace) -> None:
             print(f"  schema: {info['schema_path']}")
             print(f"  fields: {info['fields']} across {info['tables']} table(s)")
             print(f"  title (kr): {info['title_kr']}")
+        _warn_if_nonstandard(info["hwpx_path"])
         return
 
     if action == "fill":
@@ -288,7 +341,10 @@ def _cmd_template(args: argparse.Namespace) -> None:
         else:
             import json as _json
             data = _json.loads(open(data_arg, "r", encoding="utf-8").read())
-        summary = tpl_fill(args.name, data, args.output)
+        summary = tpl_fill(
+            args.name, data, args.output,
+            fix_linesegs=getattr(args, "fix", False),
+        )
         if as_json:
             _emit({"command": "template fill", **summary}, True)
         else:
@@ -299,6 +355,11 @@ def _cmd_template(args: argparse.Namespace) -> None:
                       f"{summary['missing_in_data'][:5]}{'...' if len(summary['missing_in_data'])>5 else ''}")
             if summary["skipped"]:
                 print(f"  skipped: {len(summary['skipped'])} (cell not found etc.)")
+            fixed = summary.get("linesegs_fixed", 0)
+            if fixed > 0:
+                print(f"  [pyhwpxlib] 비표준 lineseg {fixed}건 보정됨 (precise)")
+        if not getattr(args, "fix", False):
+            _warn_if_nonstandard(summary.get("output", args.output))
         return
 
     if action == "show":
@@ -415,47 +476,196 @@ def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
     _emit(result, as_json)
 
 
-def _cmd_validate(args: argparse.Namespace) -> None:
+def _validate_compat(hwpx_path: str) -> dict:
+    """Compat mode: zip integrity, required files, XML parse.
+
+    This is the historical (≤ v0.13.x) behaviour — checks whether the file
+    is a structurally well-formed HWPX that Hancom would open. Does NOT
+    check OWPML spec conformance.
+    """
     import zipfile
     import xml.etree.ElementTree as ET
 
-    hwpx_path = args.input
-    as_json = getattr(args, 'json', False)
     required = ["mimetype", "Contents/header.xml", "Contents/section0.xml", "Contents/content.hpf"]
     checks = []
 
     if not zipfile.is_zipfile(hwpx_path):
-        result = {'command': 'validate', 'ok': False, 'file': hwpx_path,
-                  'checks': [{'name': 'zip_open', 'ok': False, 'detail': 'Not a valid ZIP file'}]}
-        _emit(result, as_json)
-        sys.exit(1)
+        return {"ok": False, "checks": [{"name": "zip_open", "ok": False,
+                                          "detail": "Not a valid ZIP file"}]}
 
     with zipfile.ZipFile(hwpx_path, "r") as z:
         names = z.namelist()
-        checks.append({'name': 'zip_open', 'ok': True, 'detail': f'{len(names)} files'})
-
+        checks.append({"name": "zip_open", "ok": True, "detail": f"{len(names)} files"})
         for req in required:
             present = req in names
-            checks.append({'name': f'file_{req.split("/")[-1]}', 'ok': present,
-                          'detail': 'present' if present else 'MISSING'})
-
+            checks.append({"name": f'file_{req.split("/")[-1]}', "ok": present,
+                          "detail": "present" if present else "MISSING"})
         if "mimetype" in names:
             mt = z.read("mimetype").decode("utf-8").strip()
-            checks.append({'name': 'mimetype_value', 'ok': True, 'detail': mt})
-
+            checks.append({"name": "mimetype_value", "ok": True, "detail": mt})
         for xml_file in ["Contents/header.xml", "Contents/section0.xml"]:
             if xml_file in names:
                 try:
                     content = z.read(xml_file).decode("utf-8")
                     ET.fromstring(content)
-                    checks.append({'name': f'xml_parse_{xml_file.split("/")[-1]}', 'ok': True,
-                                  'detail': f'{len(content):,} bytes'})
+                    checks.append({"name": f'xml_parse_{xml_file.split("/")[-1]}',
+                                   "ok": True, "detail": f"{len(content):,} bytes"})
                 except ET.ParseError as e:
-                    checks.append({'name': f'xml_parse_{xml_file.split("/")[-1]}', 'ok': False,
-                                  'detail': str(e)})
+                    checks.append({"name": f'xml_parse_{xml_file.split("/")[-1]}',
+                                   "ok": False, "detail": str(e)})
+    ok = all(c["ok"] for c in checks)
+    return {"ok": ok, "checks": checks}
 
-    ok = all(c['ok'] for c in checks)
-    result = {'command': 'validate', 'ok': ok, 'file': hwpx_path, 'checks': checks}
+
+def _validate_strict(hwpx_path: str) -> dict:
+    """Strict mode: OWPML spec conformance — may flag files Hancom accepts.
+
+    This is the rhwp-aligned check: does the file declare what the spec says
+    it should, with values consistent with the actual content? A failing
+    strict check does NOT mean Hancom rejects the file — it means external
+    renderers / validators may render incorrectly because Hancom silently
+    reflows on load.
+
+    Checks
+    ------
+    - lineseg ``textpos`` ≤ UTF-16 length of paragraph text
+    - paired ``<hp:t>...</hp:t>`` vs self-closing ``<hp:t/>`` — both legal
+      but reported as info for visibility
+    - core namespace declarations present (xmlns:hp, xmlns:hh)
+    - first paragraph ordering: secPr if present, otherwise non-empty content
+    """
+    import zipfile
+    import re
+    import xml.etree.ElementTree as ET
+    from pyhwpxlib.postprocess import count_textpos_overflow
+
+    checks = []
+    if not zipfile.is_zipfile(hwpx_path):
+        return {"ok": False, "checks": [{"name": "zip_open", "ok": False,
+                                          "detail": "Not a valid ZIP file"}]}
+
+    with zipfile.ZipFile(hwpx_path, "r") as z:
+        names = z.namelist()
+        section_names = sorted(n for n in names
+                               if n.startswith("Contents/section") and n.endswith(".xml"))
+
+        # Check 1: lineseg textpos consistency
+        total_overflow = 0
+        for n in section_names:
+            xml_str = z.read(n).decode("utf-8")
+            total_overflow += count_textpos_overflow(xml_str)
+        checks.append({
+            "name": "lineseg_textpos_consistency",
+            "ok": total_overflow == 0,
+            "detail": (f"{total_overflow} lineseg(s) with textpos > UTF-16 text length"
+                       if total_overflow else "all lineseg textpos within text bounds"),
+        })
+
+        # Check 2: hp:t form mix (info, not pass/fail)
+        sc_count = 0
+        paired_count = 0
+        for n in section_names:
+            xml_str = z.read(n).decode("utf-8")
+            sc_count += len(re.findall(r"<hp:t[^>]*?/>", xml_str))
+            paired_count += len(re.findall(r"<hp:t[^>]*>[^<]*</hp:t>", xml_str))
+        checks.append({
+            "name": "hp_t_form",
+            "ok": True,  # informational
+            "detail": f"paired={paired_count}, self_closing={sc_count}",
+        })
+
+        # Check 3: namespace declarations
+        if "Contents/section0.xml" in names:
+            try:
+                xml_str = z.read("Contents/section0.xml").decode("utf-8")
+                root = ET.fromstring(xml_str)
+                ns_attrs = {k: v for k, v in root.attrib.items() if k.startswith("xmlns")}
+                # ET strips xmlns: prefix to {namespace} form, so check via raw scan
+                has_hp = "xmlns:hp=" in xml_str or 'xmlns="http://www.hancom.co.kr/hwpml/2011/paragraph"' in xml_str
+                checks.append({
+                    "name": "namespace_hp",
+                    "ok": has_hp,
+                    "detail": "hp namespace declared" if has_hp else "missing xmlns:hp",
+                })
+            except ET.ParseError as e:
+                checks.append({"name": "namespace_hp", "ok": False, "detail": str(e)})
+
+        # Check 4: first paragraph ordering / empty para before content
+        if "Contents/section0.xml" in names:
+            xml_str = z.read("Contents/section0.xml").decode("utf-8")
+            try:
+                root = ET.fromstring(xml_str)
+                ns = {"hp": "http://www.hancom.co.kr/hwpml/2011/paragraph"}
+                paras = root.findall(".//hp:p", ns)
+                if paras:
+                    first = paras[0]
+                    has_secpr = first.find(".//hp:secPr", ns) is not None
+                    first_texts = [t.text for t in first.iter()
+                                    if t.tag.endswith("}t") and t.text and t.text.strip()]
+                    bad_empty_first = (not has_secpr) and (not first_texts) and len(paras) >= 2
+                    checks.append({
+                        "name": "first_paragraph_ordering",
+                        "ok": not bad_empty_first,
+                        "detail": ("empty first paragraph without secPr — may break rendering"
+                                   if bad_empty_first else "first paragraph valid"),
+                    })
+            except ET.ParseError:
+                pass
+
+    ok = all(c["ok"] for c in checks)
+    return {"ok": ok, "checks": checks}
+
+
+def _cmd_doctor(args: argparse.Namespace) -> None:
+    """Delegate to pyhwpxlib.doctor.main with the same argv."""
+    from pyhwpxlib.doctor import main as doctor_main
+    argv = [args.input]
+    if getattr(args, "fix", False):
+        argv.append("--fix")
+    if getattr(args, "output", None):
+        argv += ["-o", args.output]
+    if getattr(args, "inplace", False):
+        argv.append("--inplace")
+    if getattr(args, "mode", None):
+        argv += ["--mode", args.mode]
+    if getattr(args, "json", False):
+        argv.append("--json")
+    sys.exit(doctor_main(argv))
+
+
+def _cmd_validate(args: argparse.Namespace) -> None:
+    """Validate HWPX. v0.14.0: --mode {strict|compat|both} (default both)."""
+    hwpx_path = args.input
+    as_json = getattr(args, "json", False)
+    mode = getattr(args, "mode", "both")
+
+    compat_result = _validate_compat(hwpx_path) if mode in ("compat", "both") else None
+    strict_result = _validate_strict(hwpx_path) if mode in ("strict", "both") else None
+
+    if mode == "both":
+        # exit code follows compat (= file usable in Hancom);
+        # strict failures are advisory.
+        ok = bool(compat_result and compat_result["ok"])
+        result = {
+            "command": "validate",
+            "ok": ok,
+            "file": hwpx_path,
+            "mode": "both",
+            "compat": compat_result,
+            "strict": strict_result,
+            # Back-compat: surface compat checks at top level too so older
+            # consumers and the human renderer keep working.
+            "checks": compat_result["checks"] if compat_result else [],
+        }
+    elif mode == "compat":
+        result = {"command": "validate", "ok": compat_result["ok"], "file": hwpx_path,
+                  "mode": "compat", "checks": compat_result["checks"]}
+        ok = compat_result["ok"]
+    else:  # strict
+        result = {"command": "validate", "ok": strict_result["ok"], "file": hwpx_path,
+                  "mode": "strict", "checks": strict_result["checks"]}
+        ok = strict_result["ok"]
+
     _emit(result, as_json)
     sys.exit(0 if ok else 1)
 
@@ -771,9 +981,32 @@ def main(argv: list[str] | None = None) -> None:
     p_pack.add_argument("-o", "--output", required=True, help="Output .hwpx file")
 
     # validate
-    p_val = sub.add_parser("validate", help="Validate HWPX file structure")
+    p_val = sub.add_parser(
+        "validate",
+        help="Validate HWPX. --mode strict (OWPML spec) / compat (Hancom-OK) / both (default)",
+    )
     p_val.add_argument("input", help="Input .hwpx file")
+    p_val.add_argument(
+        "--mode", choices=["strict", "compat", "both"], default="both",
+        help="strict = OWPML spec (rhwp-aligned), compat = Hancom acceptance, both = report side-by-side (default)",
+    )
     p_val.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # doctor (v0.14.0+)
+    p_doc = sub.add_parser(
+        "doctor",
+        help="Diagnose non-standard HWPX structures; --fix to repair (rhwp-aligned, opt-in)",
+    )
+    p_doc.add_argument("input", help="Input .hwpx file")
+    p_doc.add_argument("--fix", action="store_true",
+                       help="apply precise textpos-overflow fix (writes new file)")
+    p_doc.add_argument("-o", "--output",
+                       help="output path when --fix (default: <input>.fixed.hwpx)")
+    p_doc.add_argument("--inplace", action="store_true",
+                       help="overwrite the input file instead of writing a new one (only with --fix)")
+    p_doc.add_argument("--mode", choices=["precise", "remove"], default="precise",
+                       help="precise: remove only overflow linesegs (default). remove: strip every <hp:linesegarray>.")
+    p_doc.add_argument("--json", action="store_true", help="JSON output")
 
     # lint
     p_lint = sub.add_parser("lint", help="Check HWPX for rendering/compatibility risks")
@@ -810,11 +1043,17 @@ def main(argv: list[str] | None = None) -> None:
     tpl_add.add_argument("--name", help="ASCII template name (default: derived from filename)")
     tpl_add.add_argument("--shared", action="store_true",
                          help="Save into skill/templates/ (commit-intended) instead of user dir")
+    tpl_add.add_argument("--fix", action="store_true",
+                         help="Apply precise textpos-overflow fix (Hancom security trigger workaround). "
+                              "Default off in v0.14.0+ — register form as-is.")
     tpl_add.add_argument("--json", action="store_true", help="JSON output")
     tpl_fill = tpl_sub.add_parser("fill", help="Fill a registered template with data")
     tpl_fill.add_argument("name", help="template name (or path to .hwpx)")
     tpl_fill.add_argument("-d", "--data", required=True, help="JSON data file or 'key=value,key=value'")
     tpl_fill.add_argument("-o", "--output", required=True, help="output .hwpx path")
+    tpl_fill.add_argument("--fix", action="store_true",
+                          help="Apply precise textpos-overflow fix on save (Hancom security trigger workaround). "
+                               "Default off in v0.14.0+ — pyhwpxlib will warn but won't silently rewrite.")
     tpl_fill.add_argument("--json", action="store_true", help="JSON output")
     tpl_show = tpl_sub.add_parser("show", help="Show schema for a template")
     tpl_show.add_argument("name", help="template name")
@@ -861,6 +1100,7 @@ def main(argv: list[str] | None = None) -> None:
         "template": _cmd_template,
         "font-check": _cmd_font_check,
         "themes": _cmd_themes,
+        "doctor": _cmd_doctor,
     }
 
     handler = dispatch.get(args.command)

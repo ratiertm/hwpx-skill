@@ -601,6 +601,7 @@ def apply_overlay(
     output_path: str,
     *,
     image_replacements: Optional[dict[str, bytes]] = None,
+    fix_linesegs: bool = False,
 ) -> str:
     """수정된 overlay JSON을 원본 HWPX에 적용.
 
@@ -675,6 +676,6 @@ def apply_overlay(
     out = Path(output_path)
     if out.exists():
         out.unlink()
-    write_zip_archive(output_path, archive)
+    write_zip_archive(output_path, archive, strip_linesegs=("precise" if fix_linesegs else False))
 
     return output_path
