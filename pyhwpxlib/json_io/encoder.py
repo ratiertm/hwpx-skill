@@ -15,6 +15,7 @@ from typing import Optional
 from .schema import (
     HwpxJsonDocument, Section, Paragraph, Run, RunContent,
     Table, TableRow, TableCell, PageSettings, Preservation,
+    Image, Footnote, Equation, Shape, HeaderFooter, PageNumber,
 )
 
 _HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -41,6 +42,8 @@ def to_json(hwpx_path: str, section_idx: Optional[int] = None) -> dict:
     file_bytes = path.read_bytes()
     sha256 = hashlib.sha256(file_bytes).hexdigest()
 
+    top_level: dict = {"header": None, "footer": None, "page_number": None}
+
     with zipfile.ZipFile(hwpx_path) as z:
         # Find section files
         section_files = sorted(
@@ -54,7 +57,7 @@ def to_json(hwpx_path: str, section_idx: Optional[int] = None) -> dict:
             if section_idx is not None and si != section_idx:
                 continue
             sec_xml = z.read(sec_name).decode('utf-8')
-            sec = _parse_section(sec_xml)
+            sec = _parse_section(sec_xml, top_level=top_level)
             sections.append(sec)
 
     preservation = None
@@ -71,16 +74,49 @@ def to_json(hwpx_path: str, section_idx: Optional[int] = None) -> dict:
         source_sha256=sha256,
         sections=sections,
         preservation=preservation,
+        header=top_level["header"],
+        footer=top_level["footer"],
+        page_number=top_level["page_number"],
     )
     return doc.to_dict()
 
 
-def _parse_section(xml_str: str) -> Section:
-    """Parse section XML into Section dataclass."""
+def _parse_section(xml_str: str, *, top_level: dict | None = None) -> Section:
+    """Parse section XML into Section dataclass.
+
+    When ``top_level`` is provided (a mutable dict with keys ``header``,
+    ``footer``, ``page_number``), this function will detect the matching
+    section-level constructs (``<hp:header>``, ``<hp:footer>``,
+    ``<hp:autoNum>`` / ``<hp:pageNum>``) and populate the dict so the
+    caller can attach them to the top-level ``HwpxJsonDocument``. This
+    mirrors HwpxBuilder's deferred-actions pattern on the encode side.
+    """
     root = ET.fromstring(xml_str)
 
     # Page settings
     page = _parse_page_settings(root)
+
+    # Top-level rich elements (best-effort, first occurrence wins)
+    if top_level is not None:
+        if top_level.get("header") is None:
+            hdr = root.find(f'.//{_HP}header')
+            if hdr is not None:
+                txt = "".join(t.text or "" for t in hdr.findall(f'.//{_HP}t'))
+                if txt:
+                    top_level["header"] = HeaderFooter(text=txt)
+        if top_level.get("footer") is None:
+            ftr = root.find(f'.//{_HP}footer')
+            if ftr is not None:
+                txt = "".join(t.text or "" for t in ftr.findall(f'.//{_HP}t'))
+                if txt:
+                    top_level["footer"] = HeaderFooter(text=txt)
+        if top_level.get("page_number") is None:
+            pn = root.find(f'.//{_HP}autoNum')
+            if pn is None:
+                pn = root.find(f'.//{_HP}pageNum')
+            if pn is not None:
+                pos = pn.get("pos") or pn.get("position") or "BOTTOM_CENTER"
+                top_level["page_number"] = PageNumber(pos=pos)
 
     # Paragraphs + inline tables
     paragraphs = []
@@ -122,18 +158,21 @@ def _parse_paragraph(p_el) -> tuple[Paragraph, list[Table]]:
     for run_el in p_el.findall(f'{_HP}run'):
         char_shape_id = int(run_el.get('charPrIDRef', '0'))
 
-        # Check for inline table
-        tbl_el = run_el.find(f'{_HP}tbl')
-        if tbl_el is not None:
-            tbl = _parse_table(tbl_el)
-            tables.append(tbl)
-            runs.append(Run(
-                content=RunContent(type="table", table=len(tables) - 1),
-                char_shape_id=char_shape_id,
-            ))
+        # ── Rich-type detection (v0.15.0 best-effort, FR-09) ──
+        # Order matters: more specific elements first.
+        rich = _detect_rich_run(run_el)
+        if rich is not None:
+            if rich.type == "table":
+                # Resolve inline table — appended to the table list
+                tbl_el = run_el.find(f'{_HP}tbl')
+                if tbl_el is not None:
+                    tbl = _parse_table(tbl_el)
+                    tables.append(tbl)
+                    rich.table = len(tables) - 1
+            runs.append(Run(content=rich, char_shape_id=char_shape_id))
             continue
 
-        # Text content
+        # Text content (default)
         text_parts = []
         for t_el in run_el.findall(f'{_HP}t'):
             # Collect text including child elements (fwSpace, tab, etc.)
@@ -159,6 +198,84 @@ def _parse_paragraph(p_el) -> tuple[Paragraph, list[Table]]:
         ))
 
     return Paragraph(runs=runs, para_shape_id=para_shape_id, page_break=page_break), tables
+
+
+def _detect_rich_run(run_el) -> Optional[RunContent]:
+    """Detect a v0.15.0 rich RunContent by inspecting the run's children.
+
+    Returns ``None`` if no rich element found (caller falls through to
+    plain text extraction). Best-effort coverage matching FR-09:
+      - <hp:tbl>      → type="table" (caller resolves the index)
+      - <hp:pic>      → type="image" (Image with current-size dimensions)
+      - <hp:footNote> → type="footnote"
+      - <hp:equation> → type="equation"
+      - <hp:rect>     → type="shape_rect"
+      - <hp:line>     → type="shape_line"
+
+    Heading / list / highlight detection requires style-table lookup and
+    is intentionally deferred (see Plan FR-09 risk row).
+    """
+    # Inline table — caller resolves table index
+    if run_el.find(f'{_HP}tbl') is not None:
+        return RunContent(type="table")
+
+    # Image: <hp:pic>
+    pic = run_el.find(f'.//{_HP}pic')
+    if pic is not None:
+        cur = pic.find(f'{_HP}curSz')
+        width = int(cur.get('width')) if cur is not None and cur.get('width') else None
+        height = int(cur.get('height')) if cur is not None and cur.get('height') else None
+        href = pic.get('href') or ''
+        return RunContent(type="image",
+                          image=Image(image_path=href or None,
+                                       width=width, height=height))
+
+    # Footnote: <hp:footNote>
+    fn = run_el.find(f'.//{_HP}footNote')
+    if fn is not None:
+        txt = "".join(t.text or "" for t in fn.findall(f'.//{_HP}t'))
+        try:
+            number = int(fn.get('number') or 1)
+        except (TypeError, ValueError):
+            number = 1
+        return RunContent(type="footnote",
+                          footnote=Footnote(text=txt, number=number))
+
+    # Equation: <hp:equation>
+    eq = run_el.find(f'.//{_HP}equation')
+    if eq is not None:
+        # Equation script lives in <hp:script> child
+        script_el = eq.find(f'{_HP}script')
+        script = (script_el.text or '') if script_el is not None else ''
+        return RunContent(type="equation", equation=Equation(script=script))
+
+    # Rectangle: <hp:rect>
+    rect = run_el.find(f'.//{_HP}rect')
+    if rect is not None:
+        return RunContent(type="shape_rect",
+                          shape=_extract_shape_from(rect))
+
+    # Line: <hp:line>
+    line = run_el.find(f'.//{_HP}line')
+    if line is not None:
+        # Distinguish shape_line vs shape_draw_line — both render as a line.
+        # Default to shape_line; a future enhancement could detect
+        # explicit endpoint coordinates to emit shape_draw_line instead.
+        return RunContent(type="shape_line")
+
+    return None
+
+
+def _extract_shape_from(el) -> Shape:
+    """Pull width/height + offset coordinates from a shape element."""
+    cur = el.find(f'{_HP}curSz')
+    off = el.find(f'{_HP}offset')
+    width = int(cur.get('width')) if cur is not None and cur.get('width') else 14400
+    height = int(cur.get('height')) if cur is not None and cur.get('height') else 7200
+    x1 = int(off.get('x', 0)) if off is not None else 0
+    y1 = int(off.get('y', 0)) if off is not None else 0
+    return Shape(width=width, height=height, x1=x1, y1=y1,
+                 x2=x1 + width, y2=y1)
 
 
 def _parse_table(tbl_el) -> Table:

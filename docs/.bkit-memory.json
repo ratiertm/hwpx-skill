@@ -6,5 +6,7 @@
     "level": "Starter"
   },
   "activeFeature": "json-schema-expansion",
-  "phase": "design"
+  "phase": "act",
+  "matchRate": 100,
+  "iterationCount": 1
 }

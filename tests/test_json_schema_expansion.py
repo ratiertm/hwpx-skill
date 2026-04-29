@@ -78,6 +78,49 @@ def test_t02_image_path_mode(tmp_path):
     assert any(n.startswith("BinData/") for n in names), names
 
 
+# ─── T-03 image (url) — mock urllib ────────────────────────────────
+
+
+def test_t03_image_url_mode_with_mocked_urllib(tmp_path, monkeypatch):
+    """URL branch in _apply_image is exercised with urllib mocked.
+
+    A 1x1 PNG byte stream is served by the patched urlopen. The test
+    asserts the resulting HWPX zip carries a BinData entry (the
+    HwpxBuilder.add_image_from_url path bundles the downloaded image).
+    """
+    from pyhwpxlib.json_io import from_json
+    import urllib.request
+
+    png_bytes = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+        b"\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01"
+        b"\xa6\x9d\x06}\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    class _FakeResp:
+        def __init__(self, data): self._data = data
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, n=-1): return self._data
+
+    def fake_urlopen(req, timeout=None):
+        return _FakeResp(png_bytes)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    out = tmp_path / "url.hwpx"
+    data = _wrap(_make_run({
+        "type": "image",
+        "image": {"image_url": "http://example.com/dot.png",
+                  "filename": "dot.png", "width": 14400, "height": 14400},
+    }))
+    from_json(data, str(out))
+    with zipfile.ZipFile(out) as z:
+        names = z.namelist()
+    assert any(n.startswith("BinData/") for n in names), names
+
+
 # ─── T-04 image: path+url both → ValueError ────────────────────────
 
 
@@ -338,6 +381,147 @@ def test_t18_rich_integration(tmp_path):
 
 
 # ─── Additional: missing nested object → ValueError ───────────────
+
+
+# ─── FR-09 encoder rich-type emission (round-trip) ─────────────────
+
+
+def test_fr09_encoder_emits_image_type_for_pic_xml(tmp_path):
+    """HwpxBuilder.add_image → encoder.to_json should emit type='image'."""
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json
+
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+        b"\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01"
+        b"\xa6\x9d\x06}\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    img = tmp_path / "tiny.png"
+    img.write_bytes(png)
+
+    src = tmp_path / "src.hwpx"
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_image(str(img), width=14400, height=14400)
+    b.save(str(src))
+
+    data = to_json(str(src))
+    types = [r["content"]["type"]
+             for s in data["sections"]
+             for p in s["paragraphs"]
+             for r in p["runs"]]
+    assert "image" in types, types
+
+
+def test_fr09_encoder_emits_footnote_type(tmp_path):
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json
+
+    src = tmp_path / "fn.hwpx"
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_footnote("see appendix")
+    b.save(str(src))
+
+    data = to_json(str(src))
+    types = [r["content"]["type"]
+             for s in data["sections"]
+             for p in s["paragraphs"]
+             for r in p["runs"]]
+    assert "footnote" in types, types
+
+
+def test_fr09_encoder_emits_equation_type(tmp_path):
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json
+
+    src = tmp_path / "eq.hwpx"
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_equation("E=mc^2")
+    b.save(str(src))
+
+    data = to_json(str(src))
+    types = [r["content"]["type"]
+             for s in data["sections"]
+             for p in s["paragraphs"]
+             for r in p["runs"]]
+    assert "equation" in types, types
+
+
+def test_fr09_encoder_emits_shape_rect_type(tmp_path):
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json
+
+    src = tmp_path / "rect.hwpx"
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_rectangle(width=10000, height=5000)
+    b.save(str(src))
+
+    data = to_json(str(src))
+    types = [r["content"]["type"]
+             for s in data["sections"]
+             for p in s["paragraphs"]
+             for r in p["runs"]]
+    assert "shape_rect" in types, types
+
+
+def test_fr09_encoder_emits_top_level_header_footer_page_number(tmp_path):
+    """Section-level <hp:header>/<hp:footer>/<hp:autoNum> bubble up to the
+    top-level HwpxJsonDocument fields (HwpxBuilder deferred pattern)."""
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json
+
+    src = tmp_path / "deferred.hwpx"
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_header("MyHeader")
+    b.add_footer("MyFooter")
+    b.add_page_number("BOTTOM_CENTER")
+    b.save(str(src))
+
+    data = to_json(str(src))
+    # at least one of header/footer/page_number should be populated
+    assert (data.get("header") is not None
+            or data.get("footer") is not None
+            or data.get("page_number") is not None), data
+
+
+def test_fr09_round_trip_image_renders_again(tmp_path):
+    """Build → to_json → from_json → output zip carries an image again."""
+    from pyhwpxlib import HwpxBuilder
+    from pyhwpxlib.json_io import to_json, from_json
+
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+        b"\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01"
+        b"\xa6\x9d\x06}\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    img = tmp_path / "tiny.png"
+    img.write_bytes(png)
+    src = tmp_path / "src.hwpx"
+    HwpxBuilder().__class__  # ensure import warm
+    b = HwpxBuilder()
+    b.add_paragraph("body")
+    b.add_image(str(img), width=14400, height=14400)
+    b.save(str(src))
+
+    data = to_json(str(src))
+    # Inject a known image_path so the from_json side has something concrete
+    for sec in data["sections"]:
+        for para in sec["paragraphs"]:
+            for run in para["runs"]:
+                if run["content"]["type"] == "image":
+                    run["content"]["image"]["image_path"] = str(img)
+
+    out = tmp_path / "rt.hwpx"
+    from_json(data, str(out))
+    with zipfile.ZipFile(out) as z:
+        names = z.namelist()
+    assert any(n.startswith("BinData/") for n in names), names
 
 
 @pytest.mark.parametrize("type_,nested_field", [

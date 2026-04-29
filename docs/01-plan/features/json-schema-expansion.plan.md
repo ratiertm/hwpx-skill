@@ -187,14 +187,18 @@ class Equation:
 
 @dataclass
 class Shape:
-    kind: str                       # "rectangle" | "line" | "draw_line"
+    """Shape geometry. The kind (rectangle/line/draw_line) is encoded in
+    ``RunContent.type`` itself (``shape_rect`` / ``shape_line`` /
+    ``shape_draw_line``), not as a separate field on this dataclass.
+    See Design § 4.2 for the dispatch table."""
     width: int = 14400
     height: int = 7200
     x1: int = 0
     y1: int = 0
     x2: int = 42520
     y2: int = 0
-    color: str = "#000000"
+    line_color: str = "#000000"
+    line_width: int = 283
 
 @dataclass
 class PageNumber:

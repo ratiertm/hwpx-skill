@@ -226,6 +226,55 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 
 ---
 
+## 워크플로우 [7] JSON ↔ HWPX (v0.15.0+, 외부 LLM/MCP 친화)
+
+JSON 한 덩어리로 builder 19개 add_* 메서드 중 16개 도달 가능. heading,
+image, header/footer, lists, footnotes, equation, highlight, shapes,
+page_number 모두 표현. v0.14.0 paragraphs/tables-only JSON 도 그대로
+동작 (back-compat).
+
+```python
+from pyhwpxlib.json_io import from_json, to_json
+
+# JSON → HWPX
+data = {
+    "header": {"text": "기밀"}, "footer": {"text": "회사 X"},
+    "page_number": {"pos": "BOTTOM_CENTER"},
+    "sections": [{
+        "paragraphs": [
+            {"runs": [{"content": {
+                "type": "heading",
+                "heading": {"text": "1. 서론", "level": 1}}}]},
+            {"runs": [{"content": {"type": "text", "text": "본문..."}}]},
+            {"runs": [{"content": {
+                "type": "bullet_list",
+                "bullet_list": {"items": ["배경", "목적", "범위"]}}}]},
+            {"runs": [{"content": {
+                "type": "footnote",
+                "footnote": {"text": "참조", "number": 1}}}]},
+        ],
+        "tables": [], "page_settings": {}
+    }]
+}
+from_json(data, "out.hwpx")
+
+# HWPX → JSON (round-trip)
+parsed = to_json("out.hwpx")
+# parsed["sections"][0]["paragraphs"][...]["runs"][...]["content"]["type"] 에
+# image/footnote/equation/shape_rect 자동 식별 (heading/list/highlight 는
+# style-table 의존이라 0.15.0 에서는 best-effort 미지원)
+```
+
+**RunContent.type 13종**: text, table, heading, image, bullet_list,
+numbered_list, nested_bullet_list, nested_numbered_list, footnote,
+equation, highlight, shape_rect, shape_line, shape_draw_line.
+**Top-level 3종 (deferred)**: header, footer, page_number.
+**Unknown type → ValueError** (rhwp 노선: silent skip 금지).
+
+MCP `hwpx_from_json` 도 새 schema 자동 지원 (signature 무변경).
+
+---
+
 ## Quick Reference
 
 | Task | Approach |
@@ -236,13 +285,21 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 | 공문 규정 검증 | `validate_file("doc.hwpx")` (ERROR/WARNING/INFO) |
 | 텍스트 읽기 | `extract_text()` |
 | 편집 | `unpack → replace → pack` |
-| 양식 채우기 | `fill_template(data={"key": "val"})` — {{key}} 패턴 |
+| **JSON → HWPX (v0.15.0+)** | `from_json(data, "out.hwpx")` — 16/19 builder 메서드 도달 |
+| **HWPX → JSON** | `to_json("doc.hwpx")` — image/footnote/equation/shape 자동 식별 |
+| 양식 등록 (v0.13.3+) | `pyhwpxlib template add my_form.hwp --name my_form` |
+| 양식 채우기 (schema) | `pyhwpxlib template fill <name> -d data.json -o out.hwpx` |
+| 양식 자동 schema 진단 | `pyhwpxlib template diagnose <hwpx> --schema MANUAL.json` |
+| 양식 채우기 ({{key}}) | `fill_template(data={"key": "val"})` — {{key}} 패턴 |
 | 체크박스 | `fill_template_checkbox(checks=["동의함"])` |
 | 이미지 삽입 | `add_image(path, width=42520, height=비율)` |
 | 기존 문서에 이미지 | `insert_image_to_existing()` |
 | 이미지 교체 | overlay `new_data_b64` |
 | HWP→HWPX | `hwp2hwpx.convert()` |
-| 검증 | `pyhwpxlib validate` + `lint` + `font-check` |
+| **검증 (dual-mode, v0.14.0+)** | `pyhwpxlib validate --mode {strict\|compat\|both}` |
+| **비표준 진단/보정 (v0.14.0+)** | `pyhwpxlib doctor <file> [--fix]` |
+| Lint | `pyhwpxlib lint <file>` |
+| Font check | `pyhwpxlib font-check <file>` |
 | 테마 추출 | `extract_theme() → save_theme()` |
 | 테마 목록 | `pyhwpxlib themes list` |
 | 프리뷰 (SVG) | `RhwpEngine().load().render_page_svg()` |
@@ -295,11 +352,12 @@ doc.add_image("photo.png", width=width, height=height)
 | 5 | condense 보존 | JUSTIFY 벌어짐 방지 |
 | 6 | 헤딩/표/이미지 앞뒤 빈 줄 | 간격 없으면 붙음 |
 | 7 | 표는 필요할 때만 | 억지 삽입 금지 |
-| 8 | hwpx 편집 후 `<hp:linesegarray>` strip | 한컴 보안경고 회피 (자동) |
+| 8 | hwpx 편집 후 lineseg 정합성 검증 | 한컴 보안경고 회피 (v0.14.0+ opt-in) |
+| 9 | 우리도 비표준 새로 생산 안 함 | rhwp 노선: 감지+고지+동의 후 보정 |
 
 > 상세 API, 프리셋, 표 파라미터, 편집 세부사항 → [references/](references/) 참조
 
-### 한컴 보안경고 자동 회피 (Rule 8 상세)
+### 한컴 보안경고 + rhwp 노선 (Rule 8/9 상세)
 
 **진짜 트리거 (확정 2026-04-27)**: section*.xml 안에서 다음 조건이 단 한 번이라도
 나타나면 한컴이 "문서 보안 설정을 낮춤" 경고를 띄운다:
@@ -310,42 +368,50 @@ doc.add_image("photo.png", width=width, height=height)
 
 (외부 도구가 텍스트를 짧게 바꿨는데 lineseg 캐시는 그대로 → 한컴이 외부 수정으로 판정)
 
-**원칙**: hwpx 저장은 항상 `write_zip_archive`를 거친다. 직접 `zipfile.ZipFile()`로 쓰면
-정밀 fix 가 누락되어 트리거 위험.
+**v0.14.0 정책 변경 (rhwp 노선)**: 한컴 자체가 silent reflow 로 비표준 lineseg
+를 덮어 후발주자에게 비용 전가하는 구조에 동조하지 않음. `write_zip_archive` 의
+silent precise fix 를 **opt-in 으로 전환**. 사용자가 명시 동의(`--fix` / `strip_linesegs="precise"`)할 때만 보정.
 
 ```python
-# ✅ 권장 — 자동 정밀 fix (default 'precise')
+# v0.14.0+ default — 비표준 lineseg 그대로 보존
 from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 arch = read_zip_archive(input_path)
-write_zip_archive(output_path, arch)
-# precise 모드 = lineseg.textpos > text_len 인 lineseg 만 제거
+n_fixed = write_zip_archive(output_path, arch)
+# n_fixed == 0 (보정 안 함). 비표준이면 한컴 보안경고 발생 가능 → CLI는 stderr 경고
+
+# 명시 보정 (이전 0.13.x default 동작)
+n_fixed = write_zip_archive(output_path, arch, strip_linesegs="precise")
+# precise = lineseg.textpos > text_len 인 lineseg 만 제거
 # 다른 lineseg 는 모두 보존 → rhwp 등 외부 렌더러 캐시 유지
 
-# 🔨 강한 망치 — linesegarray 통째 제거 (옛 default)
+# 강한 망치 — linesegarray 통째 제거
 write_zip_archive(output_path, arch, strip_linesegs="remove")
-
-# ⚠️ 직접 zipfile.ZipFile() 사용 시 — 마지막에 후처리 필수
-import zipfile
-with zipfile.ZipFile(output_path, 'w') as zf:
-    for n, info in infos.items():
-        zf.writestr(info, files[n])
-import subprocess
-subprocess.run(['python3', '-m', 'pyhwpxlib', 'reflow-linesegs', output_path])
 ```
 
-**저장 후 검증** (필수 체크리스트):
+**검증 + 진단 + 보정 워크플로 (v0.14.0+)**:
 ```bash
-pyhwpxlib lint <output.hwpx>
-#   TEXTPOS_OVERFLOW (error)         → 한컴 보안경고 발생, 즉시 fix 필수
-#   RHWP_R3_RENDER_RISK (warning)    → 한컴은 OK, rhwp 등 외부 렌더러만 영향
-pyhwpxlib reflow-linesegs <file>            # default --mode precise
-pyhwpxlib reflow-linesegs <file> --mode remove   # 강한 망치
+# 1. 검증 (spec/compat 두 계층 분리)
+pyhwpxlib validate <file>                     # default --mode both
+pyhwpxlib validate <file> --mode strict       # OWPML 명세 엄격 (rhwp 정렬)
+pyhwpxlib validate <file> --mode compat       # 한컴 받아들이는 범위
+
+# 2. 진단 (감지만, 자동 fix 안 함)
+pyhwpxlib doctor <file>                       # 비표준 항목 보고
+
+# 3. 보정 (사용자 명시 동의 후)
+pyhwpxlib doctor <file> --fix                 # → <file>.fixed.hwpx
+pyhwpxlib doctor <file> --fix --inplace       # 같은 파일에 덮어쓰기
+pyhwpxlib doctor <file> --fix -o out.hwpx     # 명시 출력 경로
+
+# CLI 명령에 직접 --fix 플래그도 사용 가능
+pyhwpxlib template fill <name> -d data.json -o out.hwpx --fix
+pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 ```
 
-**옵트아웃** (디버깅/원본 보존):
-```python
-write_zip_archive(path, archive, strip_linesegs=False)
-```
+**우리 자신의 원칙** (Rule 9):
+- HwpxBuilder 가 만드는 새 문서는 항상 정확한 lineseg 출력
+- 외부 입력의 비표준 구조는 lint/doctor 로 **감지+고지** 하되 자동 보정 안 함
+- 잘못된 입력 (unknown JSON type 등) 은 silent skip 금지 — 명시 ValueError
 
 ---
 
@@ -361,3 +427,14 @@ write_zip_archive(path, archive, strip_linesegs=False)
 | [templates/README.md](templates/README.md) | 번들 양식 모음 (전정Makers 결과보고서 등) + schema |
 | [references/gongmun.md](references/gongmun.md) | 공문 생성 (편람 준수) — 일반/간이/일괄/공동기안 + validator |
 | [references/HWPX_RULEBOOK.md](references/HWPX_RULEBOOK.md) | Critical Rules 전체 + 상세 설명 |
+
+## Versions
+
+| Version | Highlights |
+|---------|------------|
+| **0.15.0** | JSON 경로 16/19 builder 메서드 도달 (옵션 A) — heading/image/list/footnote/equation/shape/header/footer/page_number, encoder rich-type emission |
+| **0.14.0** | rhwp 노선 채택 — silent fix opt-in, `pyhwpxlib doctor`, `validate --mode strict\|compat\|both` |
+| 0.13.4 | auto_schema cellSpan-aware grid + row-group label, `template diagnose` |
+| 0.13.3 | template workflow (옵션 B) — add/fill/show/list/diagnose, XDG 계층 |
+| 0.13.2 | precise textpos-overflow fix |
+| 0.13.0 | 한국 공문서 표준 — 폰트/크기/여백/줄간격 |
