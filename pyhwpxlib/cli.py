@@ -344,6 +344,7 @@ def _cmd_template(args: argparse.Namespace) -> None:
         summary = tpl_fill(
             args.name, data, args.output,
             fix_linesegs=getattr(args, "fix", False),
+            log_history=not getattr(args, "no_history", False),
         )
         if as_json:
             _emit({"command": "template fill", **summary}, True)
@@ -358,6 +359,10 @@ def _cmd_template(args: argparse.Namespace) -> None:
             fixed = summary.get("linesegs_fixed", 0)
             if fixed > 0:
                 print(f"  [pyhwpxlib] 비표준 lineseg {fixed}건 보정됨 (precise)")
+            hist = summary.get("history")
+            if hist:
+                print(f"  [history] 누적 {hist['usage_count']}회 사용 "
+                      f"(최근 {hist['history_count']}건 보존)")
         if not getattr(args, "fix", False):
             _warn_if_nonstandard(summary.get("output", args.output))
         return
@@ -405,8 +410,153 @@ def _cmd_template(args: argparse.Namespace) -> None:
             diagnose_argv.append("--json")
         sys.exit(diagnose_main(diagnose_argv))
 
+    if action == "context":
+        from pyhwpxlib.templates.context import load_context
+        ctx = load_context(args.name)
+        if as_json:
+            _emit(ctx.to_dict(), True)
+        else:
+            print(ctx.to_markdown())
+        return
+
+    if action == "annotate":
+        from pyhwpxlib.templates.context import annotate as tpl_annot
+        result = tpl_annot(
+            args.name,
+            description=getattr(args, "description", None),
+            page_standard=getattr(args, "page_standard", None),
+            structure_type=getattr(args, "structure_type", None),
+            notes=getattr(args, "notes", None),
+            add_decision=getattr(args, "add_decision", None),
+        )
+        if as_json:
+            _emit({"command": "template annotate",
+                   "name": args.name, **result}, True)
+        else:
+            if result["meta_updated"]:
+                print(f"Updated _meta: {', '.join(result['meta_updated'])}")
+            if result["decision_added"]:
+                print(f"Decision appended to decisions.md (today's block)")
+            if not result["meta_updated"] and not result["decision_added"]:
+                print("(nothing changed — pass --description / --decision / etc.)")
+        return
+
+    if action == "log-fill":
+        from pyhwpxlib.templates.context import log_fill
+        data_arg = args.data
+        if "=" in data_arg and not os.path.exists(data_arg):
+            data = {}
+            for pair in data_arg.split(","):
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    data[k.strip()] = v.strip()
+        else:
+            import json as _json
+            data = _json.loads(open(data_arg, "r", encoding="utf-8").read())
+        info = log_fill(args.name, data,
+                        output_path=getattr(args, "output_path", None))
+        if as_json:
+            _emit({"command": "template log-fill",
+                   "name": args.name, **info}, True)
+        else:
+            print(f"history: 누적 {info['usage_count']}회 "
+                  f"(최근 {info['history_count']}건 보존)")
+        return
+
+    if action == "open":
+        from pyhwpxlib.templates.context import open_workspace
+        rc = open_workspace(args.name)
+        if as_json:
+            _emit({"command": "template open",
+                   "name": args.name, "returncode": rc}, True)
+        else:
+            if rc == 0:
+                print(f"Opened workspace: {args.name}")
+            else:
+                print(f"Failed to open workspace: {args.name}",
+                      file=sys.stderr)
+                sys.exit(1)
+        return
+
+    if action == "migrate":
+        from pyhwpxlib.templates.migration import (
+            plan_migration, execute_migration,
+        )
+        from pathlib import Path as _Path
+        root = _Path(args.root) if getattr(args, "root", None) else None
+        plan = plan_migration(root)
+
+        if getattr(args, "dry_run", False):
+            if as_json:
+                _emit({
+                    "command": "template migrate (dry-run)",
+                    "flat_files": [str(p) for p in plan.flat_files],
+                    "targets": [str(p) for p in plan.target_workspaces],
+                    "conflicts": plan.conflicts,
+                    "backup_path": str(plan.backup_path),
+                }, True)
+            else:
+                print(plan.report())
+                if not plan.flat_files:
+                    print("\n(마이그레이션 대상 없음 — 이미 v0.17.0 구조)")
+            return
+
+        if not plan.flat_files:
+            if as_json:
+                _emit({"command": "template migrate",
+                       "migrated": 0, "skipped": 0,
+                       "message": "no legacy flat files"}, True)
+            else:
+                print("(마이그레이션 대상 없음 — 이미 v0.17.0 구조)")
+            return
+
+        result = execute_migration(
+            plan,
+            backup=not getattr(args, "no_backup", False),
+            overwrite=getattr(args, "overwrite", False),
+        )
+        if as_json:
+            _emit({"command": "template migrate", **result}, True)
+        else:
+            print(f"Migrated: {result['migrated']}, Skipped: {result['skipped']}")
+            if result.get("backup"):
+                print(f"  Backup: {result['backup']}")
+            if result.get("errors"):
+                print(f"  Errors: {len(result['errors'])}")
+                for err in result["errors"][:5]:
+                    print(f"    - {err}")
+        return
+
     print(f"Unknown template action: {action}", file=sys.stderr)
     sys.exit(2)
+
+
+def _cmd_install_hook(args: argparse.Namespace) -> None:
+    """Install Claude Code SessionStart hook script + show settings snippet."""
+    from pathlib import Path as _Path
+    from pyhwpxlib.templates.workspace import (
+        install_session_hook, hook_settings_snippet,
+    )
+
+    target = _Path(args.target).expanduser() if getattr(args, "target", None) \
+        else None
+    script_path = install_session_hook(target)
+    snippet = hook_settings_snippet(script_path)
+
+    as_json = getattr(args, "json", False)
+    if as_json:
+        _emit({
+            "command": "install-hook",
+            "script_path": str(script_path),
+            "settings_snippet": snippet,
+        }, True)
+    else:
+        print(f"Installed SessionStart hook: {script_path}")
+        print()
+        print("Add to ~/.claude/settings.json (merge with existing hooks):")
+        print(json.dumps(snippet, ensure_ascii=False, indent=2))
+        print()
+        print("이후 새 채팅 시작 시 등록된 양식 목록이 컨텍스트에 자동 주입됩니다.")
 
 
 def _cmd_reflow_linesegs(args: argparse.Namespace) -> None:
@@ -1075,7 +1225,10 @@ def main(argv: list[str] | None = None) -> None:
     tpl_fill = tpl_sub.add_parser("fill", help="Fill a registered template with data")
     tpl_fill.add_argument("name", help="template name (or path to .hwpx)")
     tpl_fill.add_argument("-d", "--data", required=True, help="JSON data file or 'key=value,key=value'")
-    tpl_fill.add_argument("-o", "--output", required=True, help="output .hwpx path")
+    tpl_fill.add_argument("-o", "--output", default=None,
+                          help="output .hwpx path. v0.17.0+: omit for workspace-templates → auto outputs/YYYY-MM-DD_<key>.hwpx")
+    tpl_fill.add_argument("--no-history", action="store_true",
+                          help="skip history.json + usage_count update (workspace templates)")
     tpl_fill.add_argument("--fix", action="store_true",
                           help="Apply precise textpos-overflow fix on save (Hancom security trigger workaround). "
                                "Default off in v0.14.0+ — pyhwpxlib will warn but won't silently rewrite.")
@@ -1095,6 +1248,64 @@ def main(argv: list[str] | None = None) -> None:
         help="optional path to a manually authored schema.json for overlap comparison",
     )
     tpl_diag.add_argument("--json", action="store_true", help="JSON output")
+
+    # v0.17.0+ workspace commands
+    tpl_ctx = tpl_sub.add_parser(
+        "context",
+        help="(v0.17.0+) Print workspace context for LLM injection (markdown or --json)",
+    )
+    tpl_ctx.add_argument("name", help="template name")
+    tpl_ctx.add_argument("--json", action="store_true", help="JSON output")
+
+    tpl_annot = tpl_sub.add_parser(
+        "annotate",
+        help="(v0.17.0+) Update _meta + append decision to decisions.md",
+    )
+    tpl_annot.add_argument("name", help="template name")
+    tpl_annot.add_argument("--description", help="set _meta.description")
+    tpl_annot.add_argument("--page-standard", choices=["1page", "free"],
+                           dest="page_standard",
+                           help="set _meta.page_standard")
+    tpl_annot.add_argument("--structure", choices=["A", "B", "unknown"],
+                           dest="structure_type",
+                           help="set _meta.structure_type")
+    tpl_annot.add_argument("--notes", help="set _meta.notes")
+    tpl_annot.add_argument(
+        "--decision",
+        dest="add_decision",
+        help="append decision line to decisions.md (today's block)",
+    )
+    tpl_annot.add_argument("--json", action="store_true", help="JSON output")
+
+    tpl_log = tpl_sub.add_parser(
+        "log-fill",
+        help="(v0.17.0+) Manually log a fill entry into history.json",
+    )
+    tpl_log.add_argument("name", help="template name")
+    tpl_log.add_argument("-d", "--data", required=True,
+                         help="JSON file or 'k=v,k=v'")
+    tpl_log.add_argument("--output-path", help="optional output_path entry")
+    tpl_log.add_argument("--json", action="store_true", help="JSON output")
+
+    tpl_open = tpl_sub.add_parser(
+        "open",
+        help="(v0.17.0+) Open workspace folder in OS file manager",
+    )
+    tpl_open.add_argument("name", help="template name")
+    tpl_open.add_argument("--json", action="store_true", help="JSON output")
+
+    tpl_mig = tpl_sub.add_parser(
+        "migrate",
+        help="(v0.17.0+) Migrate v0.13.3 flat templates → v0.17.0 workspace folders",
+    )
+    tpl_mig.add_argument("--dry-run", action="store_true",
+                         help="Preview migration plan without writing")
+    tpl_mig.add_argument("--no-backup", action="store_true",
+                         help="Skip the safety tar.gz backup (NOT recommended)")
+    tpl_mig.add_argument("--overwrite", action="store_true",
+                         help="Overwrite existing workspace folders if conflict")
+    tpl_mig.add_argument("--root", help="custom templates root (default: XDG)")
+    tpl_mig.add_argument("--json", action="store_true", help="JSON output")
 
     # themes
     # page-guard (v0.16.0+) — 레퍼런스/결과 페이지 카운트 강제 게이트
@@ -1121,6 +1332,17 @@ def main(argv: list[str] | None = None) -> None:
     p_an.add_argument("--depth", type=int, choices=[1, 2, 3], default=2,
                       help="분석 깊이 (default 2)")
     p_an.add_argument("--json", action="store_true", help="JSON 출력")
+
+    # v0.17.0+ — Claude Code SessionStart hook 설치
+    p_hook = sub.add_parser(
+        "install-hook",
+        help="(v0.17.0+) Install Claude Code SessionStart hook for auto template context injection",
+    )
+    p_hook.add_argument(
+        "--target",
+        help="custom hook dir (default: ~/.claude/hooks)",
+    )
+    p_hook.add_argument("--json", action="store_true", help="JSON output")
 
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
     p_th.add_argument("action", choices=["list", "extract", "delete"],
@@ -1153,6 +1375,7 @@ def main(argv: list[str] | None = None) -> None:
         "doctor": _cmd_doctor,
         "page-guard": _cmd_page_guard,
         "analyze": _cmd_analyze,
+        "install-hook": _cmd_install_hook,
     }
 
     handler = dispatch.get(args.command)

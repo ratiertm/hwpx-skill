@@ -177,10 +177,11 @@ def fill_section(section_xml: str, schema: dict, data: dict[str, Any]) -> tuple[
 def fill_template_file(
     template_name_or_path: str,
     data: dict[str, Any] | str | Path,
-    output_path: str | Path,
+    output_path: str | Path | None = None,
     *,
     schema_path: str | Path | None = None,
     fix_linesegs: bool = False,
+    log_history: bool = True,
 ) -> dict:
     """Fill a registered template (or hwpx file) with data, write to output_path.
 
@@ -189,31 +190,65 @@ def fill_template_file(
     template_name_or_path : registered template name (resolved via XDG/skill dir)
         or direct path to a .hwpx file.
     data : dict or path/str pointing to JSON file
-    output_path : where to write the filled .hwpx
+    output_path : where to write the filled .hwpx. **None** (v0.17.0+) →
+        if template is a workspace, auto-generate
+        ``<workspace>/outputs/YYYY-MM-DD_<key>.hwpx``. Required for raw-path mode.
     schema_path : explicit schema path. If None, resolves alongside the template.
     fix_linesegs : when True, apply the precise textpos-overflow fix on save
         (Hancom security trigger workaround). Default False per v0.14.0
         rhwp-aligned policy: caller must opt in to silent corrections so
         external renderers / validators see the original structures.
+    log_history : v0.17.0+. workspace template 일 때 history.json 갱신 +
+        usage_count 증가. raw path 호출에는 영향 없음.
     """
-    from pyhwpxlib.templates.resolver import resolve_template_path
+    from pyhwpxlib.templates.resolver import (
+        resolve_template_path,
+        resolve_template_file,
+        user_workspaces_dir,
+    )
+    from pyhwpxlib.templates.workspace import (
+        auto_output_path,
+        is_workspace_template,
+    )
     from pyhwpxlib.package_ops import read_zip_archive, write_zip_archive
 
-    # resolve template
+    # 1) resolve template + workspace name
     p = Path(template_name_or_path)
+    workspace_name: str | None = None
     if p.exists() and p.suffix == ".hwpx":
         hwpx_path = p
         if schema_path is None:
-            cand = p.with_suffix(".schema.json")
-            schema_path = cand if cand.exists() else None
+            # workspace 구조면 ``schema.json`` 우선, 아니면 legacy ``<stem>.schema.json``
+            ws_schema = p.parent / "schema.json"
+            cand_legacy = p.with_suffix(".schema.json")
+            if ws_schema.exists() and p.name == "source.hwpx":
+                schema_path = ws_schema
+                # workspace name = parent dir name (under user_workspaces_dir)
+                try:
+                    if p.parent.parent.resolve() == user_workspaces_dir().resolve():
+                        workspace_name = p.parent.name
+                except OSError:
+                    pass
+            elif cand_legacy.exists():
+                schema_path = cand_legacy
     else:
-        hwpx_path = resolve_template_path(template_name_or_path, suffix=".hwpx")
-        if hwpx_path is None:
-            raise FileNotFoundError(f"template not found: {template_name_or_path}")
-        if schema_path is None:
-            schema_path = resolve_template_path(
-                template_name_or_path, suffix=".schema.json"
-            )
+        # registered name → workspace 우선, skill flat 폴백
+        if is_workspace_template(template_name_or_path):
+            workspace_name = template_name_or_path
+            hwpx_path = resolve_template_file(template_name_or_path, "source")
+            if schema_path is None:
+                schema_path = resolve_template_file(
+                    template_name_or_path, "schema")
+        else:
+            hwpx_path = resolve_template_path(
+                template_name_or_path, suffix=".hwpx")
+            if hwpx_path is None:
+                raise FileNotFoundError(
+                    f"template not found: {template_name_or_path}")
+            if schema_path is None:
+                schema_path = resolve_template_path(
+                    template_name_or_path, suffix=".schema.json"
+                )
 
     if schema_path is None or not Path(schema_path).exists():
         raise FileNotFoundError(
@@ -227,6 +262,17 @@ def fill_template_file(
     if not isinstance(data, dict):
         raise TypeError("data must be a dict or a path to a JSON file")
 
+    # 2) auto output path (workspace 일 때만)
+    if output_path is None:
+        if workspace_name is None:
+            raise ValueError(
+                "output_path is required when template is not a registered "
+                "workspace (raw path mode). v0.17.0+: register via "
+                "`pyhwpxlib template add` to enable auto outputs/."
+            )
+        output_path = auto_output_path(workspace_name, data)
+
+    # 3) fill section
     archive = read_zip_archive(str(hwpx_path))
     section_xml = archive.files["Contents/section0.xml"].decode("utf-8")
     new_xml, summary = fill_section(section_xml, schema, data)
@@ -235,9 +281,21 @@ def fill_template_file(
     from pyhwpxlib.package_ops import ZipArchive
     new_archive = ZipArchive(infos=archive.infos, files=new_files)
     strip_mode = "precise" if fix_linesegs else False
-    fixed_count = write_zip_archive(str(output_path), new_archive, strip_linesegs=strip_mode)
+    fixed_count = write_zip_archive(
+        str(output_path), new_archive, strip_linesegs=strip_mode)
 
     summary["template"] = str(hwpx_path)
     summary["output"] = str(output_path)
     summary["linesegs_fixed"] = fixed_count
+
+    # 4) history 기록 (workspace template 만)
+    if log_history and workspace_name is not None:
+        try:
+            from pyhwpxlib.templates.context import log_fill
+            log_info = log_fill(
+                workspace_name, data, output_path=output_path)
+            summary["history"] = log_info
+        except Exception as e:  # noqa: BLE001
+            summary["history_error"] = f"{type(e).__name__}: {e}"
+
     return summary

@@ -66,14 +66,15 @@ def test_skill_dir_resolves_to_repo():
 
 
 def test_resolve_user_wins_over_skill(tmp_path, monkeypatch):
+    """v0.17.0+: user 워크스페이스 (`<name>/source.hwpx`) 가 skill bundle 보다 우선."""
     from pyhwpxlib.templates.resolver import resolve_template_path
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    user_dir = tmp_path / "pyhwpxlib" / "templates"
-    user_dir.mkdir(parents=True)
-    fake_user = user_dir / "makers_project_report.hwpx"
+    ws_dir = tmp_path / "pyhwpxlib" / "templates" / "makers_project_report"
+    ws_dir.mkdir(parents=True)
+    fake_user = ws_dir / "source.hwpx"
     fake_user.write_bytes(b"x")
     found = resolve_template_path("makers_project_report")
-    assert found == fake_user  # user dir wins
+    assert found == fake_user  # user workspace wins
 
 
 def test_resolve_falls_back_to_skill(tmp_path, monkeypatch):

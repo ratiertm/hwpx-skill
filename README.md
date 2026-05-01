@@ -342,7 +342,7 @@ This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for
 - Personal / non-commercial / educational / open-source: **Free**
 - Internal use (up to 5 users): **Free**
 - Commercial use / 6+ users: **Commercial license required**
-- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.16.1 → 2030-05-01). See [LICENSE.md](LICENSE.md).
+- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.17.0 → 2030-05-01). See [LICENSE.md](LICENSE.md).
 
 ## Fonts
 
@@ -377,3 +377,68 @@ b = HwpxBuilder(theme='default')  # FontSet override 는 사용자 정의 theme 
 `hwp2hwpx.convert()` **preserves original font names** from `.hwp` files.
 Converted HWPX retains whatever fonts the source document used —
 license compliance for converted files is the user's responsibility.
+
+## Form Templates with Cross-Session Memory (v0.17.0+)
+
+Forms are no longer flat files — each registered form lives in its own
+**workspace folder** under `~/.local/share/pyhwpxlib/templates/<name>/`:
+
+```
+attendance/
+├── source.hwpx        # original template
+├── schema.json        # field map + _meta {description, page_standard, ...}
+├── decisions.md       # accumulated user decisions (newest first)
+├── history.json       # last 10 fill records (FIFO)
+└── outputs/           # auto-saved filled documents
+```
+
+This solves "the chatbot forgot everything when I opened a new chat" —
+context (rules you agreed on, recent fill data, structure type) survives
+across sessions.
+
+```bash
+# Register a form (creates workspace folder)
+pyhwpxlib template add my_form.hwp --name attendance
+
+# Annotate decisions you want to remember
+pyhwpxlib template annotate attendance \
+    --description "외부 전문가 참여 확인용" \
+    --page-standard 1page --structure A \
+    --decision "field_2 는 항상 한글 성명"
+
+# Fill — output auto-saved to <workspace>/outputs/, history logged
+pyhwpxlib template fill attendance -d 'field_2=홍길동'
+# → outputs/2026-05-01_홍길동.hwpx
+
+# In a new chat: load full context (decisions + recent_data) for the LLM
+pyhwpxlib template context attendance
+
+# Open workspace in Finder/Explorer
+pyhwpxlib template open attendance
+```
+
+### Optional: Claude Code SessionStart hook
+
+```bash
+pyhwpxlib install-hook
+# → installs ~/.claude/hooks/pyhwpxlib_session_start.py
+# Add the printed snippet to ~/.claude/settings.json
+```
+
+After this, every new Claude Code chat sees the list of registered forms in
+its session context — mention the form name, and the LLM uses
+`hwpx_template_context` MCP tool to load the full decisions/history.
+
+### Migration from v0.13.3 flat templates
+
+```bash
+# Preview migration plan
+pyhwpxlib template migrate --dry-run
+
+# Execute (auto tar.gz backup of legacy flat dir before conversion)
+pyhwpxlib template migrate
+```
+
+Backup is written to `templates_backup_v0.16.x_YYYYMMDD_HHMMSS.tar.gz`
+in the parent directory before any change. Use `--no-backup` to skip
+(not recommended).

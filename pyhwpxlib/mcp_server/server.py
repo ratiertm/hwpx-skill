@@ -632,6 +632,98 @@ def hwpx_build_preset(preset: str, title: str, sections: str, output: str,
 
 
 @mcp.tool()
+def hwpx_template_context(name: str) -> str:
+    """Load workspace context for a registered HWPX template (v0.17.0+).
+
+    워크스페이스 폴더 (`~/.local/share/pyhwpxlib/templates/<name>/`) 에서 schema._meta,
+    decisions.md, history.json (최근 채우기) 를 로드해서 LLM 주입용 markdown + json
+    으로 반환. 새 채팅 세션 진입 시 양식명만 알면 이전 합의·결정·최근 데이터를
+    그대로 복원할 수 있다 — `pyhwpxlib template context <name>` 의 MCP 인터페이스.
+    """
+    try:
+        from pyhwpxlib.templates.context import load_context
+    except ImportError:
+        return json.dumps(
+            {"error": "context module not available (pyhwpxlib < 0.17.0)"},
+            ensure_ascii=False,
+        )
+    try:
+        ctx = load_context(name)
+    except FileNotFoundError as e:
+        return json.dumps(
+            {"error": f"template not registered: {name}",
+             "hint": "Use `pyhwpxlib template add <file>` first",
+             "detail": str(e)},
+            ensure_ascii=False,
+        )
+    return json.dumps({
+        "markdown": ctx.to_markdown(),
+        **ctx.to_dict(),
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_template_workspace_list() -> str:
+    """List all registered HWPX templates with workspace metadata (v0.17.0+).
+
+    User workspaces (folder structure) + skill bundle (flat) 모두 포함.
+    각 항목은 name / name_kr / source / decisions_count / outputs_count / _meta 를
+    담아 LLM 이 양식 매칭에 사용할 수 있다.
+    """
+    try:
+        from pyhwpxlib.templates.resolver import list_all_templates
+    except ImportError:
+        return json.dumps(
+            {"error": "templates module not available"},
+            ensure_ascii=False,
+        )
+    items = list_all_templates()
+    return json.dumps({
+        "count": len(items),
+        "templates": items,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_template_log_fill(name: str, data: str,
+                            output_path: str = "") -> str:
+    """Append a fill entry to a template's history.json (v0.17.0+).
+
+    `hwpx_fill_form` 같은 외부 채우기 후 수동으로 기록을 남기고 싶을 때 사용.
+    `pyhwpxlib template fill` 을 통한 호출은 자동 기록이라 호출 불필요.
+
+    Args:
+        name: registered template name (workspace 등록 필요)
+        data: JSON string of fill data
+        output_path: optional output file path to record alongside the entry
+    """
+    try:
+        from pyhwpxlib.templates.context import log_fill
+    except ImportError:
+        return json.dumps(
+            {"error": "context module not available (pyhwpxlib < 0.17.0)"},
+            ensure_ascii=False,
+        )
+    try:
+        data_dict = json.loads(data) if isinstance(data, str) else data
+    except json.JSONDecodeError as e:
+        return json.dumps(
+            {"error": f"invalid JSON data: {e}"},
+            ensure_ascii=False,
+        )
+    try:
+        info = log_fill(name, data_dict,
+                        output_path=output_path or None)
+    except FileNotFoundError as e:
+        return json.dumps(
+            {"error": f"workspace not found: {name}",
+             "detail": str(e)},
+            ensure_ascii=False,
+        )
+    return json.dumps({"name": name, **info}, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def hwpx_guide() -> str:
     """Get the latest pyhwpxlib usage guide.
 
