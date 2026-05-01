@@ -43,15 +43,22 @@ class Palette:
 class FontSet:
     """Font names for heading, body, and caption text.
 
-    Default is '맑은 고딕' (Malgun Gothic) — 2022년 6월 이후 공문서 표준.
-    Fallback: 번들된 NanumGothic (vendor/).
+    Default is '나눔고딕' (Naver Nanum Gothic, SIL OFL 1.1) —
+    재배포 자유 폰트. v0.16.1 부터 라이선스 안전화 차원에서 통일.
+
+    이전 default '맑은 고딕' (Microsoft) + 일부 사용 흔적이 있던
+    '함초롬돋움/바탕' (한컴) 은 모두 재배포 라이선스 제약으로 회피.
+    사용자가 명시 지정하면 그대로 사용 가능 (호환성):
+        FontSet(heading_hangul='맑은 고딕', body_hangul='맑은 고딕')
+
+    Fallback: 번들된 NanumGothic (vendor/) — rhwp 렌더 시 자동 매핑.
     """
-    heading_hangul: str = '맑은 고딕'
-    heading_latin: str = '맑은 고딕'
-    body_hangul: str = '맑은 고딕'
-    body_latin: str = '맑은 고딕'
-    caption_hangul: str = '맑은 고딕'
-    caption_latin: str = '맑은 고딕'
+    heading_hangul: str = '나눔고딕'
+    heading_latin: str = '나눔고딕'
+    body_hangul: str = '나눔고딕'
+    body_latin: str = '나눔고딕'
+    caption_hangul: str = '나눔고딕'
+    caption_latin: str = '나눔고딕'
 
 
 @dataclass(frozen=True)

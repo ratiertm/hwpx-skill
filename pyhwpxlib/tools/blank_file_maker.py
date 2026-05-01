@@ -258,10 +258,16 @@ def _fontfaces(ref_list: RefList, font_set=None) -> None:
 
 
 def _add_font_pair(fontface) -> None:
-    # Font 0: 맑은 고딕 (공문서 표준, 2022.06~)
+    """Default font pair — 나눔고딕 (id=0,1) 통일 (v0.16.1+).
+
+    재배포 안전 (SIL OFL 1.1). 이전의 '맑은 고딕' (MS) 과
+    '함초롬돋움/바탕' (한컴) 은 라이선스 제약으로 회피. 한컴 오피스에서
+    열 때는 시스템 폰트 매핑으로 자동 fallback (한글 fontface lang="HANGUL").
+    """
+    # Font 0: 나눔고딕 (OFL, 통일 default)
     f1 = fontface.add_new_font()
     f1.id = "0"
-    f1.face = "맑은 고딕"
+    f1.face = "나눔고딕"
     f1.type = FontType.TTF
     f1.isEmbedded = False
     ti1 = f1.create_type_info()
@@ -275,10 +281,10 @@ def _add_font_pair(fontface) -> None:
     ti1.midline = 1
     ti1.xHeight = 1
 
-    # Font 1: 나눔명조 (system fallback — NanumMyeongjo)
+    # Font 1: 나눔고딕 (통일)
     f2 = fontface.add_new_font()
     f2.id = "1"
-    f2.face = "나눔명조"
+    f2.face = "나눔고딕"
     f2.type = FontType.TTF
     f2.isEmbedded = False
     ti2 = f2.create_type_info()

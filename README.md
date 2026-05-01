@@ -342,4 +342,38 @@ This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for
 - Personal / non-commercial / educational / open-source: **Free**
 - Internal use (up to 5 users): **Free**
 - Commercial use / 6+ users: **Commercial license required**
-- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.16.0 → 2030-05-01). See [LICENSE.md](LICENSE.md).
+- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.16.1 → 2030-05-01). See [LICENSE.md](LICENSE.md).
+
+## Fonts
+
+pyhwpxlib uses **NanumGothic** (Naver, SIL OFL 1.1) as default font metadata
+in generated documents and bundles it (`vendor/`) for rhwp rendering fallback.
+
+### Why not 함초롬돋움/바탕 or 맑은 고딕?
+
+| Font | License | Issue |
+|------|---------|-------|
+| 함초롬돋움/바탕 (HCR-) | Hancom Office license | Bundled with Hancom Office only |
+| 맑은 고딕 (Malgun Gothic) | Microsoft license | Bundled with Windows/Office only |
+| **나눔고딕/명조** | **SIL OFL 1.1** | **Free redistribution + embed** |
+
+Both Hancom and Microsoft fonts have redistribution restrictions, so
+v0.16.1+ defaults to NanumGothic to avoid license concerns for users.
+
+### Override default
+
+```python
+from pyhwpxlib import HwpxBuilder
+from pyhwpxlib.themes import FontSet
+
+# Use 맑은 고딕 explicitly (you are responsible for the license)
+fonts = FontSet(heading_hangul='맑은 고딕', body_hangul='맑은 고딕',
+                caption_hangul='맑은 고딕')
+b = HwpxBuilder(theme='default')  # FontSet override 는 사용자 정의 theme 통합 시
+```
+
+### HWP→HWPX conversion
+
+`hwp2hwpx.convert()` **preserves original font names** from `.hwp` files.
+Converted HWPX retains whatever fonts the source document used —
+license compliance for converted files is the user's responsibility.
