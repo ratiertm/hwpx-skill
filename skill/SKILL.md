@@ -27,18 +27,41 @@ description: "Use this skill whenever the user wants to create, read, edit, anal
 
 ## On Load — 스킬 로드 시 즉시 실행
 
-사용자 메시지에 구체적 작업이 없으면 AskUserQuestion:
+**Step 1: 등록된 양식 자동 인식 (v0.17.0+, 채팅 간 컨텍스트 유지의 핵심)**
+```python
+from pyhwpxlib.templates import list_templates
+items = list_templates()  # workspace 우선 + skill bundle 폴백
+# items[i]: {name, name_kr, source, _meta:{description,...}, decisions_count, ...}
+```
+- 사용자가 양식명·한글명·기능 키워드를 언급하면 매칭되는 양식이 있는지 먼저 확인.
+- 매칭되면 곧장 **Step 2: 컨텍스트 로드**.
+- "양식이 등록돼 있다 / 새로 등록 / 검색" 중에 능동 안내.
 
+**Step 2: 등록 양식 매칭 시 컨텍스트 자동 주입**
+```python
+from pyhwpxlib.templates.context import load_context
+ctx = load_context(name)            # schema/_meta + decisions.md + history.json
+print(ctx.to_markdown())            # 채팅에 그대로 포스트 — 모델이 즉시 흡수
+```
+이전 채팅의 결정사항 (`structure_type`/`page_standard`/`notes`/decisions) 과
+최근 채우기 값 (`recent_data`) 이 자동 복원된다 → 사용자가 양식 다시 업로드하거나
+설명 다시 할 필요 없음.
+
+**Step 3: 사용자 메시지에 구체적 작업이 없으면 AskUserQuestion**
 ```
 "어떤 작업을 하시겠어요?"
 1. 새 문서 만들기
 2. 기존 문서 편집
-3. 양식 자동화
+3. 양식 자동화 (등록된 양식 N개 — 이름 말씀하시면 컨텍스트 즉시 로드)
 4. 문서 변환
 5. 문서 분석 — 텍스트·표·이미지 추출 + Vision
 ```
 
 **자동 감지**: `.hwp` → 변환 후 진행, `.hwpx` → 바로 진행, `.md` → md2hwpx
+
+**SessionStart hook (선택)**: `pyhwpxlib install-hook` 한 번 실행하면 Claude Code 가
+새 채팅 시작 시 등록 양식 목록을 자동으로 sessionContext 에 주입한다 → 매번
+list_templates() 호출 없이도 모델이 바로 인식.
 
 ---
 
@@ -159,14 +182,25 @@ Step D: `unpack → 원본 문자열 교체 → pack → validate`
 
 ## 워크플로우 [3] 양식 채우기
 
-**Step 0: 메타 인지 (생략 금지)** — 워크플로우 [2]와 동일. 양식은 특히 페이지 표준이 강하므로 필수.
+**Step 0: 컨텍스트 자동 로드 (v0.17.0+, 새 채팅에서 우선 시도)**
+```python
+from pyhwpxlib.templates.context import load_context
+ctx = load_context(name)  # 등록 양식 → 결정사항·이전 채우기 값 자동 복원
+print(ctx.to_markdown())
+```
+또는 CLI: `pyhwpxlib template context <name>`. **이전 채팅의 합의가 살아 있다 →
+사용자가 양식 다시 업로드/설명할 필요 없음.** 미등록이면 Step 0' 메타 인지로.
+
+**Step 0': 메타 인지 (미등록 양식만)** — 워크플로우 [2]와 동일. 양식은 특히 페이지 표준이 강하므로 필수.
 - "1매 표준" 양식 (지급조서·증빙·검수확인서)은 결과도 1페이지여야 함
 - 양식에 포함된 **(예시) 페이지는 가이드** — 결과물에선 보통 제거
 - 미리 인쇄된 항목 (사업명·기관명)은 보존, 빈 칸만 채움
-- → 사용자에게 "이 양식의 결과물은 1페이지로 만드는 게 맞나요?" 확인
+- → 사용자에게 "이 양식의 결과물은 1페이지로 만드는 게 맞나요?" 확인 후
+  `pyhwpxlib template add` + `template annotate --page-standard 1page --structure A/B`
+  로 결과를 워크스페이스에 박제 (다음 채팅에서 자동 복원).
 
 Step A: 프리뷰 렌더링 → Claude가 PNG 보고 양식 분석
-Step B: 사용자에게 필드 입력 요청
+Step B: 사용자에게 필드 입력 요청 (ctx.recent_data 가 있으면 보여주고 재사용 제안)
 Step C: **구조 판정** — 인접 셀(A) vs 같은 셀(B)
 - 구조 A → `fill_by_labels` 사용
 - 구조 B → `unpack → 문자열 교체 → pack`
@@ -179,6 +213,13 @@ Step F: **page-guard 통과 (v0.16.0+, 필수 게이트)**
 ```bash
 pyhwpxlib page-guard --reference original_form.hwpx --output filled.hwpx
 # → exit 0 (PASS) 일 때만 완료 처리. exit 1 (FAIL) 시 텍스트 압축/autofit 재시도
+```
+
+Step G: **결정사항 박제 (v0.17.0+)** — 이번 채팅에서 새로 합의한 규칙이 있으면
+```bash
+pyhwpxlib template annotate <name> --decision "이번에 합의한 내용"
+# 결과물도 자동으로 <workspace>/outputs/YYYY-MM-DD_<key>.hwpx 에 누적되고
+# history.json 에 채우기 데이터가 FIFO 10건 보존된다 (template fill 자동 호출).
 ```
 
 ---
