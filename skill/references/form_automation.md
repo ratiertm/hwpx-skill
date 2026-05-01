@@ -80,12 +80,17 @@ analyzed = analyze_schema_with_llm(schema)
 
 ---
 
-## Template Builder UI
+## Template Workflow CLI (v0.13.3+)
 
 ```bash
-python template_builder.py template.hwpx --port 8081
-# 브라우저에서 필드 입력/고정/제목 토글 → schema.json 저장
+pyhwpxlib template add my_form.hwpx --name my_form    # 등록 + schema 자동 생성
+pyhwpxlib template list                                 # 등록된 양식 목록
+pyhwpxlib template show my_form                         # schema 확인
+pyhwpxlib template diagnose my_form.hwpx --schema MANUAL.json  # 매핑 정확도 진단
+pyhwpxlib template fill my_form -d data.json -o out.hwpx       # 채우기
 ```
+
+이전의 `template_builder.py` HTTP UI 는 v0.13.3 부터 위 CLI 로 대체되어 삭제되었습니다.
 
 ---
 

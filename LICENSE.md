@@ -28,7 +28,22 @@
 **Copyright:** (c) 2026 Eunmi Lee
 
 **Change License:** Apache License, Version 2.0
-**Change Date:** 2030-04-07
+
+### Rolling Change Date
+
+각 릴리스 버전은 **자체 Change Date** 를 가지며, 그 값은 **해당 버전의 릴리스일 + 4년** 으로
+설정됩니다. 즉 새 버전이 나올 때마다 Change Date 가 자동으로 4년 뒤로 갱신됩니다 (HashiCorp,
+Sentry 와 동일한 Rolling 패턴). 이전 버전은 자신의 Change Date 가 도래하면 자동으로
+Apache 2.0 으로 전환됩니다.
+
+<!-- ROLLING_TABLE_START -->
+| 버전 | 릴리스일 | Change Date |
+|------|---------|------------|
+| 0.15.0 | 2026-04-29 | 2030-04-29 |
+| 0.16.0 (current) | 2026-05-01 | 2030-05-01 |
+<!-- ROLLING_TABLE_END -->
+
+> 매 릴리스 시 `python scripts/update_license_date.py` 로 위 표가 자동 갱신됩니다.
 
 ### Permitted Uses (무료)
 
@@ -47,12 +62,10 @@
 
 Commercial licenses: https://lchfkorea.com
 
-### Change Date
-
-2030-04-07 이후 (또는 해당 버전의 최초 공개 배포일로부터 4년 후 중 빠른 날짜),
-BSL 적용 파일도 Apache License 2.0으로 자동 전환됩니다.
-
 ### General
+
+각 릴리스 버전의 Change Date 가 도래하면 해당 버전의 BSL 적용 파일은 자동으로 Apache
+License 2.0 으로 전환됩니다. 새 버전은 항상 자신의 새로운 Change Date 를 갖습니다.
 
 본 라이선스를 준수하지 않는 사용은 라이선서, 계열사, 또는 공인 대리점으로부터
 상업 라이선스를 구매하거나 사용을 중단해야 합니다.

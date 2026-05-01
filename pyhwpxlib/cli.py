@@ -616,6 +616,31 @@ def _validate_strict(hwpx_path: str) -> dict:
     return {"ok": ok, "checks": checks}
 
 
+def _cmd_page_guard(args: argparse.Namespace) -> None:
+    """page-guard CLI 핸들러. exit code 로 fail/pass 신호."""
+    from . import page_guard
+    rc = page_guard.main([
+        "--reference", args.reference,
+        "--output", args.output,
+        "--threshold", str(args.threshold),
+        "--mode", args.mode,
+        *(["--json"] if args.json else []),
+    ])
+    sys.exit(rc)
+
+
+def _cmd_analyze(args: argparse.Namespace) -> None:
+    """analyze CLI 핸들러."""
+    from . import blueprint
+    rc = blueprint.main([
+        args.file,
+        *(["--blueprint"] if args.blueprint else []),
+        "--depth", str(args.depth),
+        *(["--json"] if args.json else []),
+    ])
+    sys.exit(rc)
+
+
 def _cmd_doctor(args: argparse.Namespace) -> None:
     """Delegate to pyhwpxlib.doctor.main with the same argv."""
     from pyhwpxlib.doctor import main as doctor_main
@@ -1072,6 +1097,31 @@ def main(argv: list[str] | None = None) -> None:
     tpl_diag.add_argument("--json", action="store_true", help="JSON output")
 
     # themes
+    # page-guard (v0.16.0+) — 레퍼런스/결과 페이지 카운트 강제 게이트
+    p_pg = sub.add_parser(
+        "page-guard",
+        help="Reference vs output 페이지 카운트 비교 (강제 게이트)",
+    )
+    p_pg.add_argument("--reference", required=True, help="기준 HWPX 경로")
+    p_pg.add_argument("--output", required=True, help="검증할 HWPX 경로")
+    p_pg.add_argument("--threshold", type=int, default=0,
+                      help="허용 페이지 차이 (default 0)")
+    p_pg.add_argument("--mode", choices=["auto", "rhwp", "static"],
+                      default="auto", help="페이지 카운트 측정 방법")
+    p_pg.add_argument("--json", action="store_true", help="JSON 출력")
+
+    # analyze (v0.16.0+) — HWPX 구조 청사진
+    p_an = sub.add_parser(
+        "analyze",
+        help="HWPX 구조 청사진 (charPr/paraPr/borderFill/표/페이지)",
+    )
+    p_an.add_argument("file", help="분석할 HWPX 경로")
+    p_an.add_argument("--blueprint", action="store_true",
+                      help="청사진 모드 (현재 유일한 모드)")
+    p_an.add_argument("--depth", type=int, choices=[1, 2, 3], default=2,
+                      help="분석 깊이 (default 2)")
+    p_an.add_argument("--json", action="store_true", help="JSON 출력")
+
     p_th = sub.add_parser("themes", help="Manage themes (list/extract/delete)")
     p_th.add_argument("action", choices=["list", "extract", "delete"],
                        help="list: show all themes, extract: save theme from HWPX, delete: remove custom theme")
@@ -1101,6 +1151,8 @@ def main(argv: list[str] | None = None) -> None:
         "font-check": _cmd_font_check,
         "themes": _cmd_themes,
         "doctor": _cmd_doctor,
+        "page-guard": _cmd_page_guard,
+        "analyze": _cmd_analyze,
     }
 
     handler = dispatch.get(args.command)

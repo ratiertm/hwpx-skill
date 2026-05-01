@@ -1017,3 +1017,113 @@ doc.save("final.hwpx")
 - 매 step마다 전체 문서를 재빌드 (HwpxBuilder는 중간 로드 불가)
 - 2~3초/step 소요 (save + rhwp render + resvg)
 - 4~5단계 이상이면 사용자에게 "전체 빌드 후 한 번에 보여줄까요?" 확인
+
+---
+
+## 38. 레퍼런스 충실도 룰 — Critical Rules #10~#13 상세 (v0.16.0)
+
+다른 hwpx-skill 개발자의 XML-first 접근에서 학습한 4개 의도 룰. SKILL.md #10~#13 과 1:1 대응.
+"validate 통과 ≠ 사용자 의도 일치" 갭을 메우기 위함.
+
+### Rule #10. 치환 우선 편집
+
+**원칙**: 양식 채우기·기존 문서 편집 시 새 노드 추가 대신 **기존 텍스트 노드 치환**을 우선.
+
+**배경**: 새 문단 추가 시 charPrIDRef/paraPrIDRef/borderFillIDRef 참조가 깨질 위험 + 페이지 변동 큼. "1매 표준" 양식은 페이지 증가가 곧 양식 위반.
+
+**정상 패턴**:
+```python
+text = section_xml.replace('{성명}', '홍길동')           # ✅ 원본 문자열 직접
+fill_template(input, output, {'성명': '홍길동'})         # ✅ 텍스트 노드만 갱신
+```
+
+**안티패턴**:
+```python
+doc.add_paragraph('성명: 홍길동')   # ❌ 새 문단 — 페이지 증가 + ID 깨짐
+```
+
+**예외**: 사용자가 명시적으로 "추가" 요청한 경우.
+
+### Rule #11. 구조 변경 제한
+
+**원칙**: 사용자 명시 요청 없이 `<hp:p>` `<hp:tbl>` `rowCnt` `colCnt` `pageBreak` `secPr` 추가·삭제·분할·병합 금지.
+
+**배경**: LLM 이 "더 보기 좋게" 의도로 표 행을 늘리거나 문단을 쪼개면 양식 의도 어긋남. page-guard 의 가장 큰 적은 무단 구조 변경.
+
+**정상 패턴**: 표 셀 텍스트만 갱신 (rowCnt 유지), `<hp:t>` 내부 텍스트만 교체 (`<hp:p>` 개수 유지).
+
+**예외**: schema 정의에서 `repeat=true` 명시된 가변 행 양식 (참여자 명단 등).
+
+### Rule #12. 페이지 동일 필수 (레퍼런스 작업)
+
+**원칙**: 사용자가 레퍼런스 HWPX 를 제공하면 **결과 페이지 수 = 레퍼런스 페이지 수**.
+
+**배경**:
+- 1매 표준 양식 (결재·증빙·계약): "한 장" 이 법적·관행적 요건
+- 공문 (기안문): 행안부 편람 "1건 1매 원칙"
+- 보고서: 사용자 의도 분량 보존
+
+**1페이지 fit 자동화**:
+```python
+GongmunBuilder(doc, autofit=True).save(output)
+# spacer(6→4pt) → lineSpacing×0.9 → 상·하여백(-2mm) 단계 조정
+```
+
+**페이지 카운트 측정**:
+```python
+from pyhwpxlib.rhwp_bridge import RhwpEngine
+pages = RhwpEngine().load(output).page_count
+```
+
+**예외**: 사용자가 "2페이지로 늘려도 됨" 명시 동의.
+
+### Rule #13. page-guard 통과 필수 (강제 게이트, v0.16.0+)
+
+**원칙**: `pyhwpxlib validate` 통과 ≠ 완료. 레퍼런스 작업은 `pyhwpxlib page-guard` 도 통과해야 완료.
+
+**배경**: `validate` 는 OWPML 무결성만 — 페이지 변동·구조 변경 미감지. 다른 hwpx-skill 의 강제 게이트 패턴 흡수.
+
+**필수 워크플로**:
+```bash
+# 1. validate (XML 무결성)
+pyhwpxlib validate result.hwpx --mode both
+
+# 2. page-guard (페이지 충실도)
+pyhwpxlib page-guard --reference original.hwpx --output result.hwpx
+# exit 0 (PASS) 일 때만 완료 처리
+# exit 1 (FAIL) 시 — autofit 또는 텍스트 압축 후 재시도
+```
+
+**threshold 사용**:
+```bash
+pyhwpxlib page-guard --reference ref.hwpx --output out.hwpx                # threshold 0 (1매 표준)
+pyhwpxlib page-guard --reference ref.hwpx --output out.hwpx --threshold 1  # 가변 분량 허용
+```
+
+**측정 방법 (`--mode`)**:
+- `auto` (default): rhwp 1차 + static 폴백
+- `rhwp`: WASM 정확 (실패 시 RuntimeError)
+- `static`: OWPML 정적 분석만 (가벼움)
+
+**CI 통합 (`--json`)**:
+```bash
+pyhwpxlib page-guard --reference ref.hwpx --output out.hwpx --json
+# {"passed": true, "diff": 0, "reference": {...}, "output": {...}}
+```
+
+**구조 청사진 동반 (`analyze --blueprint`, v0.16.0+)**:
+```bash
+pyhwpxlib analyze ref.hwpx --blueprint --depth 2
+# Page / Styles (charPr/paraPr/borderFill) / Tables / Body 한 번에 청사진
+```
+
+### 워크플로별 적용 매핑
+
+| 워크플로 | #10 | #11 | #12 | #13 |
+|---------|:---:|:---:|:---:|:---:|
+| [1] 새 문서 생성 | ➖ | ➖ | ➖ | ➖ (레퍼런스 없음) |
+| [2] 기존 문서 편집 | ✅ | ✅ | ✅ | ✅ |
+| [3] 양식 채우기 | ✅ | ✅ | ✅ (1매) | ✅ |
+| [5] 공문 생성 | — | — | ✅ (편람) | ✅ |
+| [6] 문서 분석 | — | — | — | — |
+| [7] JSON ↔ HWPX | — | — | — | ➖ (레퍼런스 있을 때) |

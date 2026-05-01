@@ -342,4 +342,4 @@ This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for
 - Personal / non-commercial / educational / open-source: **Free**
 - Internal use (up to 5 users): **Free**
 - Commercial use / 6+ users: **Commercial license required**
-- After 2030-04-07: Converts to Apache 2.0 automatically
+- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.16.0 → 2030-05-01). See [LICENSE.md](LICENSE.md).

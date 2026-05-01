@@ -53,6 +53,18 @@ customs = sorted(_THEMES_DIR.glob('*.json')) if _THEMES_DIR.exists() else []
 
 Step B: 내용 확인 → AskUserQuestion
 
+**Rich Mode 체크리스트** — "최대한 기능 활용", "풍부하게", 보고서/제안서 요청 시 점검:
+
+| 분류 | Builder 메서드 | 언제 |
+|------|---------------|------|
+| 구조 | `add_heading` `add_paragraph` `add_page_break` `add_line` | 항상 |
+| 강조 | `add_highlight` `add_footnote` `add_equation` | 핵심 메시지·각주·수식 |
+| 리스트 | `add_bullet_list` `add_numbered_list` `add_nested_bullet_list` `add_nested_numbered_list` | 단계·항목·계층 |
+| 시각 | `add_image` `add_image_from_url` `add_table` `add_rectangle` `add_draw_line` | 그래프·표·도형 |
+| 결문 | `add_header` `add_footer` `add_page_number` | 보고서·공식 문서 |
+
+→ 내용에 자연스러운 것만 선택. 디자인 규칙 #2 (억지 삽입 금지) 유지. 골든 샘플: [references/rich_document_example.md](references/rich_document_example.md).
+
 Step C: 실행
 ```python
 from pyhwpxlib import HwpxBuilder
@@ -163,6 +175,12 @@ Step E: **1페이지 fit 검증** — page_count == 1 이어야 함 (1매 표준
 - 넘치면: 사람이 하는 방식대로 ① 폰트 한 단계 ↓ ② 줄간격 10%씩 ↓ ③ 셀 높이 비례 ↓ 단계 적용
 - 자동화: `GongmunBuilder(autofit=True)` 또는 신규 양식이면 동일 패턴 직접 구현
 
+Step F: **page-guard 통과 (v0.16.0+, 필수 게이트)**
+```bash
+pyhwpxlib page-guard --reference original_form.hwpx --output filled.hwpx
+# → exit 0 (PASS) 일 때만 완료 처리. exit 1 (FAIL) 시 텍스트 압축/autofit 재시도
+```
+
 ---
 
 ## 워크플로우 [4] 문서 변환
@@ -228,10 +246,10 @@ BinData에서 이미지 추출 → Read tool로 내용 파악 (Vision)
 
 ## 워크플로우 [7] JSON ↔ HWPX (v0.15.0+, 외부 LLM/MCP 친화)
 
-JSON 한 덩어리로 builder 19개 add_* 메서드 중 16개 도달 가능. heading,
-image, header/footer, lists, footnotes, equation, highlight, shapes,
-page_number 모두 표현. v0.14.0 paragraphs/tables-only JSON 도 그대로
-동작 (back-compat).
+JSON 한 덩어리로 builder 19개 add_* 메서드 **전부** 표현 가능 (19/19, 100%).
+heading, image, image_from_url, header/footer, lists, footnotes, equation,
+highlight, shapes, page_number, page_break 모두 dispatch. v0.14.0
+paragraphs/tables-only JSON 도 그대로 동작 (back-compat).
 
 ```python
 from pyhwpxlib.json_io import from_json, to_json
@@ -265,9 +283,10 @@ parsed = to_json("out.hwpx")
 # style-table 의존이라 0.15.0 에서는 best-effort 미지원)
 ```
 
-**RunContent.type 13종**: text, table, heading, image, bullet_list,
+**RunContent.type 14종**: text, table, heading, image, bullet_list,
 numbered_list, nested_bullet_list, nested_numbered_list, footnote,
 equation, highlight, shape_rect, shape_line, shape_draw_line.
+**Paragraph flag**: `page_break: true` → `add_page_break()`.
 **Top-level 3종 (deferred)**: header, footer, page_number.
 **Unknown type → ValueError** (rhwp 노선: silent skip 금지).
 
@@ -285,7 +304,7 @@ MCP `hwpx_from_json` 도 새 schema 자동 지원 (signature 무변경).
 | 공문 규정 검증 | `validate_file("doc.hwpx")` (ERROR/WARNING/INFO) |
 | 텍스트 읽기 | `extract_text()` |
 | 편집 | `unpack → replace → pack` |
-| **JSON → HWPX (v0.15.0+)** | `from_json(data, "out.hwpx")` — 16/19 builder 메서드 도달 |
+| **JSON → HWPX (v0.15.0+)** | `from_json(data, "out.hwpx")` — 19/19 builder 메서드 전부 도달 |
 | **HWPX → JSON** | `to_json("doc.hwpx")` — image/footnote/equation/shape 자동 식별 |
 | 양식 등록 (v0.13.3+) | `pyhwpxlib template add my_form.hwp --name my_form` |
 | 양식 채우기 (schema) | `pyhwpxlib template fill <name> -d data.json -o out.hwpx` |
@@ -298,6 +317,8 @@ MCP `hwpx_from_json` 도 새 schema 자동 지원 (signature 무변경).
 | HWP→HWPX | `hwp2hwpx.convert()` |
 | **검증 (dual-mode, v0.14.0+)** | `pyhwpxlib validate --mode {strict\|compat\|both}` |
 | **비표준 진단/보정 (v0.14.0+)** | `pyhwpxlib doctor <file> [--fix]` |
+| **page-guard (v0.16.0+)** | `pyhwpxlib page-guard --reference REF --output OUT [--threshold N]` — 강제 게이트 |
+| **structure 청사진 (v0.16.0+)** | `pyhwpxlib analyze FILE --blueprint [--depth 1\|2\|3] [--json]` |
 | Lint | `pyhwpxlib lint <file>` |
 | Font check | `pyhwpxlib font-check <file>` |
 | 테마 추출 | `extract_theme() → save_theme()` |
@@ -354,6 +375,10 @@ doc.add_image("photo.png", width=width, height=height)
 | 7 | 표는 필요할 때만 | 억지 삽입 금지 |
 | 8 | hwpx 편집 후 lineseg 정합성 검증 | 한컴 보안경고 회피 (v0.14.0+ opt-in) |
 | 9 | 우리도 비표준 새로 생산 안 함 | rhwp 노선: 감지+고지+동의 후 보정 |
+| **10** | **치환 우선 편집** — 양식·기존 문서 편집 시 새 문단/표 추가 대신 텍스트 노드 치환 우선 | 서식 보존, 페이지 변동 최소화 |
+| **11** | **구조 변경 제한** — 사용자 명시 요청 없이 `<hp:p>` `<hp:tbl>` `rowCnt` `colCnt` 추가/삭제/분할/병합 금지 | 레퍼런스 충실도 |
+| **12** | **페이지 동일 필수 (레퍼런스 작업)** — 레퍼런스 있으면 결과 쪽수 동일 | 양식·공문 신뢰도 |
+| **13** | **page-guard 통과 필수** — `validate` 통과 ≠ 완료. `pyhwpxlib page-guard` 도 통과해야 완료 처리 | 강제 게이트 (v0.16.0+) |
 
 > 상세 API, 프리셋, 표 파라미터, 편집 세부사항 → [references/](references/) 참조
 
@@ -427,12 +452,14 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 | [templates/README.md](templates/README.md) | 번들 양식 모음 (전정Makers 결과보고서 등) + schema |
 | [references/gongmun.md](references/gongmun.md) | 공문 생성 (편람 준수) — 일반/간이/일괄/공동기안 + validator |
 | [references/HWPX_RULEBOOK.md](references/HWPX_RULEBOOK.md) | Critical Rules 전체 + 상세 설명 |
+| [references/rich_document_example.md](references/rich_document_example.md) | Rich Mode 골든 샘플 — 14/15 builder 메서드 활용 보고서 |
 
 ## Versions
 
 | Version | Highlights |
 |---------|------------|
-| **0.15.0** | JSON 경로 16/19 builder 메서드 도달 (옵션 A) — heading/image/list/footnote/equation/shape/header/footer/page_number, encoder rich-type emission |
+| **0.16.0** | reference-fidelity-toolkit — `pyhwpxlib page-guard` 강제 게이트 (rhwp+static 이중 경로) + `pyhwpxlib analyze --blueprint` 청사진 + Critical Rules 의도 룰 4개 (#10~#13) |
+| 0.15.0 | JSON 경로 19/19 builder 메서드 전부 도달 (옵션 A) — heading/image/image_from_url/list/footnote/equation/shape/header/footer/page_number/page_break, encoder rich-type emission |
 | **0.14.0** | rhwp 노선 채택 — silent fix opt-in, `pyhwpxlib doctor`, `validate --mode strict\|compat\|both` |
 | 0.13.4 | auto_schema cellSpan-aware grid + row-group label, `template diagnose` |
 | 0.13.3 | template workflow (옵션 B) — add/fill/show/list/diagnose, XDG 계층 |
