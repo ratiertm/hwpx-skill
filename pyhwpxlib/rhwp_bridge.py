@@ -34,11 +34,15 @@ from typing import Optional
 
 try:
     import wasmtime
-except ImportError as e:  # pragma: no cover
-    raise ImportError(
-        "pyhwpxlib.rhwp_bridge requires `wasmtime`. "
-        "Install with `pip install pyhwpxlib[preview]`."
-    ) from e
+    _HAS_WASMTIME = True
+except ImportError:
+    wasmtime = None  # type: ignore[assignment]
+    _HAS_WASMTIME = False
+
+_WASMTIME_INSTALL_HINT = (
+    "pyhwpxlib.rhwp_bridge.RhwpEngine requires `wasmtime`. "
+    "Install with `pip install pyhwpxlib[preview]`."
+)
 
 # importlib.resources.files() is standard on 3.9+; on 3.8 use the backport if present.
 if sys.version_info >= (3, 9):
@@ -441,6 +445,8 @@ class RhwpEngine:
 
     def __init__(self, wasm_path: Optional[str | Path] = None,
                  font_map: Optional[dict[str, str]] = None):
+        if not _HAS_WASMTIME:
+            raise ImportError(_WASMTIME_INSTALL_HINT)
         self._wasm_path = Path(wasm_path) if wasm_path else _find_wasm()
         self._engine = wasmtime.Engine()
         self._store = wasmtime.Store(self._engine)
@@ -462,7 +468,7 @@ class RhwpEngine:
 
     # -- internal helpers -------------------------------------------------
 
-    def _build_linker(self) -> wasmtime.Linker:
+    def _build_linker(self) -> "wasmtime.Linker":
         linker = wasmtime.Linker(self._engine)
         measurer = self._measurer
 

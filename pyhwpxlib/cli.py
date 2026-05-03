@@ -992,16 +992,43 @@ def _cmd_lint(args: argparse.Namespace) -> None:
 
 
 def _cmd_font_check(args: argparse.Namespace) -> None:
-    """Check font availability and resolution for an HWPX file."""
+    """Check font availability and resolution for an HWPX file.
+
+    Status values:
+      ok       — declared font resolves to its own family file (direct hit).
+      alias    — declared font resolves, but to a different family
+                 (e.g. 함초롬돋움 → bundled NanumGothic).
+      fallback — declared font is not in any map; rhwp will pick the
+                 platform Korean/Latin fallback at render time.
+      missing  — declared font is mapped, but the target file is absent
+                 from disk (broken install / removed bundle).
+    """
     import zipfile
     import xml.etree.ElementTree as ET
 
     path = args.input
     as_json = getattr(args, 'json', False)
+    user_map_path = getattr(args, 'font_map', None)
 
     if not os.path.exists(path):
         print(f"File not found: {path}")
         sys.exit(1)
+
+    # Load user override map if provided
+    user_overrides: dict[str, str] = {}
+    if user_map_path:
+        if not os.path.exists(user_map_path):
+            print(f"Font map not found: {user_map_path}")
+            sys.exit(1)
+        try:
+            with open(user_map_path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            if not isinstance(raw, dict):
+                raise ValueError("font-map JSON must be an object {name: path}")
+            user_overrides = {str(k).lower(): str(v) for k, v in raw.items()}
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            print(f"Error reading font-map {user_map_path}: {e}")
+            sys.exit(1)
 
     doc_fonts: set[str] = set()
     try:
@@ -1016,35 +1043,74 @@ def _cmd_font_check(args: argparse.Namespace) -> None:
         print(f"Error reading {path}: {e}")
         sys.exit(1)
 
-    # Resolve each font against font_map
+    # Build effective map = bundled defaults + user overrides
     try:
-        from .rhwp_bridge import _DEFAULT_FONT_MAP
-        font_map = dict(_DEFAULT_FONT_MAP)
+        from .rhwp_bridge import (
+            _DEFAULT_FONT_MAP,
+            _BUNDLED_REGULAR,
+            _BUNDLED_BOLD,
+            _KOREAN_FALLBACK,
+            _LATIN_FALLBACK,
+            _TextMeasurer,
+        )
     except ImportError:
-        font_map = {}
+        _DEFAULT_FONT_MAP, _BUNDLED_REGULAR, _BUNDLED_BOLD = {}, '', ''
+        _KOREAN_FALLBACK = _LATIN_FALLBACK = ''
+        _TextMeasurer = None  # type: ignore[assignment]
+
+    font_map = dict(_DEFAULT_FONT_MAP)
+    font_map.update(user_overrides)
+
+    bundled_paths = {_BUNDLED_REGULAR, _BUNDLED_BOLD}
+    fallback_paths = {_KOREAN_FALLBACK, _LATIN_FALLBACK}
+
+    def _is_nanum_family(name_lower: str) -> bool:
+        return any(token in name_lower for token in ('nanum', '나눔'))
 
     fonts_result = []
     for font in sorted(doc_fonts):
         lower = font.lower()
-        resolved = font_map.get(lower, '')
-        if resolved and os.path.exists(resolved):
-            # Check if it's the bundled font (alias) or exact match
-            if lower in ('나눔고딕', 'nanumgothic', 'nanum gothic'):
-                status = 'ok'
-            elif lower in ('함초롬돋움', '함초롬바탕'):
-                status = 'alias'
-            else:
-                status = 'ok'
-            fonts_result.append({'declared': font, 'resolved': resolved, 'status': status})
-        elif resolved:
-            # Path in map but file doesn't exist
-            fonts_result.append({'declared': font, 'resolved': resolved, 'status': 'missing'})
-        else:
-            # Not in map at all — will use fallback
-            fonts_result.append({'declared': font, 'resolved': '', 'status': 'fallback'})
+        direct_hit = lower in font_map
+        in_overrides = lower in user_overrides
 
-    ok = not any(f['status'] in ('missing',) for f in fonts_result)
-    result = {'command': 'font-check', 'ok': ok, 'file': path, 'fonts': fonts_result}
+        # Prefer rhwp-aligned resolver if available — same logic rhwp uses
+        # at render time, so the reported path is what actually resolves.
+        if _TextMeasurer is not None:
+            measurer = _TextMeasurer(font_map=user_overrides if user_overrides else None)
+            resolved = measurer._resolve_path([lower])
+        else:
+            resolved = font_map.get(lower, '')
+
+        # Mapped path that doesn't exist on disk
+        if direct_hit and font_map[lower] and not os.path.exists(font_map[lower]):
+            status = 'missing'
+            resolved = font_map[lower]
+        elif not resolved or not os.path.exists(resolved):
+            status = 'missing'
+        elif not direct_hit and resolved in fallback_paths:
+            # No mapping — rhwp would pick a platform fallback
+            status = 'fallback'
+        elif resolved in bundled_paths and not _is_nanum_family(lower):
+            # Mapped to bundled NanumGothic but declared is a different family
+            status = 'alias'
+        else:
+            status = 'ok'
+
+        fonts_result.append({
+            'declared': font,
+            'resolved': resolved,
+            'status': status,
+            'source': 'override' if in_overrides else ('map' if direct_hit else 'fallback'),
+        })
+
+    ok = not any(f['status'] == 'missing' for f in fonts_result)
+    result = {
+        'command': 'font-check',
+        'ok': ok,
+        'file': path,
+        'font_map': user_map_path or None,
+        'fonts': fonts_result,
+    }
     _emit(result, as_json)
 
 
@@ -1192,6 +1258,13 @@ def main(argv: list[str] | None = None) -> None:
     p_fc = sub.add_parser("font-check", help="Check font availability and resolution")
     p_fc.add_argument("input", help="Input .hwpx file")
     p_fc.add_argument("--json", action="store_true", help="Output as JSON")
+    p_fc.add_argument(
+        "--font-map",
+        dest="font_map",
+        metavar="PATH",
+        help="JSON file with {font_name: file_path} overrides "
+             "(merged on top of the bundled font map; case-insensitive keys)",
+    )
 
     # reflow-linesegs
     p_rls = sub.add_parser(
