@@ -60,7 +60,6 @@ def find_project_skill():
 SYNC_FILES = [
     "SKILL.md",
     "hwpx-form/SKILL.md",  # workflow [3] focused doc (linked from parent)
-    "chatgpt_hwpx_guide.md",
     "references/HWPX_RULEBOOK.md",
     "references/api_reference.md",
     "references/api_full.md",

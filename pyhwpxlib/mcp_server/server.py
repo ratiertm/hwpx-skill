@@ -819,15 +819,11 @@ def hwpx_template_save_session(name: str,
 def hwpx_guide() -> str:
     """Get the latest pyhwpxlib usage guide.
 
-    Returns the full guide including API reference, themes, workflows,
-    critical rules, and design guidelines. Call this first when starting
-    any HWPX document task to ensure you have the latest instructions.
+    Returns the built-in LLM quick-reference guide (API surface, themes,
+    workflows, critical rules, design guidelines). Call this first when
+    starting any HWPX document task to ensure you have the latest
+    instructions.
     """
-    guide_path = os.path.join(_PROJECT_ROOT, 'skill', 'chatgpt_hwpx_guide.md')
-    if os.path.exists(guide_path):
-        with open(guide_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    # Fallback to built-in LLM guide
     from pyhwpxlib.llm_guide import GUIDE
     return GUIDE
 
