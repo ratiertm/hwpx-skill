@@ -6,6 +6,46 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.17.2 — 2026-05-04
+
+> **Docs patch.** No code change. Refreshes the built-in LLM
+> quick-reference guide (`pyhwpxlib.llm_guide.GUIDE`) which was
+> last updated for v0.10.0.
+
+### Changed
+
+- `pyhwpxlib.llm_guide.GUIDE` rewritten end-to-end (232 → 349 lines).
+  This string is what the MCP `hwpx_guide()` tool returns, so the
+  refresh propagates to every Claude Code / external orchestration
+  client that calls it. Coverage now includes:
+  - Template workflow (v0.13.3+) — `add` / `fill` / `show` / `list`
+  - rhwp alignment (v0.14.0) — silent-fix opt-in, `doctor`,
+    `validate --mode strict|compat|both`
+  - JSON 19/19 builder coverage (v0.15.0)
+  - `page-guard` mandatory gate + `analyze --blueprint` (v0.16.0)
+  - Critical Rules #10–#13 (intent rules) elevated to top of guide
+  - NanumGothic OFL default fonts (v0.16.1)
+  - Workspace persistence Step 0 → Step G (v0.17.0)
+  - `font-check --font-map`, ok/alias/fallback/missing taxonomy,
+    `hwpx_template_save_session` MCP tool (v0.17.1)
+- Added a workflow router table at the top so users with one-line
+  intents ("fill this form", "convert .hwp") see the right section
+  immediately.
+- Added a recent-version-history table at the bottom of the guide.
+
+### Removed
+
+- `skill/chatgpt_hwpx_guide.md` (a ChatGPT-onboarding companion that
+  also lived behind `hwpx_guide()`'s file lookup branch). Stale
+  since v0.7.5; superseded by the in-process built-in. The MCP tool
+  now reads `llm_guide.GUIDE` directly without a filesystem probe.
+
+### Compatibility
+
+Pure docs / built-in resource update. No public API change.
+
+---
+
 ## 0.17.1 — 2026-05-04
 
 > **Patch.** Quiet bug fix in the font-resolution path + two additive

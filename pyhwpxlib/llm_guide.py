@@ -4,7 +4,7 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib v0.17.1 — LLM Quick Reference Guide
+# pyhwpxlib v0.17.2 — LLM Quick Reference Guide
 
 ## Installation
 ```
@@ -343,7 +343,8 @@ tree = doc.get_page_render_tree(0)               # {type, bbox, children}
 
 | Version | Highlights |
 |---------|-----------|
-| **0.17.1** | font-check `--font-map` + ok/alias/fallback/missing precision + lazy wasmtime fix + MCP `hwpx_template_save_session` |
+| **0.17.2** | docs — built-in LLM guide refreshed (was stuck at v0.10.0) covering 0.13.3–0.17.1 features |
+| 0.17.1 | font-check `--font-map` + ok/alias/fallback/missing precision + lazy wasmtime fix + MCP `hwpx_template_save_session` |
 | **0.17.0** | Workspace persistence — `template add/annotate/context/log-fill/install-hook` + outputs/decisions.md/history.json |
 | 0.16.1 | Default fonts → 나눔고딕 (SIL OFL) for license safety |
 | **0.16.0** | `page-guard` mandatory gate + `analyze --blueprint` + Critical Rules #10–#13 |
