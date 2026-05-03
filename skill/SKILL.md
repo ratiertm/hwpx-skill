@@ -206,8 +206,8 @@ Step C: **구조 판정** — 인접 셀(A) vs 같은 셀(B)
 - 구조 B → `unpack → 문자열 교체 → pack`
 Step D: 프리뷰 검증 → Whale 확인 요청
 Step E: **1페이지 fit 검증** — page_count == 1 이어야 함 (1매 표준 양식)
-- 넘치면: 사람이 하는 방식대로 ① 폰트 한 단계 ↓ ② 줄간격 10%씩 ↓ ③ 셀 높이 비례 ↓ 단계 적용
-- 자동화: `GongmunBuilder(autofit=True)` 또는 신규 양식이면 동일 패턴 직접 구현
+- 넘치면: `GongmunBuilder(autofit=True)` 로 코드에 위임 (폰트/줄간격/셀 높이 조정 알고리즘은 결정론 영역)
+- autofit 후에도 실패 → 사용자에게 보고하고 수동 조정 요청 (LLM이 mm 단위로 임의 결정 금지)
 
 Step F: **page-guard 통과 (v0.16.0+, 필수 게이트)**
 ```bash
@@ -499,6 +499,8 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 
 | Version | Highlights |
 |---------|------------|
+| **0.17.0** | 컨텍스트 지속성 — 양식별 워크스페이스 폴더 (`~/.local/share/pyhwpxlib/templates/<name>/`) + `decisions.md` / `history.json` / `outputs/` 자동 누적 + `template context/annotate/log-fill/open/migrate/install-hook` CLI + MCP `hwpx_template_context / workspace_list / log_fill / save_session` |
+| 0.16.1 | 라이선스 안전 — default 폰트 함초롬/맑은 고딕 → 나눔고딕 (SIL OFL 1.1), `pyhwpxlib/font/` 148 MB 제거, vendor NanumGothic 보존 |
 | **0.16.0** | reference-fidelity-toolkit — `pyhwpxlib page-guard` 강제 게이트 (rhwp+static 이중 경로) + `pyhwpxlib analyze --blueprint` 청사진 + Critical Rules 의도 룰 4개 (#10~#13) |
 | 0.15.0 | JSON 경로 19/19 builder 메서드 전부 도달 (옵션 A) — heading/image/image_from_url/list/footnote/equation/shape/header/footer/page_number/page_break, encoder rich-type emission |
 | **0.14.0** | rhwp 노선 채택 — silent fix opt-in, `pyhwpxlib doctor`, `validate --mode strict\|compat\|both` |

@@ -271,6 +271,73 @@ def test_T_MCP_03_template_log_fill(tmp_path, monkeypatch):
     assert out["usage_count"] == 1
 
 
+# ─── T-MCP-04 ~ T-MCP-07 save_session diarization-loop closer ──────
+
+
+def test_T_MCP_04_save_session_data_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    _add_sample("mcp04", tmp_path)
+    from pyhwpxlib.mcp_server.server import hwpx_template_save_session
+    out = json.loads(hwpx_template_save_session(
+        "mcp04",
+        data=json.dumps({"name": "Tester"}),
+    ))
+    assert out["saved"] is True
+    assert out["history"] is not None
+    assert out["history"]["usage_count"] == 1
+    assert out["decision_added"] is False
+
+
+def test_T_MCP_05_save_session_decision_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    _add_sample("mcp05", tmp_path)
+    from pyhwpxlib.mcp_server.server import hwpx_template_save_session
+    out = json.loads(hwpx_template_save_session(
+        "mcp05",
+        decision="구조 B 형, 1매 표준으로 결정",
+    ))
+    assert out["saved"] is True
+    assert out["history"] is None
+    assert out["decision_added"] is True
+    # decisions.md must contain the note
+    decisions = (tmp_path / "pyhwpxlib/templates/mcp05/decisions.md").read_text(
+        encoding="utf-8")
+    assert "구조 B 형" in decisions
+
+
+def test_T_MCP_06_save_session_both(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    _add_sample("mcp06", tmp_path)
+    from pyhwpxlib.mcp_server.server import hwpx_template_save_session
+    out = json.loads(hwpx_template_save_session(
+        "mcp06",
+        data=json.dumps({"name": "Tester", "amount": 100}),
+        decision="amount 필드는 천 단위 콤마 자동 적용",
+    ))
+    assert out["saved"] is True
+    assert out["history"]["usage_count"] == 1
+    assert out["decision_added"] is True
+
+
+def test_T_MCP_07_save_session_empty_is_noop(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    _add_sample("mcp07", tmp_path)
+    from pyhwpxlib.mcp_server.server import hwpx_template_save_session
+    out = json.loads(hwpx_template_save_session("mcp07"))
+    assert out["saved"] is False
+    assert "reason" in out
+
+
+def test_T_MCP_08_save_session_invalid_json_data(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    _add_sample("mcp08", tmp_path)
+    from pyhwpxlib.mcp_server.server import hwpx_template_save_session
+    out = json.loads(hwpx_template_save_session(
+        "mcp08", data="not-json{",
+    ))
+    assert "error" in out
+
+
 # ─── T-HOOK-01 ~ T-HOOK-02 install-hook ─────────────────────────────
 
 

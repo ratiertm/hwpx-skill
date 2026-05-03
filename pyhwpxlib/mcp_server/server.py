@@ -724,6 +724,98 @@ def hwpx_template_log_fill(name: str, data: str,
 
 
 @mcp.tool()
+def hwpx_template_save_session(name: str,
+                                data: str = "",
+                                decision: str = "",
+                                output_path: str = "") -> str:
+    """Close the diarization loop in one call (v0.17.0+).
+
+    Combines `hwpx_template_log_fill` + `annotate(add_decision=...)` so the
+    session-end "save state" step is a single round-trip. Use at the very
+    end of a form-fill session to persist what just happened:
+
+      - `data`: fill payload (JSON string). Appended to history.json.
+      - `decision`: free-form note for decisions.md (e.g. structure type
+        choice, page standard, edge cases discovered this session).
+      - `output_path`: optional, recorded alongside the history entry.
+
+    At least one of `data` or `decision` must be non-empty. When both are
+    empty the call is a no-op and returns ``{"saved": false}``.
+
+    Args:
+        name: registered template name (must exist in the workspace).
+        data: JSON string of fill data, or "" to skip log-fill.
+        decision: text appended to decisions.md, or "" to skip annotate.
+        output_path: optional output file path (paired with `data`).
+
+    Returns:
+        JSON string with shape:
+          {
+            "name": "<name>",
+            "saved": true|false,
+            "history": {...} | null,    # log_fill return when called
+            "decision_added": true|false
+          }
+    """
+    has_data = bool(data and data.strip())
+    has_decision = bool(decision and decision.strip())
+
+    if not has_data and not has_decision:
+        return json.dumps({
+            "name": name,
+            "saved": False,
+            "reason": "both data and decision empty — nothing to save",
+        }, ensure_ascii=False)
+
+    try:
+        from pyhwpxlib.templates.context import log_fill, annotate
+    except ImportError:
+        return json.dumps(
+            {"error": "context module not available (pyhwpxlib < 0.17.0)"},
+            ensure_ascii=False,
+        )
+
+    history_info = None
+    if has_data:
+        try:
+            data_dict = json.loads(data)
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {"error": f"invalid JSON data: {e}"},
+                ensure_ascii=False,
+            )
+        try:
+            history_info = log_fill(name, data_dict,
+                                     output_path=output_path or None)
+        except FileNotFoundError as e:
+            return json.dumps(
+                {"error": f"workspace not found: {name}",
+                 "detail": str(e)},
+                ensure_ascii=False,
+            )
+
+    decision_added = False
+    if has_decision:
+        try:
+            anno = annotate(name, add_decision=decision.strip())
+            decision_added = bool(anno.get("decision_added"))
+        except FileNotFoundError as e:
+            return json.dumps(
+                {"error": f"workspace not found: {name}",
+                 "detail": str(e),
+                 "history": history_info},
+                ensure_ascii=False,
+            )
+
+    return json.dumps({
+        "name": name,
+        "saved": True,
+        "history": history_info,
+        "decision_added": decision_added,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def hwpx_guide() -> str:
     """Get the latest pyhwpxlib usage guide.
 
