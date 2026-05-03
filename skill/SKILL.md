@@ -469,6 +469,7 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 
 | Version | Highlights |
 |---------|------------|
+| **0.17.1** | font-check 강화 — `--font-map <path>` 사용자 매핑 + 상태 ok/alias/fallback/missing 정밀화 + `rhwp_bridge` lazy wasmtime (`[preview]` 미설치 사용자 font-check 정상 동작) + MCP `hwpx_template_save_session` (log_fill+annotate 한 번 호출) |
 | **0.17.0** | 컨텍스트 지속성 — 양식별 워크스페이스 폴더 (`~/.local/share/pyhwpxlib/templates/<name>/`) + `decisions.md` / `history.json` / `outputs/` 자동 누적 + `template context/annotate/log-fill/open/migrate/install-hook` CLI + MCP `hwpx_template_context / workspace_list / log_fill / save_session` |
 | 0.16.1 | 라이선스 안전 — default 폰트 함초롬/맑은 고딕 → 나눔고딕 (SIL OFL 1.1), `pyhwpxlib/font/` 148 MB 제거, vendor NanumGothic 보존 |
 | **0.16.0** | reference-fidelity-toolkit — `pyhwpxlib page-guard` 강제 게이트 (rhwp+static 이중 경로) + `pyhwpxlib analyze --blueprint` 청사진 + Critical Rules 의도 룰 4개 (#10~#13) |

@@ -15,7 +15,7 @@
 설치 확인:
 ```python
 import pyhwpxlib
-print(pyhwpxlib.__version__)  # 0.7.0+
+print(pyhwpxlib.__version__)  # 0.17.1+ (2026-05-04)
 ```
 
 ---
@@ -573,4 +573,4 @@ doc.add_paragraph("표에 대한 설명...")
 
 ---
 
-*pyhwpxlib v0.7.0+ | PyPI: https://pypi.org/project/pyhwpxlib/ | GitHub: https://github.com/ratiertm/hwpx-skill*
+*pyhwpxlib v0.17.1+ | PyPI: https://pypi.org/project/pyhwpxlib/ | GitHub: https://github.com/ratiertm/hwpx-skill*
