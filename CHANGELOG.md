@@ -6,6 +6,65 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.17.1 — 2026-05-04
+
+> **Patch.** Quiet bug fix in the font-resolution path + two additive
+> CLI/MCP improvements built on top.
+
+### Fixed
+
+- **`pyhwpxlib.rhwp_bridge` no longer hard-requires `wasmtime`.** The
+  module-level `import wasmtime` was raising `ImportError` at import
+  time even when callers only needed font resolution (no WASM engine).
+  As a result, `pyhwpxlib font-check` returned empty resolutions on
+  systems without the `[preview]` extra installed — silently wrong,
+  not an error users could see. `wasmtime` is now lazy: it loads when
+  `RhwpEngine()` is actually instantiated, with the same install hint
+  as before. Fonts are resolved via `_TextMeasurer` regardless.
+
+### Added
+
+- **`pyhwpxlib font-check --font-map <path>`.** A user-supplied JSON
+  file `{"font_name": "/path/to/font.ttf", ...}` merges over the
+  bundled defaults (case-insensitive keys). Invalid JSON or list-type
+  payloads are rejected with exit 1 + a clear message.
+- **Refined font-check status taxonomy.** The four states now reflect
+  what rhwp would actually pick at render time:
+
+  | Status | Meaning |
+  |--------|---------|
+  | `ok` | declared font resolves to its own family file |
+  | `alias` | declared resolves but to a different family (e.g. 함초롬돋움 → bundled NanumGothic) |
+  | `fallback` | no entry in any map; rhwp picks a platform Korean/Latin fallback |
+  | `missing` | mapped, but the target file is absent on disk |
+
+  Each result row now also reports `source` ∈ `{map, override, fallback}`
+  for traceability.
+- **MCP `hwpx_template_save_session(name, data, decision, output_path)`.**
+  Closes the diarization loop in one call — combines `log_fill` and
+  `annotate(add_decision=...)` so the session-end "save state" step is
+  a single round-trip. At least one of `data`/`decision` must be
+  non-empty; both empty returns `{"saved": false}`.
+
+### Tests
+
+- 6 new cases for `font-check` (`tests/test_font_check.py`,
+  T-FC-01..06): direct hit, alias detection, override promotion,
+  missing path, invalid JSON, list-type rejection.
+- 5 new cases for `save_session` (`tests/test_workspace_persistence.py`,
+  T-MCP-04..08): data-only, decision-only, both, empty no-op,
+  invalid-JSON.
+- Total: 148 → **159 PASS**.
+
+### Compatibility
+
+- Fully backward compatible. No public API breakage. The lazy
+  wasmtime change is invisible to users with `[preview]` already
+  installed; users without it now see correct font resolution
+  instead of empty rows.
+
+---
+
 ## 0.17.0 — 2026-05-01
 
 > **Cross-session memory.** When the chat context resets, pyhwpxlib no
