@@ -6,6 +6,153 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.17.0 — 2026-05-01
+
+> **Cross-session memory.** When the chat context resets, pyhwpxlib no
+> longer forgets your form. Each registered template now owns a
+> workspace folder under `~/.local/share/pyhwpxlib/templates/<name>/`
+> that holds the original document, decisions, fill history, and saved
+> outputs — all auto-loaded on the next session.
+
+### Added
+
+- **Per-template workspace folders.** `template add <file>` creates
+  `~/.local/share/pyhwpxlib/templates/<name>/` containing
+  `original.hwpx`, `decisions.md` (free-form notes), `history.json`
+  (last fill payloads), and `outputs/` (auto-named results).
+- **Auto-named outputs.** `template fill --name <key>` with no
+  `--output` writes to `outputs/YYYY-MM-DD_<key>.hwpx` and appends the
+  payload to `history.json`. Re-runs preserve the prior file (suffixed
+  `_2`, `_3`, …).
+- **CLI commands.**
+  - `template context <name>` — print decisions, recent fills,
+    structural summary
+  - `template annotate <name>` — append a note to `decisions.md`
+  - `template log-fill <name> --data <json>` — manual history entry
+  - `template open <name>` — open the workspace folder in Finder/Explorer
+  - `template migrate` — relocate templates from legacy registry to the
+    new layout (creates a `tar.gz` backup before moving)
+  - `template install-hook` — install a Claude Code SessionStart hook
+    that calls `list_templates` + `load_context` automatically
+- **MCP tools.** `hwpx_template_context`, `hwpx_template_workspace_list`,
+  `hwpx_template_log_fill` exposed via `pyhwpxlib.mcp_server`.
+- **New modules.**
+  - `pyhwpxlib/templates/workspace.py` — `auto_output_path`,
+    `install_session_hook`
+  - `pyhwpxlib/templates/context.py` — `TemplateContext`,
+    `load_context`, `annotate`, `log_fill`
+  - `pyhwpxlib/templates/migration.py` — `plan_migration`,
+    `execute_migration` (`tar.gz` backup before mutate)
+
+### Changed
+
+- `pyhwpxlib.templates.fill.fill` accepts `output_path=None` and
+  resolves to the workspace `outputs/` folder when the template has
+  one. Existing callers that pass an explicit path are unaffected.
+- `LICENSE.md` — Rolling Change Date advanced to 2030-05-01.
+
+### Tests
+
+- `tests/test_workspace_persistence.py` — 18 cases (T-WS / T-MIG /
+  T-MCP / T-HOOK), incl. cross-session restoration scenario.
+- Total regression: 130 → **148 PASS**.
+
+### Compatibility
+
+- Fully backward compatible. Templates registered under the legacy
+  registry continue to work; `template migrate` is opt-in.
+
+---
+
+## 0.16.1 — 2026-05-01
+
+> **License safety patch.** Default font metadata switched from
+> 함초롬 / 맑은 고딕 (closed redistribution licenses) to 나눔고딕 (SIL
+> OFL 1.1). PyPI users no longer inherit redistribution risk from
+> Hancom / Microsoft fonts in the default code path.
+
+### Changed
+
+- `pyhwpxlib/themes.py` — `FontSet` six fields all default to
+  `'나눔고딕'` (previously `'맑은 고딕'`).
+- `pyhwpxlib/tools/blank_file_maker.py::_add_font_pair` — font slots
+  0 and 1 unified to `'나눔고딕'`.
+- `pyhwpxlib/tools/_reference_header.xml` — 함초롬돋움 / 바탕
+  references rewritten to 나눔고딕.
+- `README.md` / `README_KO.md` — new **Fonts** section explains the
+  license comparison table and how to override.
+
+### Removed
+
+- `pyhwpxlib/font/` — 148 MB of unused font zip bundles (7 archives)
+  pruned from the package. Significant PyPI wheel size reduction.
+
+### Preserved
+
+- `vendor/NanumGothic-*.ttf` (4 MB OFL embed) still ships for the
+  rhwp fallback path.
+- `rhwp_bridge.py` 함초롬 → NanumGothic mapping is unchanged
+  (existing HWPX files render unchanged).
+- `hwp2hwpx.convert()` preserves original font names for fidelity.
+- `FontSet(heading_hangul='맑은 고딕')` override remains supported
+  — the user takes on the redistribution responsibility.
+
+### Tests
+
+- `tests/test_font_defaults.py` — 7 new cases (T-FR-01…06 +
+  backward-compat bonus).
+- Total regression: 123 → **130 PASS**.
+
+---
+
+## 0.16.0 — 2026-05-01
+
+> **Reference-fidelity toolkit.** Closes the
+> "validate 통과 ≠ 사용자 의도 일치" gap by introducing a mandatory
+> reference/result page-count gate plus four intent rules in the
+> rulebook. Inspired by the XML-first `page_guard.py` pattern from a
+> partner hwpx skill author and absorbed into our API-first stack.
+
+### Added
+
+- `pyhwpxlib/page_guard.py` — compares reference and result page
+  counts via dual paths (rhwp engine + static heuristics) so the gate
+  works whether or not rhwp is available.
+- `pyhwpxlib/blueprint.py` — `analyze --blueprint` produces a human-
+  readable structural blueprint at depth 1 / 2 / 3.
+- CLI commands.
+  - `pyhwpxlib page-guard <ref> <result>` — strict gate, exit ≠ 0
+    on page-count mismatch.
+  - `pyhwpxlib analyze --blueprint --depth N` — text blueprint
+    output for documents.
+- **Critical Rules #10–#13** in `skill/references/HWPX_RULEBOOK.md`
+  Section 38:
+  - #10 substitution-first edits
+  - #11 structural-change restrictions
+  - #12 reference / result page-count parity required
+  - #13 page-guard pass required before delivery
+- `skill/references/rich_document_example.md` — golden Rich-Mode
+  sample + checklist.
+- `scripts/update_license_date.py` — auto-bump the LICENSE Rolling
+  Change Date on each release (release date + 4 years).
+
+### Removed (legacy GUI)
+
+- `template_builder.py`, `form_editor.py` — superseded by the v0.13.3+
+  CLI workflow.
+
+### Changed
+
+- `LICENSE.md` / `README*.md` — Rolling Change Date pattern documented.
+
+### Tests
+
+- 16 new cases (`test_page_guard.py` T-PG-01..06, `test_blueprint.py`
+  T-BP-01..03, plus regression-strengthening additions).
+- Total regression: 107 → **123 PASS**.
+
+---
+
 ## 0.15.0 — 2026-04-29
 
 > JSON path now reaches the same expressivity as direct ``HwpxBuilder``
