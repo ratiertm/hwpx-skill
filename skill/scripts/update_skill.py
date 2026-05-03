@@ -59,6 +59,7 @@ def find_project_skill():
 
 SYNC_FILES = [
     "SKILL.md",
+    "hwpx-form/SKILL.md",  # workflow [3] focused doc (linked from parent)
     "chatgpt_hwpx_guide.md",
     "references/HWPX_RULEBOOK.md",
     "references/api_reference.md",
@@ -68,6 +69,7 @@ SYNC_FILES = [
     "references/editing.md",
     "references/form_automation.md",
     "references/gongmun.md",
+    "references/rich_document_example.md",  # linked from SKILL.md Rich Mode 표
     "scripts/hwpx_helper.py",
     "scripts/update_skill.py",
     "evals/evals.json",
