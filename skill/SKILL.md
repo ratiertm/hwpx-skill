@@ -180,47 +180,17 @@ Step D: `unpack → 원본 문자열 교체 → pack → validate`
 
 ---
 
-## 워크플로우 [3] 양식 채우기
+## 워크플로우 [3] 양식 채우기 → 별도 스킬 `hwpx-form`
 
-**Step 0: 컨텍스트 자동 로드 (v0.17.0+, 새 채팅에서 우선 시도)**
-```python
-from pyhwpxlib.templates.context import load_context
-ctx = load_context(name)  # 등록 양식 → 결정사항·이전 채우기 값 자동 복원
-print(ctx.to_markdown())
-```
-또는 CLI: `pyhwpxlib template context <name>`. **이전 채팅의 합의가 살아 있다 →
-사용자가 양식 다시 업로드/설명할 필요 없음.** 미등록이면 Step 0' 메타 인지로.
+기존 양식(.hwpx)에 데이터를 채우는 작업은 **별도 스킬 [`hwpx-form`](hwpx-form/SKILL.md)** 에 분리되어 있다 (페이지 표준·1매 강제·구조 A/B 판정·page-guard·다이어리제이션 등 고유 절차가 많기 때문).
 
-**Step 0': 메타 인지 (미등록 양식만)** — 워크플로우 [2]와 동일. 양식은 특히 페이지 표준이 강하므로 필수.
-- "1매 표준" 양식 (지급조서·증빙·검수확인서)은 결과도 1페이지여야 함
-- 양식에 포함된 **(예시) 페이지는 가이드** — 결과물에선 보통 제거
-- 미리 인쇄된 항목 (사업명·기관명)은 보존, 빈 칸만 채움
-- → 사용자에게 "이 양식의 결과물은 1페이지로 만드는 게 맞나요?" 확인 후
-  `pyhwpxlib template add` + `template annotate --page-standard 1page --structure A/B`
-  로 결과를 워크스페이스에 박제 (다음 채팅에서 자동 복원).
-
-Step A: 프리뷰 렌더링 → Claude가 PNG 보고 양식 분석
-Step B: 사용자에게 필드 입력 요청 (ctx.recent_data 가 있으면 보여주고 재사용 제안)
-Step C: **구조 판정** — 인접 셀(A) vs 같은 셀(B)
-- 구조 A → `fill_by_labels` 사용
-- 구조 B → `unpack → 문자열 교체 → pack`
-Step D: 프리뷰 검증 → Whale 확인 요청
-Step E: **1페이지 fit 검증** — page_count == 1 이어야 함 (1매 표준 양식)
-- 넘치면: `GongmunBuilder(autofit=True)` 로 코드에 위임 (폰트/줄간격/셀 높이 조정 알고리즘은 결정론 영역)
-- autofit 후에도 실패 → 사용자에게 보고하고 수동 조정 요청 (LLM이 mm 단위로 임의 결정 금지)
-
-Step F: **page-guard 통과 (v0.16.0+, 필수 게이트)**
-```bash
-pyhwpxlib page-guard --reference original_form.hwpx --output filled.hwpx
-# → exit 0 (PASS) 일 때만 완료 처리. exit 1 (FAIL) 시 텍스트 압축/autofit 재시도
-```
-
-Step G: **결정사항 박제 (v0.17.0+)** — 이번 채팅에서 새로 합의한 규칙이 있으면
-```bash
-pyhwpxlib template annotate <name> --decision "이번에 합의한 내용"
-# 결과물도 자동으로 <workspace>/outputs/YYYY-MM-DD_<key>.hwpx 에 누적되고
-# history.json 에 채우기 데이터가 FIFO 10건 보존된다 (template fill 자동 호출).
-```
+**요약 절차** (자세한 내용은 `hwpx-form` 스킬):
+- Step 0: `template context <name>` — 등록 양식이면 결정사항·이전 값 자동 복원
+- Step 0': 메타 인지 (5질문) — 미등록 양식 한정
+- Step A→D: 프리뷰 렌더링 → 필드 입력 → 구조 A/B 판정 → 채우기 → 검증
+- Step E: 1페이지 fit (필요 시 `GongmunBuilder(autofit=True)` — 알고리즘 영역)
+- Step F: `page-guard` 통과 게이트 (Critical Rule #13)
+- Step G: `hwpx_template_save_session(name, data, decision)` — 다음 세션 위해 박제
 
 ---
 
