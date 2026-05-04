@@ -4,6 +4,15 @@ Tell an AI what you want, get a formatted Hancom Office document. No Hancom Offi
 
 [**한국어 문서**](README_KO.md)
 
+## What's new
+
+- **v0.17.3** (2026-05-05) — PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. Bypasses cairosvg's `@font-face` CJK limitation by substituting `font-family` to bundled NanumGothic. No more Korean tofu (□□□) when generating PNG previews.
+- **v0.17.2** (2026-05-04) — built-in LLM guide (`pyhwpxlib.llm_guide.GUIDE`, MCP `hwpx_guide()`) refreshed v0.10.0 → v0.17.2 with workspace persistence, `page-guard`, JSON 19/19, Critical Rules #10–#13, etc.
+- **v0.17.1** (2026-05-04) — `font-check --font-map <path>` user override, status taxonomy `ok/alias/fallback/missing`, lazy `wasmtime` import (font resolution works without `[preview]` extra), MCP `hwpx_template_save_session` (single-call diarization-loop close).
+- **v0.17.0** (2026-05-01) — workspace persistence: per-template folder under `~/.local/share/pyhwpxlib/templates/<name>/` with `decisions.md` / `history.json` / `outputs/` auto-tracked across chat sessions.
+
+Full history: [CHANGELOG.md](CHANGELOG.md).
+
 ## The main idea
 
 Describe your document in plain language to any LLM (Claude Code, Cursor, ChatGPT, ...) and it generates a `.hwpx` file using this skill's CLI commands:
