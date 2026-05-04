@@ -182,7 +182,7 @@ Step D: `unpack → 원본 문자열 교체 → pack → validate`
 
 ## 워크플로우 [3] 양식 채우기 → 전용 워크플로우 문서
 
-기존 양식(.hwpx)에 데이터를 채우는 작업은 **워크플로우 전용 문서 [`hwpx-form/SKILL.md`](hwpx-form/SKILL.md)** 에 분리되어 있다 (페이지 표준·1매 강제·구조 A/B 판정·page-guard·다이어리제이션 등 고유 절차 + 학습 루프 다이어그램 + 최초 등록 복붙 블록을 한 페이지에 응집).
+기존 양식(.hwpx)에 데이터를 채우는 작업은 **워크플로우 전용 문서 [`hwpx-form/WORKFLOW.md`](hwpx-form/WORKFLOW.md)** 에 분리되어 있다 (페이지 표준·1매 강제·구조 A/B 판정·page-guard·다이어리제이션 등 고유 절차 + 학습 루프 다이어그램 + 최초 등록 복붙 블록을 한 페이지에 응집).
 
 **요약 절차** (자세한 내용은 `hwpx-form` 스킬):
 - Step 0: `template context <name>` — 등록 양식이면 결정사항·이전 값 자동 복원

@@ -59,7 +59,7 @@ def find_project_skill():
 
 SYNC_FILES = [
     "SKILL.md",
-    "hwpx-form/SKILL.md",  # workflow [3] focused doc (linked from parent)
+    "hwpx-form/WORKFLOW.md",  # workflow [3] focused doc (linked from parent)
     "references/HWPX_RULEBOOK.md",
     "references/api_reference.md",
     "references/api_full.md",
