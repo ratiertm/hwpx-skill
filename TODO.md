@@ -1,5 +1,58 @@
 # TODO — hwpx-skill / python-hwpx OWPML 구현
 
+---
+
+## 다음 세션: render-perf-opt (PDCA, 0.18.0 목표)
+
+> 시작: `/pdca plan render-perf-opt`
+> 컨텍스트: 2026-05-05 세션에서 Tier 1 + T2.2 + T2.3 합의, 컨텍스트 한계로 Plan 직전 중단.
+> 제약: **문서 정확도 유지 (byte-identical PNG)** — 캐시는 순수 메모이제이션만.
+
+### Baseline (2026-05-05 측정)
+
+- `RhwpEngine()` instantiate: **851 ms** — WASM compile
+- `render_to_png` cold: **1,291 ms**
+- `render_to_png` 5회 평균: **879 ms/회** (매번 새 엔진)
+- 테스트 167 PASS in 13.8s
+- 회귀 검증 anchor: PNG `sha256 = d4501eeed09bc3d4d6c45a887523fdec913f428bdfee18f3e8c2570a793f2c05`
+  - 입력: `Test/output/template_fill_makers.hwpx`, page=0, scale=1.0, register_fonts=False
+  - 크기: 85,966 bytes
+
+### 변경 항목 (8개 + 2 인프라 + 1 릴리스)
+
+| Tier | # | 변경 | 위치 | 주의 |
+|---|---|---|---|---|
+| 1 | T1.1 | wasmtime Engine + Module 모듈-레벨 캐시 | `pyhwpxlib/rhwp_bridge.py` | Store/Linker/Instance 는 인스턴스별 (thread-safe 패턴) |
+| 1 | T1.2 | `_TextMeasurer` LRU on `(font_path, size, text)` → width | `pyhwpxlib/rhwp_bridge.py` | functools.lru_cache, 키 정확해야 회귀 없음 |
+| 1 | T1.3 | `_register_bundled_fonts` 모듈-레벨 가드 (1회만) | `pyhwpxlib/api.py` | — |
+| 1 | T1.4 | `render_to_png(engine=None)` DI | `pyhwpxlib/api.py` | 외부 엔진 주입 시 N장 렌더 1회 init |
+| 1 | T1.5 | MCP docstrings 압축 (다단락 → 2-3 문장) | `pyhwpxlib/mcp_server/server.py` | `hwpx_template_*`, `hwpx_render_png`, `hwpx_guide` |
+| 2 | T2.2 | 신규 CLI `pyhwpxlib check-fill <name> -d data.json` + MCP `hwpx_check_fill` | `pyhwpxlib/cli.py` + api.py + mcp_server | XML-level 빈칸 검증, ~10ms (PNG 안 만듦) |
+| 2 | T2.3 | Workflow [3] Step D 게이팅 — 중간엔 check-fill, 최종에만 PNG | `skill/hwpx-form/WORKFLOW.md` | 안티 패턴 예시 추가 |
+| - | INF | 회귀 테스트 — 변경 전/후 byte-identical PNG (3개 문서) | `tests/test_render_consistency.py` | sha256 anchor 사용 |
+| - | INF | 벤치마크 스크립트 — 5회 sequential, mean/p50/p95 보고 | `scripts/bench_render.py` | 변경 전/후 비교 자동화 |
+| - | REL | 0.18.0 minor 릴리스 (신규 CLI 라서 patch 부족) | pyproject + __init__ + CHANGELOG + skill zip + llm_guide | **CLAUDE.md "Release checklist" 8단계 따라야 함** |
+
+### 예상 효과 (5장 fill-and-verify 시나리오)
+
+- 컴퓨트: 6초 → **1초** (-83%)
+- 응답 토큰: 25K → **10K** (-60%)
+- 코드 변경: ~250 줄 (LRU + CLI + MCP + workflow doc + tests)
+- 테스트: 167 → ~175 (회귀 + check-fill 7-8 케이스)
+
+### 보류 항목 (이번 묶음 제외)
+
+- T3.1 wasmtime AOT 디스크 캐시 — 별도 PDCA cycle
+- T3.2 병렬 렌더 — 1-2 페이지 양식이 대부분이라 회귀 위험
+- T3.3 SKILL.md 슬림 20-30% — 라우팅 영향 검증 필요
+- T3.4 Anthropic `cache_control` 마커 문서화
+
+### Pre-task 등록 상태 (2026-05-05 세션)
+
+Tasks #19~#26 등록되어 있음 (in TaskList). 새 세션 시작 시 정리하고 PDCA Plan 부터 정식 진행.
+
+---
+
 ## 현재 상태 (2026-03-28)
 
 - **구현 완료 + Whale 검증**: ~38개 기능 (텍스트, charPr, paraPr, 표, 페이지 설정, 기본 도형)
