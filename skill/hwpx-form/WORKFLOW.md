@@ -96,7 +96,13 @@ pyhwpxlib template annotate <key> --description "<무엇>" --structure-type A|B 
 
 ## Step A: 프리뷰 렌더링 → 시각 분석
 
-PNG/SVG 로 양식 페이지 전체 렌더링 → Read tool 로 직접 확인.
+PNG 로 양식 페이지 렌더링 → Read tool 로 직접 확인.
+
+```python
+from pyhwpxlib.api import render_to_png
+png = render_to_png("source.hwpx", page=0)        # → source_preview_p0.png (v0.17.3+)
+```
+또는 CLI: `pyhwpxlib png source.hwpx`. **`render_page_svg(embed_fonts=True)` + cairosvg 조합은 한글 깨짐 (cairosvg `@font-face` 한계). PNG 가 필요하면 `render_to_png()` 만 사용.**
 
 ## Step B: 필드 입력 요청
 
@@ -113,7 +119,7 @@ PNG/SVG 로 양식 페이지 전체 렌더링 → Read tool 로 직접 확인.
 
 ## Step D: 프리뷰 검증
 
-채우기 후 PNG 재렌더링 → 시각 확인 → 사용자에게 Whale 확인 요청.
+채우기 후 `render_to_png(filled_path)` 재실행 → Read tool 로 시각 확인 → 사용자에게 Whale 확인 요청.
 
 ## Step E: 1페이지 fit 검증 (1매 표준 양식)
 

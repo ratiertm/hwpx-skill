@@ -346,6 +346,23 @@ def _embed_fonts_in_svg(svg: str, font_map: dict[str, str]) -> str:
     skip subsetting entirely. This significantly speeds up multi-page rendering.
 
     Requires ``fonttools``.  Returns the SVG unchanged if fonttools is missing.
+
+    .. note::
+       **Embedded @font-face vs cairosvg PNG conversion (v0.17.3 audit):**
+       The subsetted TTFs produced here include the correct CJK glyphs
+       (verified: 85 Korean codepoints subsetted into the NanumGothic
+       data URL for a typical form). Browsers and most HTML/SVG viewers
+       honor these @font-face data URLs and render Korean correctly.
+
+       However, ``cairosvg`` (Cairo + pycairo path) does not reliably
+       resolve ``@font-face`` data URLs for CJK text — the glyphs render
+       as tofu (□□□) even when the embedded subset is valid. This is a
+       cairosvg/Cairo limitation, not a fontTools subset bug.
+
+       For PNG export use :func:`pyhwpxlib.api.render_to_png` which
+       performs a regex substitution of every ``font-family`` attribute
+       to a fontconfig-installed name (bundled NanumGothic) before
+       calling cairosvg. That bypasses the @font-face path entirely.
     """
     if not _HAS_FONTTOOLS:
         return svg
@@ -582,6 +599,13 @@ class RhwpDocument:
         embed_fonts : bool
             If True, subset and base64-embed used fonts into the SVG so it
             renders identically on any machine. Requires ``fonttools``.
+
+            **Caveat (v0.17.3):** the embedded ``@font-face`` rules are
+            honored by browsers and most HTML/SVG viewers, but **not** by
+            ``cairosvg`` for CJK text. If your goal is a PNG export, use
+            :func:`pyhwpxlib.api.render_to_png` (which uses a different
+            font-substitution strategy). See :func:`_embed_fonts_in_svg`
+            for details.
         """
         self._check()
         if page < 0 or page >= self.page_count:

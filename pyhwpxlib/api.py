@@ -2687,3 +2687,172 @@ def insert_image_to_existing(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return output_path
+
+
+# ───────────────────────────────────────────────────────────────────
+# PNG preview rendering (v0.17.3+)
+# ───────────────────────────────────────────────────────────────────
+
+def _register_bundled_fonts(font_dir: Optional[str] = None) -> str:
+    """Idempotently copy bundled NanumGothic into a fontconfig-watched dir.
+
+    Returns the directory path used. Re-running is a no-op when the files
+    are already present. Calls ``fc-cache`` only when a file was copied.
+    Best-effort: failures (e.g. ``fc-cache`` missing on Windows) are
+    silently ignored — Cairo's font lookup may still succeed via other
+    means.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    try:
+        from pyhwpxlib.vendor import NANUM_GOTHIC_REGULAR, NANUM_GOTHIC_BOLD
+    except ImportError as e:  # pragma: no cover
+        raise RuntimeError(
+            "Bundled NanumGothic font missing from pyhwpxlib.vendor. "
+            "Reinstall pyhwpxlib."
+        ) from e
+
+    if font_dir is None:
+        font_dir = os.path.expanduser("~/.local/share/fonts")
+    os.makedirs(font_dir, exist_ok=True)
+
+    copied = False
+    for src, dst_name in [
+        (NANUM_GOTHIC_REGULAR, "NanumGothic-Regular.ttf"),
+        (NANUM_GOTHIC_BOLD, "NanumGothic-Bold.ttf"),
+    ]:
+        dst = os.path.join(font_dir, dst_name)
+        if not os.path.exists(dst):
+            shutil.copy(str(src), dst)
+            copied = True
+
+    if copied:
+        try:
+            subprocess.run(
+                ["fc-cache", "-fv", font_dir],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=10,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass  # fc-cache may not be installed; Cairo can still find fonts via other paths
+
+    return font_dir
+
+
+def render_to_png(
+    hwpx_path: str,
+    output_path: Optional[str] = None,
+    *,
+    page: int = 0,
+    scale: float = 1.2,
+    font_name: str = "NanumGothic",
+    register_fonts: bool = True,
+) -> str:
+    """Render one page of an HWPX document to PNG.
+
+    Pipeline: ``RhwpEngine.render_page_svg`` → regex-substitute every
+    ``font-family`` attribute to ``font_name`` → ``cairosvg.svg2png``.
+
+    The font-family substitution is the crucial step: rhwp emits SVG
+    referencing original Korean font names (e.g. ``함초롬바탕``), which
+    Cairo / fontconfig fails to resolve in headless or sandboxed
+    environments — text renders as tofu (□□□). Replacing every
+    ``font-family`` to a single fontconfig-known name fixes it.
+
+    Args:
+        hwpx_path: input ``.hwpx`` file path.
+        output_path: output ``.png`` path. Default: ``{stem}_preview_p{page}.png``.
+        page: 0-based page index.
+        scale: cairosvg DPI scale (default 1.2 ≈ 110 DPI).
+        font_name: fontconfig name to substitute everywhere. Must resolve
+            on the host. Default ``"NanumGothic"`` works after
+            ``register_fonts=True`` (default) or manual install.
+        register_fonts: when True, copy bundled NanumGothic into
+            ``~/.local/share/fonts`` and refresh ``fc-cache`` (idempotent,
+            one-time cost).
+
+    Returns:
+        Output PNG path.
+
+    Raises:
+        ImportError: when ``[preview]`` extra (rhwp/wasmtime) or
+            ``cairosvg`` is missing. The message includes the
+            ``pip install`` command to fix it.
+        FileNotFoundError: when ``hwpx_path`` does not exist.
+        ValueError: when ``page`` is out of range.
+    """
+    import os
+
+    if not os.path.exists(hwpx_path):
+        raise FileNotFoundError(f"HWPX file not found: {hwpx_path}")
+
+    try:
+        from pyhwpxlib.rhwp_bridge import (
+            RhwpEngine,
+            NANUM_GOTHIC_REGULAR,
+        )
+    except ImportError as e:
+        raise ImportError(
+            "render_to_png requires the [preview] extra. "
+            "Install with: pip install 'pyhwpxlib[preview]'"
+        ) from e
+
+    try:
+        import cairosvg
+    except ImportError as e:
+        raise ImportError(
+            "render_to_png requires cairosvg. "
+            "Install with: pip install cairosvg"
+        ) from e
+
+    if register_fonts:
+        _register_bundled_fonts()
+
+    # Map every Korean / generic font family to the bundled NanumGothic
+    # so rhwp's text-measurement also resolves consistently. The regex
+    # substitution below handles the SVG-emission side.
+    font_map = {
+        "함초롬바탕": NANUM_GOTHIC_REGULAR,
+        "함초롬돋움": NANUM_GOTHIC_REGULAR,
+        "휴먼명조": NANUM_GOTHIC_REGULAR,
+        "바탕": NANUM_GOTHIC_REGULAR,
+        "Batang": NANUM_GOTHIC_REGULAR,
+        "NanumGothic": NANUM_GOTHIC_REGULAR,
+        "나눔고딕": NANUM_GOTHIC_REGULAR,
+        "serif": NANUM_GOTHIC_REGULAR,
+        "sans-serif": NANUM_GOTHIC_REGULAR,
+    }
+
+    engine = RhwpEngine(font_map=font_map)
+    doc = engine.load(hwpx_path)
+
+    if page < 0 or page >= doc.page_count:
+        raise ValueError(
+            f"page {page} out of range (document has {doc.page_count} pages)"
+        )
+
+    svg = doc.render_page_svg(page)
+
+    # Crucial: replace every font-family attr so cairosvg/Cairo finds the
+    # font via fontconfig. Without this, Korean glyphs render as tofu.
+    svg_fixed = _re.sub(
+        r'font-family="[^"]*"',
+        f'font-family="{font_name}"',
+        svg,
+    )
+
+    if output_path is None:
+        stem = os.path.splitext(hwpx_path)[0]
+        output_path = f"{stem}_preview_p{page}.png"
+
+    cairosvg.svg2png(
+        bytestring=svg_fixed.encode("utf-8"),
+        write_to=output_path,
+        scale=scale,
+        unsafe=True,
+    )
+    return output_path

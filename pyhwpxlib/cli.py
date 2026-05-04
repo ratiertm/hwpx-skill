@@ -1114,6 +1114,31 @@ def _cmd_font_check(args: argparse.Namespace) -> None:
     _emit(result, as_json)
 
 
+def _cmd_png(args: argparse.Namespace) -> None:
+    """Render an HWPX page to PNG (v0.17.3+)."""
+    as_json = getattr(args, 'json', False)
+    try:
+        from .api import render_to_png
+        out = render_to_png(
+            args.input,
+            output_path=args.output,
+            page=args.page,
+            scale=args.scale,
+            font_name=args.font,
+            register_fonts=not args.no_register_fonts,
+        )
+    except (ImportError, FileNotFoundError, ValueError) as e:
+        msg = {"command": "png", "ok": False, "error": str(e)}
+        if as_json:
+            print(json.dumps(msg, ensure_ascii=False))
+        else:
+            print(f"Error: {e}")
+        sys.exit(1)
+    result = {"command": "png", "ok": True, "input": args.input, "output": out,
+              "page": args.page, "scale": args.scale, "font": args.font}
+    _emit(result, as_json)
+
+
 def _cmd_themes(args: argparse.Namespace) -> None:
     """List saved custom themes or extract/save a theme."""
     from .themes import BUILTIN_THEMES, _THEMES_DIR, extract_theme, save_theme, load_theme
@@ -1424,6 +1449,20 @@ def main(argv: list[str] | None = None) -> None:
     p_th.add_argument("--name", "-n", help="Theme name (for extract/delete)")
     p_th.add_argument("--json", action="store_true", help="Output as JSON")
 
+    p_png = sub.add_parser(
+        "png",
+        help="(v0.17.3+) Render an HWPX page to PNG (cairosvg + bundled NanumGothic font fix)",
+    )
+    p_png.add_argument("input", help="Input .hwpx file")
+    p_png.add_argument("-o", "--output", help="Output .png file (default: <input>_preview_p<page>.png)")
+    p_png.add_argument("--page", type=int, default=0, help="Page index (0-based, default 0)")
+    p_png.add_argument("--scale", type=float, default=1.2, help="DPI scale factor (default 1.2)")
+    p_png.add_argument("--font", default="NanumGothic",
+                       help="fontconfig font name to substitute (default NanumGothic)")
+    p_png.add_argument("--no-register-fonts", action="store_true",
+                       help="Skip bundled-font fontconfig registration (use when fonts already installed)")
+    p_png.add_argument("--json", action="store_true", help="JSON output")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -1449,6 +1488,7 @@ def main(argv: list[str] | None = None) -> None:
         "page-guard": _cmd_page_guard,
         "analyze": _cmd_analyze,
         "install-hook": _cmd_install_hook,
+        "png": _cmd_png,
     }
 
     handler = dispatch.get(args.command)

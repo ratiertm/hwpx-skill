@@ -6,6 +6,60 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.17.3 — 2026-05-05
+
+> **PNG export.** New API + CLI + MCP for rendering an HWPX page to PNG.
+> Solves the long-standing Korean-tofu (□□□) problem when going through
+> `cairosvg`. Triggered by a real user-reported workaround.
+
+### Added
+
+- `pyhwpxlib.api.render_to_png(hwpx_path, output_path=None, *, page=0,
+  scale=1.2, font_name="NanumGothic", register_fonts=True)`. Pipeline:
+  RhwpEngine SVG → regex-substitute every `font-family` → cairosvg.
+  Idempotent fontconfig registration of bundled NanumGothic on first
+  call. Returns the output PNG path.
+- CLI: `pyhwpxlib png <input> [-o OUT] [--page N] [--scale N]
+  [--font NAME] [--no-register-fonts] [--json]`.
+- MCP tool: `hwpx_render_png(hwpx_path, output_path, page, scale,
+  font_name, register_fonts)` returning `{"ok": true, "output": ...}`
+  or `{"ok": false, "error": ...}`.
+
+### Documented (no behavior change)
+
+- `pyhwpxlib.rhwp_bridge._embed_fonts_in_svg` — docstring expanded.
+  The function works correctly (subsetted TTFs include the right CJK
+  glyphs); the limitation is downstream in cairosvg's `@font-face`
+  data-URL handling for CJK. `embed_fonts=True` remains useful for
+  browser / HTML embedding; for PNG export, `render_to_png` is the
+  correct path.
+- `RhwpDocument.render_page_svg` — caveat note added.
+
+### Why this matters
+
+- Form-fill workflow Step A (preview → analyze) and Step D (verify
+  after fill) both depend on correct PNG rendering. Without this,
+  Korean text rendered as tofu in headless / sandboxed PNG flows even
+  though browsers showed it correctly.
+- Single-call API removes the per-project workaround burden.
+
+### Tests
+
+- `tests/test_render_png.py` — 8 cases (T-PNG-01..08): API default
+  output, default-path resolution, out-of-range page, missing input,
+  CLI happy path, CLI error path, MCP happy path, MCP error path.
+- All gated on `[preview]` extra + `cairosvg` availability so minimal
+  CI envs skip cleanly.
+- Total: 159 → **167 PASS**.
+
+### Compatibility
+
+Fully backward compatible. New surface only; no existing API touched.
+Requires `[preview]` extra + `cairosvg` for the new path; absence
+raises a clear `ImportError` with the exact `pip install` command.
+
+---
+
 ## 0.17.2 — 2026-05-04
 
 > **Docs patch.** No code change. Refreshes the built-in LLM

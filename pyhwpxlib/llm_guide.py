@@ -4,7 +4,7 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib v0.17.2 — LLM Quick Reference Guide
+# pyhwpxlib v0.17.3 — LLM Quick Reference Guide
 
 ## Installation
 ```
@@ -302,16 +302,36 @@ Auto-detected violations: `DATE_FORMAT`, `AUTHORITATIVE_TONE`,
 `DISCRIMINATORY_TERM`, `HANGUL_COMPAT_CHAR` (㉮ etc.), `DUEUM_ERROR`,
 `LOANWORD_ERROR`, `END_MARKER_MISSING`.
 
-## 12. Preview (SVG / HTML / RenderTree)
+## 12. Preview (SVG / HTML / RenderTree / PNG)
 ```python
 from pyhwpxlib.rhwp_bridge import RhwpEngine     # needs [preview] extra
 engine = RhwpEngine()
 doc = engine.load("output.hwpx")
-svg  = doc.render_page_svg(0, embed_fonts=True)  # heaviest, ~hundreds KB
+svg  = doc.render_page_svg(0, embed_fonts=True)  # for browser embedding
 html = doc.render_page_html(0)                   # lighter, tens of KB
 tree = doc.get_page_render_tree(0)               # {type, bbox, children}
                                                   # use bbox to assert overflow
+
+# PNG export (v0.17.3+) — handles the Korean-tofu pitfall automatically
+from pyhwpxlib.api import render_to_png
+png_path = render_to_png("output.hwpx", page=0)  # → output_preview_p0.png
+# Pipeline: rhwp SVG → regex-substitute every font-family to bundled
+# NanumGothic (registered to fontconfig) → cairosvg.svg2png. The
+# substitution is critical: cairosvg cannot resolve original Korean
+# font names like 함초롬바탕 via fontconfig, so without it CJK text
+# renders as tofu (□□□). Don't try render_page_svg(embed_fonts=True)
+# + cairosvg — cairosvg's @font-face support fails for CJK even when
+# the embedded subset is valid. Use render_to_png() instead.
 ```
+
+CLI:
+```bash
+pyhwpxlib png input.hwpx                          # → input_preview_p0.png
+pyhwpxlib png input.hwpx --page 1 --scale 2.0    # higher DPI
+pyhwpxlib png input.hwpx --json                   # machine-readable result
+```
+
+MCP: `hwpx_render_png(hwpx_path, output_path, page, scale, font_name, register_fonts)`.
 
 ## 13. MCP tools (Claude Code / external orchestration)
 
@@ -323,6 +343,7 @@ tree = doc.get_page_render_tree(0)               # {type, bbox, children}
 | `hwpx_template_context` | Restore decisions + recent_data for one form |
 | `hwpx_template_log_fill` | Append a fill record |
 | `hwpx_template_save_session` | log_fill + annotate in one call (v0.17.1+) |
+| `hwpx_render_png` | Render an HWPX page to PNG (Korean-safe, v0.17.3+) |
 
 ## Common LLM mistakes — avoid
 
@@ -343,7 +364,8 @@ tree = doc.get_page_render_tree(0)               # {type, bbox, children}
 
 | Version | Highlights |
 |---------|-----------|
-| **0.17.2** | docs — built-in LLM guide refreshed (was stuck at v0.10.0) covering 0.13.3–0.17.1 features |
+| **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. Bypasses cairosvg `@font-face` CJK limitation by font-family substitution to bundled NanumGothic |
+| 0.17.2 | docs — built-in LLM guide refreshed (was stuck at v0.10.0) covering 0.13.3–0.17.1 features |
 | 0.17.1 | font-check `--font-map` + ok/alias/fallback/missing precision + lazy wasmtime fix + MCP `hwpx_template_save_session` |
 | **0.17.0** | Workspace persistence — `template add/annotate/context/log-fill/install-hook` + outputs/decisions.md/history.json |
 | 0.16.1 | Default fonts → 나눔고딕 (SIL OFL) for license safety |

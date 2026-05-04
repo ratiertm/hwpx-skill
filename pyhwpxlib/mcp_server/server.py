@@ -816,6 +816,56 @@ def hwpx_template_save_session(name: str,
 
 
 @mcp.tool()
+def hwpx_render_png(hwpx_path: str,
+                     output_path: str = "",
+                     page: int = 0,
+                     scale: float = 1.2,
+                     font_name: str = "NanumGothic",
+                     register_fonts: bool = True) -> str:
+    """Render one page of an HWPX document to PNG (v0.17.3+).
+
+    Pipeline: ``RhwpEngine`` SVG → regex-substitute every ``font-family``
+    to ``font_name`` → ``cairosvg.svg2png``. The substitution is the key
+    step that prevents Korean text from rendering as tofu (□□□) when
+    cairosvg/Cairo cannot resolve original Korean font names like
+    ``함초롬바탕`` via fontconfig in headless environments.
+
+    Args:
+        hwpx_path: input ``.hwpx`` file path.
+        output_path: output ``.png`` path. Default (empty) →
+            ``<input_stem>_preview_p<page>.png``.
+        page: 0-based page index (default 0).
+        scale: cairosvg DPI scale factor (default 1.2).
+        font_name: fontconfig name to substitute (default
+            ``"NanumGothic"`` — works after auto-registration).
+        register_fonts: when True (default), copy bundled NanumGothic
+            into ``~/.local/share/fonts`` and refresh ``fc-cache``
+            (idempotent).
+
+    Returns:
+        JSON string ``{"ok": true, "output": "<path>", ...}`` on success
+        or ``{"ok": false, "error": "<message>"}`` on failure.
+    """
+    try:
+        from pyhwpxlib.api import render_to_png
+        out = render_to_png(
+            hwpx_path,
+            output_path=output_path or None,
+            page=page,
+            scale=scale,
+            font_name=font_name,
+            register_fonts=register_fonts,
+        )
+    except (ImportError, FileNotFoundError, ValueError) as e:
+        return json.dumps({"ok": False, "error": str(e),
+                           "type": type(e).__name__},
+                          ensure_ascii=False)
+    return json.dumps({"ok": True, "output": out, "input": hwpx_path,
+                       "page": page, "scale": scale, "font": font_name},
+                      ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def hwpx_guide() -> str:
     """Get the latest pyhwpxlib usage guide.
 

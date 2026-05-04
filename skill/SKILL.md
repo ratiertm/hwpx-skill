@@ -107,16 +107,23 @@ Step D: `pyhwpxlib validate` + `pyhwpxlib lint`
 
 Step E: **시각 검토 (생략 금지)**
 ```python
+# v0.17.3+ 권장: PNG 한 번 호출 (한글 깨짐 자동 회피)
+from pyhwpxlib.api import render_to_png
+png = render_to_png("output.hwpx", page=0)        # → output_preview_p0.png
+# Read tool로 PNG 직접 확인
+
+# 또는 SVG (브라우저 임베딩용)
 from pyhwpxlib.rhwp_bridge import RhwpEngine
 engine = RhwpEngine()
 doc = engine.load("output.hwpx")
-svg = doc.render_page_svg(0, embed_fonts=True)
-# Read tool로 SVG/PNG 직접 확인
+svg = doc.render_page_svg(0, embed_fonts=True)    # 브라우저 OK, cairosvg→PNG는 한글 깨짐
 ```
+> ⚠️ **PNG 변환 함정**: `render_page_svg(embed_fonts=True)` + cairosvg 조합은 cairosvg 의 `@font-face` 한계로 한글이 □□□ (tofu) 로 깨진다. PNG 가 필요하면 `pyhwpxlib.api.render_to_png()` 또는 CLI `pyhwpxlib png <file>` 사용 (font-family 를 fontconfig 등록된 NanumGothic 으로 일괄 치환).
 
 **rhwp 프리뷰 알려진 한계** (Whale에서는 정상):
 - 이미지와 텍스트 겹침 — rhwp가 textWrap 미지원
 - linesegarray 불일치 — 텍스트 교체 후 줄 뭉침
+- cairosvg 로 PNG 변환 시 한글 깨짐 → `pyhwpxlib.api.render_to_png()` 사용 (v0.17.3+)
 
 **보조 렌더 API** (용도별 선택):
 ```python
@@ -335,6 +342,7 @@ MCP `hwpx_from_json` 도 새 schema 자동 지원 (signature 무변경).
 | 테마 추출 | `extract_theme() → save_theme()` |
 | 테마 목록 | `pyhwpxlib themes list` |
 | 프리뷰 (SVG) | `RhwpEngine().load().render_page_svg()` |
+| **프리뷰 (PNG, v0.17.3+)** | `render_to_png(file, page=0)` 또는 CLI `pyhwpxlib png file` — 한글 안전 |
 | 프리뷰 (HTML, 경량) | `doc.render_page_html(0)` |
 | 레이아웃 검증 | `doc.get_page_render_tree(0)` → bbox 좌표로 overflow 판정 |
 
@@ -469,7 +477,8 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 
 | Version | Highlights |
 |---------|------------|
-| **0.17.2** | docs — 내장 LLM 가이드 (`pyhwpxlib.llm_guide.GUIDE`, MCP `hwpx_guide()`) v0.10.0 → v0.17.2 갱신 + chatgpt_hwpx_guide.md 제거 |
+| **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. cairosvg 의 `@font-face` 한글 한계를 font-family 일괄 치환으로 우회. 번들 NanumGothic 자동 등록 |
+| 0.17.2 | docs — 내장 LLM 가이드 (`pyhwpxlib.llm_guide.GUIDE`, MCP `hwpx_guide()`) v0.10.0 → v0.17.2 갱신 + chatgpt_hwpx_guide.md 제거 |
 | 0.17.1 | font-check 강화 — `--font-map <path>` 사용자 매핑 + 상태 ok/alias/fallback/missing 정밀화 + `rhwp_bridge` lazy wasmtime (`[preview]` 미설치 사용자 font-check 정상 동작) + MCP `hwpx_template_save_session` (log_fill+annotate 한 번 호출) |
 | **0.17.0** | 컨텍스트 지속성 — 양식별 워크스페이스 폴더 (`~/.local/share/pyhwpxlib/templates/<name>/`) + `decisions.md` / `history.json` / `outputs/` 자동 누적 + `template context/annotate/log-fill/open/migrate/install-hook` CLI + MCP `hwpx_template_context / workspace_list / log_fill / save_session` |
 | 0.16.1 | 라이선스 안전 — default 폰트 함초롬/맑은 고딕 → 나눔고딕 (SIL OFL 1.1), `pyhwpxlib/font/` 148 MB 제거, vendor NanumGothic 보존 |
