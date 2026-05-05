@@ -71,6 +71,9 @@ def add_table(
     cell_aligns: dict[tuple[int, int], str] | None = None,
     cell_styles: dict[tuple[int, int], dict] | None = None,
     section_index: int = 0,
+    *,
+    page_break: str = "CELL",
+    repeat_header: bool = False,
 ) -> Para:
     """Add a table to the document.
 
@@ -83,6 +86,12 @@ def add_table(
         (``"CENTER"``, ``"LEFT"``, ``"RIGHT"``).
     *cell_styles* maps ``(row, col)`` to char style dict with keys:
         ``bold``, ``text_color``, ``font_size``.
+
+    Page-break controls (v0.18.1+, keyword-only):
+    *page_break* — ``"CELL"`` (default, split between rows), ``"TABLE"``
+    (push entire table to next page if it doesn't fit), ``"NONE"`` (no split).
+    *repeat_header* — when True, row 0 repeats at the top of every page the
+    table spans. Hancom UI: 표 속성 → "여러 쪽 지원" / "제목 줄 반복".
     """
     from .writer.shape_writer import build_table_xml
     from .style_manager import ensure_border_fill, ensure_gradient_border_fill
@@ -146,6 +155,8 @@ def add_table(
         cell_margin=cell_margin,
         cell_para_pr_ids=cell_para_pr_ids,
         cell_char_pr_ids=cell_char_pr_ids,
+        page_break=page_break,
+        repeat_header=repeat_header,
     )
     return para
 

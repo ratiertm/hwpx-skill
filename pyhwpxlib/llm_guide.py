@@ -4,7 +4,7 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib v0.18.0 — LLM Quick Reference Guide
+# pyhwpxlib v0.18.1 — LLM Quick Reference Guide
 
 ## Installation
 ```
@@ -98,11 +98,24 @@ HwpxBuilder(theme='custom/my_style')
 | Structure | `add_heading(text, level=1..4)` `add_paragraph(text, bold, italic, font_size, text_color, alignment)` `add_page_break()` `add_line()` |
 | Emphasis | `add_highlight(text, color)` `add_footnote(text)` `add_equation(latex)` |
 | Lists | `add_bullet_list(items)` `add_numbered_list(items)` `add_nested_bullet_list(items)` `add_nested_numbered_list(items)` |
-| Visuals | `add_image(path, width, height)` `add_image_from_url(url, filename, width, height)` `add_table(data, header_bg, cell_colors, col_widths, row_heights)` `add_rectangle(...)` `add_draw_line(...)` |
+| Visuals | `add_image(path, width, height)` `add_image_from_url(url, filename, width, height)` `add_table(data, header_bg, cell_colors, col_widths, row_heights, *, page_break="CELL", repeat_header=False)` `add_rectangle(...)` `add_draw_line(...)` |
 | Decorum | `add_header(text)` `add_footer(text)` `add_page_number(pos="BOTTOM_CENTER")` |
 | Save | `save(path)` |
 
 `add_paragraph("")` is the spacing primitive — use liberally.
+
+### 3.1 Long tables that span multiple pages (v0.18.1+)
+
+```python
+doc.add_table(
+    [["헤더1", "헤더2"]] + [[f"r{r}c0", f"r{r}c1"] for r in range(50)],
+    page_break="TABLE",   # "CELL" (default, split between rows) | "TABLE" | "NONE"
+    repeat_header=True,   # repeat row 0 at top of every page
+)
+```
+
+Hancom UI mapping: 표 속성 → "여러 쪽 지원" / "제목 줄 반복". Whale won't
+visualize these — verify in Hancom Office (Critical Rule #12).
 
 ## 4. Read existing documents
 ```python
@@ -431,6 +444,7 @@ confirmation uses `render_to_png`. See `skill/hwpx-form/WORKFLOW.md` Step D.
 
 | Version | Highlights |
 |---------|-----------|
+| **0.18.1** | 표 자동 페이지 넘기기 — `add_table(page_break="CELL"|"TABLE"|"NONE", repeat_header=False)` 노출 (Hancom UI "여러 쪽 지원" / "제목 줄 반복"). Builder/api/writer 3-layer forward. 8 신규 단위 테스트. 자간 자동조정은 0.19.0으로 deferred. |
 | **0.18.0** | render-perf-opt — wasmtime Engine/Module module-level cache (warm `render_to_png` 1.2s→70ms, -94%) + `_TextMeasurer` LRU + `_register_bundled_fonts` guard + `render_to_png(*, engine=)` DI + new `pyhwpxlib check-fill` CLI / MCP `hwpx_check_fill` (~10ms XML-level verify) + MCP docstring compression (-45%) + Workflow [3] Step D gating (mid: check-fill / final: PNG). All output byte-identical to 0.17.3 (sha256 verified). |
 | **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. Bypasses cairosvg `@font-face` CJK limitation by font-family substitution to bundled NanumGothic |
 | 0.17.2 | docs — built-in LLM guide refreshed (was stuck at v0.10.0) covering 0.13.3–0.17.1 features |

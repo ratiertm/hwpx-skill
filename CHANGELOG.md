@@ -6,6 +6,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.18.1 — 2026-05-06
+
+> **표 자동 페이지 넘기기.** Hancom UI의 "여러 쪽 지원" / "제목 줄 반복"
+> 옵션을 builder API로 노출. 새 keyword-only 파라미터만 추가, 기존 호출자
+> 무영향.
+
+### Added
+
+- `HwpxBuilder.add_table(..., page_break="CELL"|"TABLE"|"NONE",
+  repeat_header=False)` (keyword-only). 동일 파라미터가 `pyhwpxlib.api.add_table()`
+  과 `pyhwpxlib.writer.shape_writer.build_table_xml()` 에도 forward 된다.
+  - `page_break="CELL"` (default) — 행 단위 분할, 다음 페이지로 흐름.
+  - `page_break="TABLE"` — 표가 1페이지에 안 들어가면 통째 다음 페이지로.
+  - `page_break="NONE"` — 분할 금지 (overflow 시 잘림).
+  - `repeat_header=True` — 0행을 매 페이지 상단에 자동 반복.
+- `tests/test_table_pagebreak.py` (8 cases) — 단위 + builder end-to-end +
+  default 보존 + 잘못된 값 ValueError 검증.
+
+### Internal
+
+- `pyhwpxlib/writer/shape_writer.py::build_table_xml`: 하드코딩된
+  `pageBreak="CELL" repeatHeader="0"` 제거, 새 keyword 파라미터에서 emit.
+  잘못된 `page_break` 값은 `ValueError` 발생 (silent skip 금지 — Critical Rules 정책).
+
+### Compatibility
+
+- 0.18.0 호출자 무수정 동작 (default 값이 기존 하드코딩과 동일).
+- 새 keyword args 는 keyword-only (positional 호출 영향 0).
+- Test count: 189 → **197** (+8).
+
+### Verification limits
+
+- Whale 뷰어는 `pageBreak`/`repeatHeader` 시각 반영 안 함 (한컴 한정 기능).
+- pyhwpxlib는 XML attribute 정확성만 보장. 실제 페이지 분할/헤더 반복 시각
+  확인은 한컴오피스에서 직접 열어보세요 (Critical Rule #12 reference fidelity).
+
+### Deferred
+
+- `from_json` 의 table action에 `page_break`/`repeat_header` 노출 — `Section.tables`
+  schema 확장 필요. 별도 사이클.
+- 자간 자동조정 (line-end 단어 분할 방지) — Hancom의 권위 있는 레이아웃에
+  의존하는 기능. 0.19.0 PDCA cycle에서 architecture 결정 후 구현.
+
+---
+
 ## 0.18.0 — 2026-05-05
 
 > **render-perf-opt.** Caching layer + XML-level fill verification +

@@ -175,6 +175,9 @@ def build_table_xml(
     cell_margin: Optional[Tuple[int, int, int, int]] = None,
     cell_para_pr_ids: Optional[dict] = None,
     cell_char_pr_ids: Optional[dict] = None,
+    *,
+    page_break: str = "CELL",
+    repeat_header: bool = False,
 ) -> str:
     """Build a complete ``<hp:run>`` containing an ``<hp:tbl>`` element.
 
@@ -189,9 +192,25 @@ def build_table_xml(
         *cell_border_fill_ids*.
     cell_border_fill_ids : dict mapping (row, col) to borderFillIDRef str
         Pre-resolved borderFill IDs per cell (created by api.py).
+    page_break : "CELL" | "TABLE" | "NONE"
+        Page-break policy when the table overflows the current page (v0.18.1+):
+        ``"CELL"`` (default) — split between rows, continue on next page.
+        ``"TABLE"`` — push the entire table to a new page if it doesn't fit.
+        ``"NONE"`` — never split (overflow is clipped). Hancom UI: 표 속성 →
+        "여러 쪽 지원".
+    repeat_header : bool
+        When True (v0.18.1+), the first row repeats at the top of every page
+        the table spans. Hancom UI: 표 속성 → "제목 줄 반복". Set this only
+        when row 0 is actually a header — otherwise duplicate data renders
+        on every page.
 
     Returns raw XML to be stored in ``Para.raw_xml_content``.
     """
+    if page_break not in ("CELL", "TABLE", "NONE"):
+        raise ValueError(
+            f"page_break must be 'CELL', 'TABLE', or 'NONE'; got {page_break!r}"
+        )
+    _repeat_header_attr = "1" if repeat_header else "0"
     # Column widths: use provided or distribute evenly
     if col_widths:
         _col_widths = col_widths
@@ -231,7 +250,8 @@ def build_table_xml(
     parts.append(
         f'<hp:tbl id="{tbl_id}" zOrder="0" numberingType="TABLE"'
         f' textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0"'
-        f' dropcapstyle="None" pageBreak="CELL" repeatHeader="0"'
+        f' dropcapstyle="None" pageBreak="{page_break}"'
+        f' repeatHeader="{_repeat_header_attr}"'
         f' rowCnt="{rows}" colCnt="{cols}" cellSpacing="0"'
         f' borderFillIDRef="{border_fill_id}" noAdjust="0">'
     )

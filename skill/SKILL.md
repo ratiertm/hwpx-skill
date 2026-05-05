@@ -340,6 +340,7 @@ MCP `hwpx_from_json` 도 새 schema 자동 지원 (signature 무변경).
 | **check-fill MCP** | `hwpx_check_fill(name, data_json)` — schema 우선 + 패턴 폴백, `is_complete` 반환 |
 | **render_to_png 캐시 DI (v0.18.0+)** | `render_to_png(path, engine=eng)` — N장 배치 시 RhwpEngine 1회만 init |
 | **render_pages_to_png (v0.18.0+)** | `render_pages_to_png(file, out_dir)` — 1 engine + 병렬 SVG + 병렬 cairosvg, byte-identical |
+| **표 자동 페이지 넘김 (v0.18.1+)** | `add_table(data, page_break="TABLE", repeat_header=True)` — Hancom "여러 쪽 지원"/"제목 줄 반복" |
 | **structure 청사진 (v0.16.0+)** | `pyhwpxlib analyze FILE --blueprint [--depth 1\|2\|3] [--json]` |
 | Lint | `pyhwpxlib lint <file>` |
 | Font check | `pyhwpxlib font-check <file>` |
@@ -481,6 +482,7 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 
 | Version | Highlights |
 |---------|------------|
+| **0.18.1** | 표 자동 페이지 넘기기 — `add_table(page_break, repeat_header)` keyword-only 노출 (Hancom UI "여러 쪽 지원"/"제목 줄 반복"). 자간 자동조정은 0.19.0 deferred |
 | **0.18.0** | render-perf-opt — wasmtime Engine/Module 모듈-레벨 캐시 (`render_to_png` warm 1.2s → 70ms, -94%) + `_TextMeasurer` LRU + `_register_bundled_fonts` 가드 + `render_to_png(*, engine=)` DI + 신규 `pyhwpxlib check-fill` CLI / MCP `hwpx_check_fill` (~10ms XML-level 검증) + MCP docstring 압축 (-45%) + Workflow [3] Step D 게이팅 (중간 check-fill / 최종 PNG) |
 | **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. cairosvg 의 `@font-face` 한글 한계를 font-family 일괄 치환으로 우회. 번들 NanumGothic 자동 등록 |
 | 0.17.2 | docs — 내장 LLM 가이드 (`pyhwpxlib.llm_guide.GUIDE`, MCP `hwpx_guide()`) v0.10.0 → v0.17.2 갱신 + chatgpt_hwpx_guide.md 제거 |

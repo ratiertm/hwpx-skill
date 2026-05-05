@@ -150,7 +150,10 @@ class HwpxBuilder:
                    cell_aligns: dict | None = None,
                    cell_styles: dict | None = None,
                    width: int = 42520,
-                   use_preset: bool = True):
+                   use_preset: bool = True,
+                   *,
+                   page_break: str = "CELL",
+                   repeat_header: bool = False):
         """표 추가
 
         Args:
@@ -165,6 +168,11 @@ class HwpxBuilder:
             cell_styles: {(row,col): {bold, text_color, font_size}} 셀별 글자 스타일
             width: 표 전체 너비 (기본 42520 = A4 content width)
             use_preset: False면 프리셋 자동 적용 안 함
+            page_break (v0.18.1+): 'CELL' (행 단위 분할, default) | 'TABLE'
+                (안 들어가면 다음 페이지 통째 push) | 'NONE' (분할 금지).
+                한컴 UI: 표 속성 → "여러 쪽 지원".
+            repeat_header (v0.18.1+): True면 0행을 매 페이지 상단에 반복.
+                한컴 UI: 표 속성 → "제목 줄 반복". 0행이 실제 헤더일 때만 사용.
         """
         rows = len(data)
         cols = max(len(r) for r in data) if data else 0
@@ -235,6 +243,8 @@ class HwpxBuilder:
             'cell_aligns': cell_aligns or None,
             'cell_styles': cell_styles or None,
             'width': width,
+            'page_break': page_break,
+            'repeat_header': repeat_header,
         })
 
     def add_image(self, image_path: str, width: int | None = None,
@@ -501,7 +511,9 @@ class HwpxBuilder:
                               cell_gradients=action.get('cell_gradients'),
                               cell_aligns=action.get('cell_aligns'),
                               cell_styles=action.get('cell_styles'),
-                              width=action.get('width', 42520))
+                              width=action.get('width', 42520),
+                              page_break=action.get('page_break', 'CELL'),
+                              repeat_header=action.get('repeat_header', False))
             elif kind == 'image':
                 from pyhwpxlib.api import add_image as api_add_image
                 api_add_image(doc, action['path'],
