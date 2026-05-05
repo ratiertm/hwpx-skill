@@ -1139,6 +1139,36 @@ def _cmd_png(args: argparse.Namespace) -> None:
     _emit(result, as_json)
 
 
+def _cmd_check_fill(args: argparse.Namespace) -> None:
+    """Verify that data covers all fields of a registered template (v0.18.0+)."""
+    as_json = getattr(args, "json", False)
+    try:
+        from .templates.check_fill import check_fill
+        if args.data:
+            data_in: object = args.data
+        else:
+            data_in = json.load(sys.stdin)
+        result = check_fill(args.name, data_in)
+    except (FileNotFoundError, TypeError, ValueError, json.JSONDecodeError) as e:
+        msg = {"command": "check-fill", "ok": False, "error": str(e)}
+        if as_json:
+            print(json.dumps(msg, ensure_ascii=False))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    out = result.to_dict()
+    if args.output:
+        Path(args.output).write_text(
+            json.dumps(out, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    _emit({"command": "check-fill", "ok": True, **out}, as_json)
+    # Exit 0 only when complete, 1 when any empty/placeholder remains.
+    sys.exit(0 if result.is_complete else 1)
+
+
 def _cmd_themes(args: argparse.Namespace) -> None:
     """List saved custom themes or extract/save a theme."""
     from .themes import BUILTIN_THEMES, _THEMES_DIR, extract_theme, save_theme, load_theme
@@ -1463,6 +1493,16 @@ def main(argv: list[str] | None = None) -> None:
                        help="Skip bundled-font fontconfig registration (use when fonts already installed)")
     p_png.add_argument("--json", action="store_true", help="JSON output")
 
+    p_cf = sub.add_parser(
+        "check-fill",
+        help="(v0.18.0+) Verify that data covers all fields of a registered template "
+             "(XML-level, ~10ms — no rendering). Exit 0 if complete, 1 if empty/placeholder.",
+    )
+    p_cf.add_argument("name", help="Registered template name or path to .hwpx")
+    p_cf.add_argument("-d", "--data", help="Path to data JSON file (or stdin if omitted)")
+    p_cf.add_argument("-o", "--output", help="Write CheckResult JSON to this path")
+    p_cf.add_argument("--json", action="store_true", help="JSON output to stdout")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -1489,6 +1529,7 @@ def main(argv: list[str] | None = None) -> None:
         "analyze": _cmd_analyze,
         "install-hook": _cmd_install_hook,
         "png": _cmd_png,
+        "check-fill": _cmd_check_fill,
     }
 
     handler = dispatch.get(args.command)

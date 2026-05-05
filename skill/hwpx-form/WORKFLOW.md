@@ -117,9 +117,28 @@ png = render_to_png("source.hwpx", page=0)        # → source_preview_p0.png (v
   template annotate <key> --structure-type A|B
   ```
 
-## Step D: 프리뷰 검증
+## Step D: 채우기 검증 — 게이팅 (중간 vs 최종, v0.18.0+)
 
-채우기 후 `render_to_png(filled_path)` 재실행 → Read tool 로 시각 확인 → 사용자에게 Whale 확인 요청.
+**중간 단계 — `check_fill` (~10ms, 권장):**
+채우기 데이터를 손볼 때마다 PNG를 생성하지 마세요. XML-level 검증으로 충분합니다.
+
+```bash
+pyhwpxlib check-fill <name> -d data.json --json
+# exit 0 = 모든 필드 채워지고 placeholder 없음
+# exit 1 = empty 또는 placeholder 잔존 — JSON에 어떤 키인지 표시됨
+```
+
+또는 MCP `hwpx_check_fill(name, data_json)` 호출. schema 등록된 양식이면
+schema vs data 비교로 누락 키를 정확히 보고, 미등록이면 `{{key}}`/`___` 패턴 폴백.
+
+**최종 단계만 — `render_to_png` (~1s, 1회):**
+`is_complete: true` 가 된 다음에만 PNG 렌더링 → Read tool 시각 확인 → 사용자에게 Whale 검증 요청.
+
+**왜 게이팅이 필요한가**: 5장 fill-and-verify 시나리오에서 매 step마다 PNG를 만들면 ~6초·25K 토큰
+소모. check-fill 우선 + 최종 PNG만 → 컴퓨트 -83%, 토큰 -60% (v0.18.0 측정).
+
+> ❌ 안티 패턴: "데이터 한 줄 바꿀 때마다 hwpx_render_png 호출" → 토큰·시간 모두 낭비.
+> 시각 확인은 사용자가 명시 요청한 시점 또는 최종 1회만.
 
 ## Step E: 1페이지 fit 검증 (1매 표준 양식)
 
@@ -164,6 +183,7 @@ pyhwpxlib template annotate <key> --decision "<note>"
 ## 안티 패턴
 
 - ❌ Step F (page-guard) 건너뛰고 "완료" 보고 → Critical Rule #13 위반
+- ❌ Step D 에서 매 데이터 변경마다 PNG 생성 → 토큰·시간 낭비. 중간엔 `check-fill` (~10ms)만 (v0.18.0+)
 - ❌ Step E 에서 LLM 이 폰트 size 를 mm 단위로 임의 결정 → 결정론 영역 침범
 - ❌ Step G 누락 → 다음 채팅에서 같은 양식을 처음부터 재판정해야 함 (다이어리제이션 깨짐)
 - ❌ 구조 B 양식에 `fill_by_labels()` 사용 → 빈 칸이 채워지지 않음 (label+값 한 셀이라서)

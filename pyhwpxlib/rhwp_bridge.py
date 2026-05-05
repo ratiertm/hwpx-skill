@@ -26,9 +26,11 @@ WASM binary resolution order
 from __future__ import annotations
 
 import ctypes
+import functools
 import os
 import re
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -245,6 +247,70 @@ _DEFAULT_FONT_MAP["sans-serif"] = _KOREAN_FALLBACK
 _DEFAULT_FONT_MAP["serif"] = _KOREAN_FALLBACK
 
 
+# Design Ref: §3.1 — Module-level cache state for Plan SC FR-01 (Engine cache)
+# wasmtime.Engine compilation is the dominant cost (~851ms cold). Cache by
+# wasm_path + PID guard so fork() in the parent process re-creates the engine
+# in the child rather than sharing a JIT region across address spaces.
+_ENGINE_CACHE: dict[str, tuple[object, object]] = {}  # wasm_path -> (Engine, Module)
+_ENGINE_CACHE_PID: int = -1
+_ENGINE_CACHE_LOCK = threading.Lock()
+
+
+def _get_engine_and_module(wasm_path: str) -> tuple[object, object]:
+    """Return cached (Engine, Module) for the given wasm_path.
+
+    Lazy-initializes on first call per process. Re-creates if the PID has
+    changed (fork-safety). Pure: same wasm_path → same Engine/Module pair
+    within a process; different wasm_path → distinct entry.
+    """
+    global _ENGINE_CACHE_PID
+    if not _HAS_WASMTIME:
+        raise ImportError(_WASMTIME_INSTALL_HINT)
+    pid = os.getpid()
+    with _ENGINE_CACHE_LOCK:
+        if _ENGINE_CACHE_PID != pid:
+            _ENGINE_CACHE.clear()
+            _ENGINE_CACHE_PID = pid
+        cached = _ENGINE_CACHE.get(wasm_path)
+        if cached is None:
+            engine = wasmtime.Engine()
+            module = wasmtime.Module.from_file(engine, wasm_path)
+            _ENGINE_CACHE[wasm_path] = (engine, module)
+            cached = (engine, module)
+        return cached
+
+
+# Design Ref: §3.1 — Module-level LRU for Plan SC FR-02 (text measure cache)
+# Pure function: (font_path, size_int, text, is_bold) → width. Same inputs →
+# same output. functools.lru_cache is thread-safe.
+@functools.lru_cache(maxsize=4096)
+def _measure_text_cached(
+    font_path: str, size_int: int, text: str, is_bold: bool
+) -> float:
+    if not _HAS_PIL:
+        # Heuristic kept identical to legacy path (preserves accuracy when
+        # Pillow is missing). is_bold is part of the cache key for forward
+        # compat but doesn't affect the heuristic.
+        w = 0.0
+        for ch in text:
+            cp = ord(ch)
+            if cp > 0x2E80 or cp == 0x3000:
+                w += size_int
+            else:
+                w += size_int * 0.5
+        return w
+    try:
+        ft = ImageFont.truetype(font_path, size_int)
+    except Exception:
+        ft = ImageFont.truetype(_KOREAN_FALLBACK, size_int)
+    try:
+        w = ft.getlength(text)  # type: ignore[attr-defined]
+    except AttributeError:  # very old Pillow
+        bbox = ft.getbbox(text)  # type: ignore[attr-defined]
+        w = bbox[2] - bbox[0]
+    return float(w)
+
+
 class _TextMeasurer:
     """Measures text width given a CSS-style font string like
     ``bold 1000px "HY견고딕", 'Malgun Gothic', sans-serif``.
@@ -287,44 +353,24 @@ class _TextMeasurer:
         return _KOREAN_FALLBACK  # final resort
 
     def measure(self, css_font: str, text: str) -> float:
+        # Plan SC FR-02: delegate to module-level LRU cache for repeated
+        # (font_path, size, text) combinations. Per-instance _css_cache stays
+        # for CSS-string→parsed parsing reuse.
         if not text:
             return 0.0
         cached = self._css_cache.get(css_font)
         if cached is not None:
-            fams, size, _bold = cached
+            fams, size, is_bold = cached
         else:
-            fams, size, _bold = self._parse_css_font(css_font)
-            self._css_cache[css_font] = (fams, size, _bold)
-
-        if not _HAS_PIL:
-            # Heuristic: 1.0em for CJK, 0.5em for ASCII/punctuation
-            w = 0.0
-            for ch in text:
-                cp = ord(ch)
-                if cp > 0x2E80 or cp == 0x3000:
-                    w += size
-                else:
-                    w += size * 0.5
-            return w
+            fams, size, is_bold = self._parse_css_font(css_font)
+            self._css_cache[css_font] = (fams, size, is_bold)
 
         path = self._resolve_path(fams)
         isize = max(1, int(round(size)))
-        key = (path, isize)
-        ft = self._cache.get(key)
-        if ft is None:
-            try:
-                ft = ImageFont.truetype(path, isize)
-            except Exception:
-                ft = ImageFont.truetype(_KOREAN_FALLBACK, isize)
-            self._cache[key] = ft
-        try:
-            w = ft.getlength(text)  # type: ignore[attr-defined]
-        except AttributeError:  # very old Pillow
-            bbox = ft.getbbox(text)  # type: ignore[attr-defined]
-            w = bbox[2] - bbox[0]
-        if ft.size and ft.size != size:
-            w *= size / ft.size
-        return float(w)
+        w = _measure_text_cached(path, isize, text, is_bold)
+        if _HAS_PIL and isize and isize != size:
+            w *= size / isize
+        return w
 
 
 # ---------------------------------------------------------------------------
@@ -465,9 +511,10 @@ class RhwpEngine:
         if not _HAS_WASMTIME:
             raise ImportError(_WASMTIME_INSTALL_HINT)
         self._wasm_path = Path(wasm_path) if wasm_path else _find_wasm()
-        self._engine = wasmtime.Engine()
+        # Plan SC FR-01: module-level Engine/Module cache amortizes the
+        # ~851ms WASM compilation cost across instances.
+        self._engine, self._module = _get_engine_and_module(str(self._wasm_path))
         self._store = wasmtime.Store(self._engine)
-        self._module = wasmtime.Module.from_file(self._engine, str(self._wasm_path))
         self._measurer = _TextMeasurer(font_map=font_map)
         self._linker = self._build_linker()
         self._instance = self._linker.instantiate(self._store, self._module)
@@ -629,6 +676,34 @@ class RhwpDocument:
         """Render every page to SVG strings."""
         return [self.render_page_svg(i, embed_fonts=embed_fonts)
                 for i in range(self.page_count)]
+
+    def render_all_svgs_parallel(self, *, embed_fonts: bool = False, max_workers: int | None = None) -> list[str]:
+        """Render every page to SVG strings in parallel using a thread pool.
+
+        Note: The underlying WASM engine call is protected by a lock to ensure
+        thread-safety, but font embedding (heavy CPU) runs concurrently.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
+
+        lock = threading.Lock()
+        results = ["" for _ in range(self.page_count)]
+
+        def _worker(i):
+            with lock:
+                # WASM calls are not thread-safe on a single store
+                svg = self.render_page_svg(i, embed_fonts=False)
+            
+            if embed_fonts:
+                # Font embedding is pure Python/CPU, can run in parallel
+                svg = _embed_fonts_in_svg(svg, self._engine._measurer._map)
+            return i, svg
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for i, svg in executor.map(_worker, range(self.page_count)):
+                results[i] = svg
+        
+        return results
 
     def render_page_html(self, page: int) -> str:
         """Render a single page to an HTML fragment string.

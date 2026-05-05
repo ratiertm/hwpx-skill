@@ -6,6 +6,108 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.18.0 — 2026-05-05
+
+> **render-perf-opt.** Caching layer + XML-level fill verification +
+> workflow gating. Cuts 5-page fill-and-verify cycle compute by 83%
+> and MCP tool-list response by 45%, all with byte-identical PNG output
+> (sha256 anchor verified). PDCA-driven cycle (Plan/Design/Do/Check/Act).
+
+### Added
+
+- `pyhwpxlib.templates.check_fill(name, data) -> CheckResult` —
+  schema-driven (when registered) or pattern-fallback fill verification
+  in ~10ms. Returns `filled / empty / placeholders / schema_used /
+  is_complete`. No rendering.
+- CLI: `pyhwpxlib check-fill <name> -d data.json [-o report.json] [--json]`.
+  Exit 0 when complete, 1 when any field empty or `{{key}}`/`___`
+  placeholder remains. Use mid-cycle instead of `pyhwpxlib png`.
+- MCP tool: `hwpx_check_fill(name, data)` — same payload as CLI.
+- `render_to_png(*, engine=None)` keyword-only DI parameter. When the
+  caller supplies a pre-built `RhwpEngine`, no new engine is constructed
+  inside the call (saves Store/Linker/Instance setup in batch loops on
+  top of the new Engine cache).
+- `pyhwpxlib.api.render_pages_to_png(hwpx_path, out_dir=None, *, scale=1.2,
+  font_name="NanumGothic", register_fonts=True, max_workers=None)` —
+  multi-page batch renderer that combines (1) shared `RhwpEngine` (created
+  once, reused across pages — sits on top of the module-level Engine cache),
+  (2) `render_all_svgs_parallel` for SVG generation, (3) parallel
+  `cairosvg.svg2png` via `ThreadPoolExecutor`. Output is byte-identical to
+  a sequential `render_to_png` loop (asserted by
+  `test_render_pages_to_png_byte_identical`). Speedup is workload-dependent
+  (~1.3× on 4-page documents under Python's GIL); the primary win is API
+  ergonomics — one call for "render all pages", no per-page loop.
+- `scripts/bench_render.py` — 5-run sequential benchmark reporting cold
+  / warm mean / p50 / p95 + LRU stats + sha256 anchor verification.
+- `tests/test_text_measurer_cache.py`, `tests/test_render_consistency.py`,
+  `tests/test_check_fill.py` — 21 new tests (engine singleton, PID
+  fork-detection, LRU hits, font-register guard, DI tripwire, byte-identical
+  regression for default/DI/serial-vs-parallel paths, schema/pattern
+  check_fill paths, CLI exit codes).
+
+### Performance (5 sequential `render_to_png`, byte-identical PNG)
+
+- `RhwpEngine()` instantiate: 851ms → ~5ms warm (-99%).
+- `render_to_png` warm mean: 879ms → 72ms (-92%).
+- 5-cycle fill-and-verify compute estimate: ~6s → ~1s (-83%).
+- MCP `tools-list` response: 7,841 → 4,300 chars (-45%) while
+  preserving `Example:` lines in every retained docstring.
+
+### Internal
+
+- `pyhwpxlib/rhwp_bridge.py`:
+  - Module-level `_ENGINE_CACHE: dict[wasm_path, (Engine, Module)]`
+    with `_ENGINE_CACHE_PID` fork-safety guard. `RhwpEngine.__init__`
+    now reuses the cached pair instead of compiling WASM per instance.
+    Per-call `Store` / `Linker` / `Instance` remain isolated.
+  - Module-level `@functools.lru_cache(maxsize=4096)
+    _measure_text_cached(font_path, size_int, text, is_bold)` — pure
+    function, thread-safe via stdlib. `_TextMeasurer.measure` delegates.
+  - Lazy `wasmtime` import preserved from 0.17.1.
+  - `RhwpDocument.render_all_svgs_parallel(*, embed_fonts=False,
+    max_workers=None)` — bonus thread-pool batch SVG renderer (WASM
+    serialised via lock, font embedding parallelised). Out of the
+    primary scope but verified byte-equal to serial output by
+    `test_parallel_svg_equals_serial`.
+- `pyhwpxlib/api.py`:
+  - Module-level `_FONTS_REGISTERED` / `_FONTS_REGISTERED_DIR` monotonic
+    flag. Second `_register_bundled_fonts()` with the same dir is a true
+    no-op (no filesystem stat).
+  - `render_to_png(...)` accepts the new keyword-only `engine=`
+    parameter.
+- `pyhwpxlib/mcp_server/server.py`:
+  - Tool docstrings compressed for `hwpx_template_save_session`,
+    `hwpx_render_png`, `hwpx_template_context`,
+    `hwpx_template_workspace_list`, `hwpx_template_log_fill`,
+    `hwpx_check_fill`, `hwpx_build`, `hwpx_build_step`,
+    `hwpx_build_preset`, `hwpx_fill_form`, `hwpx_analyze_form`,
+    `hwpx_guide` — "2-3 sentences + 1 example" pattern.
+
+### Docs
+
+- `pyhwpxlib/llm_guide.GUIDE` v0.17.3 → **v0.18.0**: new §12.1 (engine
+  reuse for batch rendering) and §13 (check-fill). Workflow router
+  gains "Verify form fill is complete" and "Render N pages efficiently"
+  rows. Version-history row updated. CLAUDE.md "Release checklist"
+  step 3 fully satisfied (no GUIDE drift this cycle, unlike 0.10.0-0.17.1).
+- `skill/SKILL.md` Versions table + Quick Reference (3 new rows for
+  check-fill CLI, MCP, and `render_to_png(engine=)` DI).
+- `skill/hwpx-form/WORKFLOW.md` Step D rewritten as a gating policy
+  with concrete commands, rationale, and an explicit anti-pattern.
+
+### Compatibility
+
+- Existing 0.17.x callers (no `engine=`) see only a perf delta — output
+  is byte-identical (sha256 anchor verified by
+  `tests/test_render_consistency.py` against
+  `Test/output/template_fill_makers.hwpx`,
+  `d4501eeed09bc3d4d6c45a887523fdec913f428bdfee18f3e8c2570a793f2c05`).
+- New keyword `engine=` is optional and keyword-only; positional call
+  sites unaffected.
+- Test count: 167 → **189** (+22 new across 3 test files).
+
+---
+
 ## 0.17.3 — 2026-05-05
 
 > **PNG export.** New API + CLI + MCP for rendering an HWPX page to PNG.

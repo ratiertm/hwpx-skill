@@ -4,7 +4,7 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib v0.17.3 — LLM Quick Reference Guide
+# pyhwpxlib v0.18.0 — LLM Quick Reference Guide
 
 ## Installation
 ```
@@ -18,6 +18,8 @@ pip install pyhwpxlib[preview]     # + rhwp WASM (SVG preview, page-guard)
 |-------------|----------|
 | "Create a new report / proposal" | §1 HwpxBuilder + §2 themes |
 | "Fill this form / template" | §8 register → fill → save_session |
+| "Verify the form fill is complete" | §13 check_fill (mid-cycle, ~10ms) — **not** PNG |
+| "Render N pages efficiently" | §12.1 `render_to_png(engine=eng)` reuse loop |
 | "Edit this existing document" | §7 overlay or §9 JSON round-trip |
 | "Convert .hwp to .hwpx" | §6 hwp2hwpx.convert() |
 | "Generate Korean 공문 (기안문)" | §11 GongmunBuilder |
@@ -333,7 +335,71 @@ pyhwpxlib png input.hwpx --json                   # machine-readable result
 
 MCP: `hwpx_render_png(hwpx_path, output_path, page, scale, font_name, register_fonts)`.
 
-## 13. MCP tools (Claude Code / external orchestration)
+### 12.1 Engine reuse for batch rendering (v0.18.0+)
+
+The wasmtime Engine/Module is now cached at module level — second
+`RhwpEngine()` instantiate hits the cache (~5ms instead of ~851ms cold).
+For tight loops you can also pass a single engine to skip per-call
+Store/Linker/Instance setup:
+
+```python
+from pyhwpxlib.api import render_to_png
+from pyhwpxlib.rhwp_bridge import RhwpEngine, NANUM_GOTHIC_REGULAR
+
+font_map = {"함초롬바탕": NANUM_GOTHIC_REGULAR, ...}
+engine = RhwpEngine(font_map=font_map)
+for path in many_files:
+    render_to_png(path, engine=engine)   # 5 calls: ~70ms each instead of ~880ms
+```
+
+Effect (5 sequential calls): warm mean **70ms** vs cold **1.2s** per call —
+~94% reduction. Output is byte-identical (sha256 verified).
+
+For a single multi-page document, prefer the all-in-one batch helper:
+
+```python
+from pyhwpxlib.api import render_pages_to_png
+
+paths = render_pages_to_png("4page.hwpx", out_dir="/tmp/out")
+# Returns ["/tmp/out/4page_p0.png", ..., "/tmp/out/4page_p3.png"]
+```
+
+It (1) creates one `RhwpEngine` and reuses it across all pages,
+(2) generates SVGs via `render_all_svgs_parallel`, (3) runs cairosvg
+PNG conversion in a `ThreadPoolExecutor`. Output is byte-identical to
+a sequential `render_to_png` loop. Speedup ~1.3× on 4-page docs (GIL
+caps cairosvg parallelism); the primary win is API ergonomics.
+
+## 13. Fill verification — check-fill (v0.18.0+)
+
+For mid-cycle fill iteration, **don't render PNG every time** —
+`render_to_png` is ~1s and ~5K response tokens. Use `check_fill` instead:
+XML-level coverage check in ~10ms.
+
+```bash
+pyhwpxlib check-fill makers_test -d data.json --json
+# exit 0 = is_complete (no empty fields, no leftover {{key}} or ___)
+# exit 1 = something missing — JSON shows which keys
+```
+
+```python
+from pyhwpxlib.templates.check_fill import check_fill
+r = check_fill("makers_test", {"team_name": "테스트팀"})
+print(r.is_complete, r.empty, r.placeholders)
+# False, ['member_1_name', ...], ['{{notes}}']
+```
+
+MCP: `hwpx_check_fill(name, data_json)` — same interface, JSON return.
+
+**Schema-driven** when the template is registered (compares schema fields
+vs data keys). **Pattern fallback** otherwise (scans `<hp:t>` for `{{key}}`
+and `___` runs). Both modes also surface residual placeholders in the
+source HWPX so you know what the template still has unfilled.
+
+**Workflow [3] gating**: middle steps use `check-fill`, only final visual
+confirmation uses `render_to_png`. See `skill/hwpx-form/WORKFLOW.md` Step D.
+
+## 14. MCP tools (Claude Code / external orchestration)
 
 | Tool | Purpose |
 |------|---------|
@@ -344,6 +410,7 @@ MCP: `hwpx_render_png(hwpx_path, output_path, page, scale, font_name, register_f
 | `hwpx_template_log_fill` | Append a fill record |
 | `hwpx_template_save_session` | log_fill + annotate in one call (v0.17.1+) |
 | `hwpx_render_png` | Render an HWPX page to PNG (Korean-safe, v0.17.3+) |
+| `hwpx_check_fill` | XML-level fill coverage check (~10ms, v0.18.0+) — use mid-cycle |
 
 ## Common LLM mistakes — avoid
 
@@ -364,6 +431,7 @@ MCP: `hwpx_render_png(hwpx_path, output_path, page, scale, font_name, register_f
 
 | Version | Highlights |
 |---------|-----------|
+| **0.18.0** | render-perf-opt — wasmtime Engine/Module module-level cache (warm `render_to_png` 1.2s→70ms, -94%) + `_TextMeasurer` LRU + `_register_bundled_fonts` guard + `render_to_png(*, engine=)` DI + new `pyhwpxlib check-fill` CLI / MCP `hwpx_check_fill` (~10ms XML-level verify) + MCP docstring compression (-45%) + Workflow [3] Step D gating (mid: check-fill / final: PNG). All output byte-identical to 0.17.3 (sha256 verified). |
 | **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. Bypasses cairosvg `@font-face` CJK limitation by font-family substitution to bundled NanumGothic |
 | 0.17.2 | docs — built-in LLM guide refreshed (was stuck at v0.10.0) covering 0.13.3–0.17.1 features |
 | 0.17.1 | font-check `--font-map` + ok/alias/fallback/missing precision + lazy wasmtime fix + MCP `hwpx_template_save_session` |

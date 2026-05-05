@@ -231,23 +231,11 @@ def hwpx_inspect(file: str) -> str:
 
 @mcp.tool()
 def hwpx_build_step(actions: str, step_name: str = "", output: str = "/tmp/hwpx_step.hwpx") -> str:
-    """Build HWPX incrementally and return a preview PNG.
+    """Build HWPX incrementally — accumulates actions, renders PNG each step.
 
-    Adds content to a document and renders a preview at each step,
-    like showing slides being built. Call repeatedly to build up
-    the document piece by piece.
-
-    actions: JSON array of actions to append. Each action:
-      {"type": "heading", "text": "제목", "level": 1}
-      {"type": "paragraph", "text": "본문", "bold": false, "font_size": 12}
-      {"type": "table", "data": [["A","B"],["1","2"]], "col_widths": [20000,22520]}
-      {"type": "page_break"}
-      {"type": "image", "path": "photo.png", "width": 21260, "height": 15000}
-
-    step_name: Label for this step (e.g., "제목 추가", "표 삽입").
-    output: Where to save the intermediate HWPX file.
-
-    Returns JSON with step info and PNG preview paths.
+    Caller passes ALL actions up to current step (HwpxBuilder is rebuilt fresh).
+    Action kinds: heading, paragraph, table, page_break, image, bullet_list,
+    numbered_list. Same schema as hwpx_build but with intermediate previews.
     """
     from pyhwpxlib import HwpxBuilder
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -327,17 +315,13 @@ def hwpx_preview(file: str, out_dir: str = "/tmp") -> str:
 
 @mcp.tool()
 def hwpx_fill_form(file: str, mappings: str, output: str) -> str:
-    """Fill a form template using label-based navigation.
+    """Fill a form by label→adjacent-cell navigation (structure A only).
 
-    Visually analyzes the form, finds label cells, and fills adjacent cells
-    (including empty cells). Supports directional navigation.
+    mappings: {"label>direction": "value"} where direction is right|left|up|down.
+    Use hwpx_analyze_form first to discover labels. For structure B (label+value
+    in same cell) use hwpx_patch instead. For coverage check use hwpx_check_fill.
 
-    mappings: JSON string of {"label>direction": "value"} pairs.
-        Direction: right (default), left, up, down.
-        Example: {"성 명>right": "홍길동", "전화번호>right": "010-1234"}
-
-    Handles both filled cells (text replacement) and empty cells (cellAddr patch).
-    Returns JSON with applied/failed counts and details.
+    Example: {"성 명>right": "홍길동", "전화번호>right": "010-1234"}
     """
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
     from templates.form_pipeline import fill_by_labels
@@ -350,13 +334,10 @@ def hwpx_fill_form(file: str, mappings: str, output: str) -> str:
 
 @mcp.tool()
 def hwpx_analyze_form(file: str) -> str:
-    """Analyze a form template and return fillable field locations.
+    """Analyze a form template — list label cells + suggested fill_paths.
 
-    Extracts all table cells, identifies labels and empty value cells,
-    and returns a structured field map for fill_form.
-
-    Use this before hwpx_fill_form to discover what fields exist.
-    Returns JSON with tables, cells, and suggested fill paths.
+    Use before hwpx_fill_form. Returns JSON with tables/cells/fields, where
+    each field has label, fill_path ("label>direction"), and target position.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
     from templates.form_pipeline import extract_form, find_cell_by_label
@@ -503,23 +484,12 @@ def hwpx_fill_batch(template: str, records: str, output_dir: str,
 
 @mcp.tool()
 def hwpx_build(actions: str, output: str) -> str:
-    """Build a new HWPX document from a full action list (one-shot, not cumulative).
+    """Build a new HWPX from a full action list (one-shot, not cumulative).
 
-    actions: JSON array. Each action:
-      {"type": "heading", "text": "제목", "level": 1, "alignment": "CENTER"}
-      {"type": "paragraph", "text": "본문", "bold": false, "font_size": 12,
-       "text_color": "#000000", "alignment": "JUSTIFY"}
-      {"type": "table", "data": [[...]], "col_widths": [...], "header_bg": "#..."}
-      {"type": "bullet_list", "items": [...]}
-      {"type": "numbered_list", "items": [...]}
-      {"type": "page_break"}
-      {"type": "line"}
-      {"type": "image", "path": "photo.png", "width": 21260, "height": 15000}
-      {"type": "image_url", "url": "...", "filename": "a.png", "width": 42520, "height": 21260}
-      {"type": "header", "text": "머리말"}
-      {"type": "footer", "text": "꼬리말"}
-      {"type": "page_number", "pos": "BOTTOM_CENTER"}
-      {"type": "highlight", "text": "...", "color": "#ffff00"}
+    actions JSON: [{"type": <kind>, ...}]. Kinds: heading, paragraph, table,
+    bullet_list, numbered_list, page_break, line, image, image_url, header,
+    footer, page_number, highlight. Schema details: references/api_full.md.
+    For incremental building use hwpx_build_step.
     """
     from pyhwpxlib import HwpxBuilder
     acts = json.loads(actions) if isinstance(actions, str) else actions
@@ -572,14 +542,10 @@ def hwpx_build(actions: str, output: str) -> str:
 @mcp.tool()
 def hwpx_build_preset(preset: str, title: str, sections: str, output: str,
                        subtitle: str = "", organization: str = "", date: str = "") -> str:
-    """Build a document using a named preset (official | report | proposal).
+    """Build with a named preset: official (공문서) | report | proposal.
 
-    Applies the preset's page margins, fonts, colors, and optional cover page.
-
-    sections: JSON array of {"heading": "제목", "body": ["단락1", ...]} or free actions
-              (same schema as hwpx_build actions).
-
-    preset: "official" (공문서), "report" (보고서), "proposal" (제안서)
+    Applies preset's margins/fonts/colors and adds cover for report/proposal.
+    sections: JSON array of {"heading": "...", "body": [...]} or hwpx_build actions.
     """
     from pyhwpxlib import HwpxBuilder
     from pyhwpxlib.presets import get_preset, build_cover_page
@@ -633,12 +599,12 @@ def hwpx_build_preset(preset: str, title: str, sections: str, output: str,
 
 @mcp.tool()
 def hwpx_template_context(name: str) -> str:
-    """Load workspace context for a registered HWPX template (v0.17.0+).
+    """Restore prior decisions/history for a registered template (v0.17.0+).
 
-    워크스페이스 폴더 (`~/.local/share/pyhwpxlib/templates/<name>/`) 에서 schema._meta,
-    decisions.md, history.json (최근 채우기) 를 로드해서 LLM 주입용 markdown + json
-    으로 반환. 새 채팅 세션 진입 시 양식명만 알면 이전 합의·결정·최근 데이터를
-    그대로 복원할 수 있다 — `pyhwpxlib template context <name>` 의 MCP 인터페이스.
+    Returns markdown + JSON of schema metadata, decisions.md, recent fills.
+    Call at session start with template name → no need to re-explain form.
+
+    Example: hwpx_template_context("makers_test")
     """
     try:
         from pyhwpxlib.templates.context import load_context
@@ -666,9 +632,9 @@ def hwpx_template_context(name: str) -> str:
 def hwpx_template_workspace_list() -> str:
     """List all registered HWPX templates with workspace metadata (v0.17.0+).
 
-    User workspaces (folder structure) + skill bundle (flat) 모두 포함.
-    각 항목은 name / name_kr / source / decisions_count / outputs_count / _meta 를
-    담아 LLM 이 양식 매칭에 사용할 수 있다.
+    Includes user workspaces + skill bundle. Each item: name, name_kr,
+    source, decisions_count, outputs_count, _meta. Use to match the user's
+    form mention to a registered template at session start.
     """
     try:
         from pyhwpxlib.templates.resolver import list_all_templates
@@ -689,13 +655,10 @@ def hwpx_template_log_fill(name: str, data: str,
                             output_path: str = "") -> str:
     """Append a fill entry to a template's history.json (v0.17.0+).
 
-    `hwpx_fill_form` 같은 외부 채우기 후 수동으로 기록을 남기고 싶을 때 사용.
-    `pyhwpxlib template fill` 을 통한 호출은 자동 기록이라 호출 불필요.
+    Use only after external fill (hwpx_fill_form etc) — `pyhwpxlib template fill`
+    auto-logs. Prefer hwpx_template_save_session at session end.
 
-    Args:
-        name: registered template name (workspace 등록 필요)
-        data: JSON string of fill data
-        output_path: optional output file path to record alongside the entry
+    Example: hwpx_template_log_fill("makers_test", '{"name":"홍"}')
     """
     try:
         from pyhwpxlib.templates.context import log_fill
@@ -728,34 +691,10 @@ def hwpx_template_save_session(name: str,
                                 data: str = "",
                                 decision: str = "",
                                 output_path: str = "") -> str:
-    """Close the diarization loop in one call (v0.17.0+).
+    """Save fill data + session decision (v0.17.0+, call at session end).
 
-    Combines `hwpx_template_log_fill` + `annotate(add_decision=...)` so the
-    session-end "save state" step is a single round-trip. Use at the very
-    end of a form-fill session to persist what just happened:
-
-      - `data`: fill payload (JSON string). Appended to history.json.
-      - `decision`: free-form note for decisions.md (e.g. structure type
-        choice, page standard, edge cases discovered this session).
-      - `output_path`: optional, recorded alongside the history entry.
-
-    At least one of `data` or `decision` must be non-empty. When both are
-    empty the call is a no-op and returns ``{"saved": false}``.
-
-    Args:
-        name: registered template name (must exist in the workspace).
-        data: JSON string of fill data, or "" to skip log-fill.
-        decision: text appended to decisions.md, or "" to skip annotate.
-        output_path: optional output file path (paired with `data`).
-
-    Returns:
-        JSON string with shape:
-          {
-            "name": "<name>",
-            "saved": true|false,
-            "history": {...} | null,    # log_fill return when called
-            "decision_added": true|false
-          }
+    data → history.json, decision → decisions.md. At least one non-empty.
+    Restored next session via hwpx_template_context.
     """
     has_data = bool(data and data.strip())
     has_decision = bool(decision and decision.strip())
@@ -822,29 +761,10 @@ def hwpx_render_png(hwpx_path: str,
                      scale: float = 1.2,
                      font_name: str = "NanumGothic",
                      register_fonts: bool = True) -> str:
-    """Render one page of an HWPX document to PNG (v0.17.3+).
+    """Render one HWPX page to PNG (v0.17.3+, final visual check only).
 
-    Pipeline: ``RhwpEngine`` SVG → regex-substitute every ``font-family``
-    to ``font_name`` → ``cairosvg.svg2png``. The substitution is the key
-    step that prevents Korean text from rendering as tofu (□□□) when
-    cairosvg/Cairo cannot resolve original Korean font names like
-    ``함초롬바탕`` via fontconfig in headless environments.
-
-    Args:
-        hwpx_path: input ``.hwpx`` file path.
-        output_path: output ``.png`` path. Default (empty) →
-            ``<input_stem>_preview_p<page>.png``.
-        page: 0-based page index (default 0).
-        scale: cairosvg DPI scale factor (default 1.2).
-        font_name: fontconfig name to substitute (default
-            ``"NanumGothic"`` — works after auto-registration).
-        register_fonts: when True (default), copy bundled NanumGothic
-            into ``~/.local/share/fonts`` and refresh ``fc-cache``
-            (idempotent).
-
-    Returns:
-        JSON string ``{"ok": true, "output": "<path>", ...}`` on success
-        or ``{"ok": false, "error": "<message>"}`` on failure.
+    For mid-cycle fill verify use hwpx_check_fill (~10× faster). PNG for last step.
+    Returns JSON {ok, output, ...}.
     """
     try:
         from pyhwpxlib.api import render_to_png
@@ -866,13 +786,34 @@ def hwpx_render_png(hwpx_path: str,
 
 
 @mcp.tool()
-def hwpx_guide() -> str:
-    """Get the latest pyhwpxlib usage guide.
+def hwpx_check_fill(name: str, data: str) -> str:
+    """Verify template fill coverage at the XML level (v0.18.0+, ~10ms).
 
-    Returns the built-in LLM quick-reference guide (API surface, themes,
-    workflows, critical rules, design guidelines). Call this first when
-    starting any HWPX document task to ensure you have the latest
-    instructions.
+    Use mid-cycle instead of hwpx_render_png — schema-driven if registered,
+    else placeholder-pattern fallback. PNG only for final visual check.
+
+    Example: hwpx_check_fill("makers_report", '{"name":"홍"}')
+    Returns JSON {ok, filled, empty, placeholders, schema_used, is_complete}.
+    """
+    try:
+        data_dict = json.loads(data) if isinstance(data, str) else data
+        if not isinstance(data_dict, dict):
+            raise TypeError("data must be a JSON object")
+        from pyhwpxlib.templates.check_fill import check_fill
+        result = check_fill(name, data_dict)
+    except (FileNotFoundError, TypeError, ValueError, json.JSONDecodeError) as e:
+        return json.dumps({"ok": False, "error": str(e),
+                           "type": type(e).__name__},
+                          ensure_ascii=False)
+    return json.dumps({"ok": True, **result.to_dict()},
+                      ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def hwpx_guide() -> str:
+    """Get the built-in pyhwpxlib usage guide (call first for any HWPX task).
+
+    Returns API surface, themes, workflows, Critical Rules, design rules.
     """
     from pyhwpxlib.llm_guide import GUIDE
     return GUIDE

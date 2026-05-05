@@ -2693,18 +2693,35 @@ def insert_image_to_existing(
 # PNG preview rendering (v0.17.3+)
 # ───────────────────────────────────────────────────────────────────
 
+# Plan SC FR-03: process-lifetime monotonic flag — fontconfig setup happens
+# at most once per process. Subsequent calls early-return without filesystem
+# access. Reset only when an explicit non-default font_dir is passed.
+_FONTS_REGISTERED: bool = False
+_FONTS_REGISTERED_DIR: Optional[str] = None
+
+
 def _register_bundled_fonts(font_dir: Optional[str] = None) -> str:
     """Idempotently copy bundled NanumGothic into a fontconfig-watched dir.
 
-    Returns the directory path used. Re-running is a no-op when the files
-    are already present. Calls ``fc-cache`` only when a file was copied.
-    Best-effort: failures (e.g. ``fc-cache`` missing on Windows) are
-    silently ignored — Cairo's font lookup may still succeed via other
-    means.
+    Returns the directory path used. After the first successful call within
+    a process, repeated calls with the same (or default) ``font_dir`` are a
+    cheap no-op (no filesystem stat). ``fc-cache`` is invoked only when at
+    least one font file was copied. Best-effort: failures (e.g. ``fc-cache``
+    missing on Windows) are silently ignored — Cairo's font lookup may
+    still succeed via other means.
     """
     import os
     import shutil
     import subprocess
+
+    global _FONTS_REGISTERED, _FONTS_REGISTERED_DIR
+
+    if font_dir is None:
+        font_dir = os.path.expanduser("~/.local/share/fonts")
+
+    # Fast path: same dir already registered in this process.
+    if _FONTS_REGISTERED and _FONTS_REGISTERED_DIR == font_dir:
+        return font_dir
 
     try:
         from pyhwpxlib.vendor import NANUM_GOTHIC_REGULAR, NANUM_GOTHIC_BOLD
@@ -2714,8 +2731,6 @@ def _register_bundled_fonts(font_dir: Optional[str] = None) -> str:
             "Reinstall pyhwpxlib."
         ) from e
 
-    if font_dir is None:
-        font_dir = os.path.expanduser("~/.local/share/fonts")
     os.makedirs(font_dir, exist_ok=True)
 
     copied = False
@@ -2740,6 +2755,8 @@ def _register_bundled_fonts(font_dir: Optional[str] = None) -> str:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass  # fc-cache may not be installed; Cairo can still find fonts via other paths
 
+    _FONTS_REGISTERED = True
+    _FONTS_REGISTERED_DIR = font_dir
     return font_dir
 
 
@@ -2751,6 +2768,7 @@ def render_to_png(
     scale: float = 1.2,
     font_name: str = "NanumGothic",
     register_fonts: bool = True,
+    engine: Optional["RhwpEngine"] = None,  # noqa: F821 — forward ref to rhwp_bridge.RhwpEngine
 ) -> str:
     """Render one page of an HWPX document to PNG.
 
@@ -2774,6 +2792,13 @@ def render_to_png(
         register_fonts: when True, copy bundled NanumGothic into
             ``~/.local/share/fonts`` and refresh ``fc-cache`` (idempotent,
             one-time cost).
+        engine: optional pre-built ``RhwpEngine``. When supplied, no new
+            engine is created — useful for batch rendering N pages without
+            paying the ~851ms per-engine WASM compile cost N times. The
+            module-level Engine/Module cache (``rhwp_bridge._ENGINE_CACHE``)
+            already amortizes that cost across calls, so passing ``engine=``
+            mostly saves the per-call ``Store``/``Linker``/``Instance``
+            setup (~5-10ms each). The caller owns the engine's lifecycle.
 
     Returns:
         Output PNG path.
@@ -2812,22 +2837,23 @@ def render_to_png(
     if register_fonts:
         _register_bundled_fonts()
 
-    # Map every Korean / generic font family to the bundled NanumGothic
-    # so rhwp's text-measurement also resolves consistently. The regex
-    # substitution below handles the SVG-emission side.
-    font_map = {
-        "함초롬바탕": NANUM_GOTHIC_REGULAR,
-        "함초롬돋움": NANUM_GOTHIC_REGULAR,
-        "휴먼명조": NANUM_GOTHIC_REGULAR,
-        "바탕": NANUM_GOTHIC_REGULAR,
-        "Batang": NANUM_GOTHIC_REGULAR,
-        "NanumGothic": NANUM_GOTHIC_REGULAR,
-        "나눔고딕": NANUM_GOTHIC_REGULAR,
-        "serif": NANUM_GOTHIC_REGULAR,
-        "sans-serif": NANUM_GOTHIC_REGULAR,
-    }
+    if engine is None:
+        # Map every Korean / generic font family to the bundled NanumGothic
+        # so rhwp's text-measurement also resolves consistently. The regex
+        # substitution below handles the SVG-emission side.
+        font_map = {
+            "함초롬바탕": NANUM_GOTHIC_REGULAR,
+            "함초롬돋움": NANUM_GOTHIC_REGULAR,
+            "휴먼명조": NANUM_GOTHIC_REGULAR,
+            "바탕": NANUM_GOTHIC_REGULAR,
+            "Batang": NANUM_GOTHIC_REGULAR,
+            "NanumGothic": NANUM_GOTHIC_REGULAR,
+            "나눔고딕": NANUM_GOTHIC_REGULAR,
+            "serif": NANUM_GOTHIC_REGULAR,
+            "sans-serif": NANUM_GOTHIC_REGULAR,
+        }
+        engine = RhwpEngine(font_map=font_map)
 
-    engine = RhwpEngine(font_map=font_map)
     doc = engine.load(hwpx_path)
 
     if page < 0 or page >= doc.page_count:
@@ -2856,3 +2882,75 @@ def render_to_png(
         unsafe=True,
     )
     return output_path
+
+
+def render_pages_to_png(
+    hwpx_path: str,
+    out_dir: Optional[str] = None,
+    *,
+    scale: float = 1.2,
+    font_name: str = "NanumGothic",
+    register_fonts: bool = True,
+    max_workers: Optional[int] = None,
+) -> List[str]:
+    """Render all pages of an HWPX document to PNGs in parallel.
+
+    Uses a thread pool to parallelize SVG generation and PNG conversion.
+    Significantly faster than sequential render_to_png for multi-page docs.
+    """
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+    from .rhwp_bridge import RhwpEngine, NANUM_GOTHIC_REGULAR
+
+    if not os.path.exists(hwpx_path):
+        raise FileNotFoundError(f"HWPX file not found: {hwpx_path}")
+
+    try:
+        import cairosvg
+    except ImportError as e:
+        raise ImportError("render_pages_to_png requires cairosvg. Install with: pip install cairosvg") from e
+
+    if register_fonts:
+        _register_bundled_fonts()
+
+    if out_dir is None:
+        out_dir = os.getcwd()
+    os.makedirs(out_dir, exist_ok=True)
+
+    font_map = {
+        "함초롬바탕": NANUM_GOTHIC_REGULAR,
+        "함초롬돋움": NANUM_GOTHIC_REGULAR,
+        "휴먼명조": NANUM_GOTHIC_REGULAR,
+        "바탕": NANUM_GOTHIC_REGULAR,
+        "Batang": NANUM_GOTHIC_REGULAR,
+        "NanumGothic": NANUM_GOTHIC_REGULAR,
+        "나눔고딕": NANUM_GOTHIC_REGULAR,
+        "serif": NANUM_GOTHIC_REGULAR,
+        "sans-serif": NANUM_GOTHIC_REGULAR,
+    }
+
+    engine = RhwpEngine(font_map=font_map)
+    doc = engine.load(hwpx_path)
+    page_count = doc.page_count
+    stem = os.path.splitext(os.path.basename(hwpx_path))[0]
+
+    # 1. Parallel SVG rendering
+    svgs = doc.render_all_svgs_parallel(embed_fonts=False, max_workers=max_workers)
+    output_paths = [os.path.join(out_dir, f"{stem}_p{i}.png") for i in range(page_count)]
+
+    # 2. Parallel SVG to PNG conversion
+    def _to_png(idx):
+        svg_fixed = _re.sub(r'font-family="[^"]*"', f'font-family="{font_name}"', svgs[idx])
+        cairosvg.svg2png(
+            bytestring=svg_fixed.encode("utf-8"),
+            write_to=output_paths[idx],
+            scale=scale,
+            unsafe=True,
+        )
+        return output_paths[idx]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        list(executor.map(_to_png, range(page_count)))
+
+    doc.close()
+    return output_paths
