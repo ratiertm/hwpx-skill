@@ -345,13 +345,17 @@ This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for
 | Files | License |
 |-------|---------|
 | `hwp2hwpx.py`, `hwp_reader.py`, `value_convertor.py` | Apache 2.0 (derivative works) |
-| **All other files** | **BSL 1.1** |
+| **All other files** | **PolyForm Noncommercial 1.0.0** |
 
-**BSL 1.1 summary:**
-- Personal / non-commercial / educational / open-source: **Free**
-- Internal use (up to 5 users): **Free**
-- Commercial use / 6+ users: **Commercial license required**
-- Rolling Change Date: each release converts to Apache 2.0 four years after its release date (latest 0.17.0 → 2030-05-01). See [LICENSE.md](LICENSE.md).
+**PolyForm Noncommercial summary:**
+- Personal / educational / non-profit / non-commercial open-source: **Free**
+- Any commercial use (regardless of team size): **Commercial license required**
+- Source is publicly available — view, study, and modify under the noncommercial terms
+- Commercial inquiries: https://lchfkorea.com
+
+> Migration note: pyhwpxlib used **BSL 1.1** through v0.18.1. Starting **v0.19.0** the
+> license switched to PolyForm Noncommercial 1.0.0. PyPI artifacts published before the
+> switch retain their original BSL 1.1 terms. See [LICENSE.md §3](LICENSE.md) for details.
 
 ## Fonts
 

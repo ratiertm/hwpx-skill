@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyhwpxlib"
-version = "0.18.1"
+version = "0.18.2"
 description = "Python library for creating and editing HWPX (Hancom Office) documents without Hancom Office"
 readme = "README.md"
-license = "Apache-2.0"
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0 AND Apache-2.0"
 license-files = ["LICENSE.md", "LICENSE-APACHE", "NOTICE"]
 requires-python = ">=3.8"
 keywords = ["hwpx", "hwp", "hancom", "korean", "document", "llm"]

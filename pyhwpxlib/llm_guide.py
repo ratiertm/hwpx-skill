@@ -4,7 +4,7 @@ Usage: python -m pyhwpxlib guide
 """
 
 GUIDE = r"""
-# pyhwpxlib v0.18.1 — LLM Quick Reference Guide
+# pyhwpxlib v0.18.2 — LLM Quick Reference Guide
 
 ## Installation
 ```
@@ -444,6 +444,7 @@ confirmation uses `render_to_png`. See `skill/hwpx-form/WORKFLOW.md` Step D.
 
 | Version | Highlights |
 |---------|-----------|
+| **0.18.2** | License migration — BSL 1.1 → PolyForm Noncommercial 1.0.0 (Apache 2.0 dual maintained). No code changes; byte-identical to 0.18.1. Personal/academic/non-profit free; any commercial use (incl. small teams, freelancers) now requires commercial license. Commercial inquiries: lchfkorea.com |
 | **0.18.1** | 표 자동 페이지 넘기기 — `add_table(page_break="CELL"|"TABLE"|"NONE", repeat_header=False)` 노출 (Hancom UI "여러 쪽 지원" / "제목 줄 반복"). Builder/api/writer 3-layer forward. 8 신규 단위 테스트. 자간 자동조정은 0.19.0으로 deferred. |
 | **0.18.0** | render-perf-opt — wasmtime Engine/Module module-level cache (warm `render_to_png` 1.2s→70ms, -94%) + `_TextMeasurer` LRU + `_register_bundled_fonts` guard + `render_to_png(*, engine=)` DI + new `pyhwpxlib check-fill` CLI / MCP `hwpx_check_fill` (~10ms XML-level verify) + MCP docstring compression (-45%) + Workflow [3] Step D gating (mid: check-fill / final: PNG). All output byte-identical to 0.17.3 (sha256 verified). |
 | **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. Bypasses cairosvg `@font-face` CJK limitation by font-family substitution to bundled NanumGothic |

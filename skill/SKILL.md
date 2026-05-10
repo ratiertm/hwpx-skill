@@ -482,6 +482,7 @@ pyhwpxlib reflow-linesegs <file>              # default --mode precise (legacy)
 
 | Version | Highlights |
 |---------|------------|
+| **0.18.2** | License migration — BSL 1.1 → PolyForm Noncommercial 1.0.0. 코드 무변경, 0.18.1 과 byte-identical. 개인/학술/비영리 무료, 영리 활동 (인원 무관) 상업 라이선스 필요 |
 | **0.18.1** | 표 자동 페이지 넘기기 — `add_table(page_break, repeat_header)` keyword-only 노출 (Hancom UI "여러 쪽 지원"/"제목 줄 반복"). 자간 자동조정은 0.19.0 deferred |
 | **0.18.0** | render-perf-opt — wasmtime Engine/Module 모듈-레벨 캐시 (`render_to_png` warm 1.2s → 70ms, -94%) + `_TextMeasurer` LRU + `_register_bundled_fonts` 가드 + `render_to_png(*, engine=)` DI + 신규 `pyhwpxlib check-fill` CLI / MCP `hwpx_check_fill` (~10ms XML-level 검증) + MCP docstring 압축 (-45%) + Workflow [3] Step D 게이팅 (중간 check-fill / 최종 PNG) |
 | **0.17.3** | PNG export — `pyhwpxlib.api.render_to_png()` + CLI `pyhwpxlib png` + MCP `hwpx_render_png`. cairosvg 의 `@font-face` 한글 한계를 font-family 일괄 치환으로 우회. 번들 NanumGothic 자동 등록 |

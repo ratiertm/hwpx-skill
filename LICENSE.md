@@ -19,60 +19,81 @@
 
 ---
 
-## 2. Business Source License 1.1 적용 파일
+## 2. PolyForm Noncommercial License 1.0.0 적용 파일
 
-위에 명시된 파일을 **제외한 모든 파일**에 BSL 1.1이 적용됩니다.
+위에 명시된 파일을 **제외한 모든 파일**에 PolyForm Noncommercial 1.0.0이 적용됩니다.
 
 **Licensor:** Eunmi Lee (ratiertm)
 **Licensed Work:** pyhwpxlib
 **Copyright:** (c) 2026 Eunmi Lee
 
-**Change License:** Apache License, Version 2.0
+### 한 줄 요약
 
-### Rolling Change Date
-
-각 릴리스 버전은 **자체 Change Date** 를 가지며, 그 값은 **해당 버전의 릴리스일 + 4년** 으로
-설정됩니다. 즉 새 버전이 나올 때마다 Change Date 가 자동으로 4년 뒤로 갱신됩니다 (HashiCorp,
-Sentry 와 동일한 Rolling 패턴). 이전 버전은 자신의 Change Date 가 도래하면 자동으로
-Apache 2.0 으로 전환됩니다.
-
-<!-- ROLLING_TABLE_START -->
-| 버전 | 릴리스일 | Change Date |
-|------|---------|------------|
-| 0.17.0 (current) | 2026-05-01 | 2030-05-01 |
-<!-- ROLLING_TABLE_END -->
-
-> 매 릴리스 시 `python scripts/update_license_date.py` 로 위 표가 자동 갱신됩니다.
+- **개인·비상업 용도: 무료** (소스 자유 열람, 수정, 재배포 가능)
+- **상업 용도: 별도 라이선스 필요** — 한 명이든 백 명이든 영리 활동에 쓰면 유료
+- 상업 라이선스 문의: https://lchfkorea.com
 
 ### Permitted Uses (무료)
 
-1. 개인, 비상업적 사용
-2. 사내 5인 이하 사용
-3. OSI 인증 오픈소스 프로젝트에서의 사용
-4. 학술, 교육 목적 사용
-5. 평가 및 테스트
+다음 용도는 **noncommercial use** 로 간주되어 무료입니다.
+
+1. 개인 사용 (자기 양식·문서 작성)
+2. 학술·교육 목적 (수업, 연구, 논문)
+3. 비영리 단체 활동 (자선, 시민사회, 종교)
+4. 오픈소스 프로젝트의 의존성 (그 프로젝트 자체가 noncommercial 일 때)
+5. 평가·테스트 (도입 검토 단계)
 
 ### Commercial License Required (유료)
 
-1. 제3자에게 제공하는 제품/서비스의 핵심 구성요소로 사용 (SaaS, API 등)
-2. 상업 제품에 포함하여 배포
-3. 사내 6인 이상 사용
-4. 라이선스 검증 메커니즘 제거 또는 우회
+다음 중 **하나라도 해당**하면 상업 라이선스가 필요합니다.
 
-Commercial licenses: https://lchfkorea.com
+1. 영리 회사·법인의 업무 자동화 (인원 수 무관)
+2. 프리랜서·자영업자가 고객 작업물에 사용
+3. 제3자 제공 서비스의 구성요소 (SaaS, API, 플러그인)
+4. 상업 제품에 포함 배포
+5. 컨설팅·용역 결과물 생성에 사용
+6. 라이선스 검증 메커니즘 제거 또는 우회
+
+### Source Visibility
+
+소스 공개는 라이선스 의무가 아닌 **저작권자의 자발적 결정**입니다. 이 저장소의 모든 코드는 누구나
+열람·복제·수정 가능하지만, 위 "Commercial License Required" 조건에 해당하면 별도 라이선스 계약
+체결 후에만 사용·재배포할 수 있습니다.
+
+### Inheritance & Continuity
+
+본 라이선스는 저작권자의 자연인 사망 후에도 유효하며, 저작권은 한국 민법에 따라 상속됩니다.
+상속인은 동일한 조건으로 상업 라이선스 grant 권한을 가집니다. 저작권을 법인에 양도한 경우
+법인의 자산으로 처리됩니다.
+
+### Full License Text
+
+전체 라이선스 본문: https://polyformproject.org/licenses/noncommercial/1.0.0/
+
+> 본 README 의 한국어 요약과 영문 본문이 충돌할 경우 영문 본문이 우선합니다.
 
 ### General
 
-각 릴리스 버전의 Change Date 가 도래하면 해당 버전의 BSL 적용 파일은 자동으로 Apache
-License 2.0 으로 전환됩니다. 새 버전은 항상 자신의 새로운 Change Date 를 갖습니다.
-
-본 라이선스를 준수하지 않는 사용은 라이선서, 계열사, 또는 공인 대리점으로부터
-상업 라이선스를 구매하거나 사용을 중단해야 합니다.
-
 본 라이선스를 위반하는 사용은 현재 및 모든 버전에 대한 권리를 자동으로 종료시킵니다.
+종료 후 사용을 계속하려면 라이선서로부터 상업 라이선스를 구매해야 합니다.
 
 TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS
 PROVIDED ON AN "AS IS" BASIS. LICENSOR HEREBY DISCLAIMS ALL
 WARRANTIES AND CONDITIONS, EXPRESS OR IMPLIED, INCLUDING (WITHOUT
 LIMITATION) WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
 PURPOSE, NON-INFRINGEMENT, AND TITLE.
+
+---
+
+## 3. License Migration Note (2026-05)
+
+본 저장소는 **0.18.1 까지 BSL 1.1 (Business Source License) 로 배포**되었으며,
+**0.19.0 부터 PolyForm Noncommercial 1.0.0 으로 전환**되었습니다.
+
+PyPI 에 이미 배포된 0.18.1 이하 버전은 배포 시점의 BSL 1.1 조건이 그대로 유지됩니다
+(소급 변경 불가). 신규 다운로드 / 신규 사용은 본 LICENSE.md 의 PolyForm Noncommercial
+조건을 따릅니다.
+
+기존 BSL 1.1 의 "Rolling Change Date 4년 후 Apache 2.0 자동 전환" 조항은 PolyForm
+전환 후 폐기되었습니다. PolyForm Noncommercial 은 Change Date 를 두지 않으며 영구적으로
+noncommercial 라이선스로 유지됩니다.

@@ -231,13 +231,18 @@ HWPX는 한컴오피스의 차세대 문서 포맷입니다. ZIP 안에 XML 파�
 | 대상 | 라이선스 |
 |------|---------|
 | `hwp2hwpx.py`, `hwp_reader.py`, `value_convertor.py` | Apache 2.0 (원본 파생물) |
-| **나머지 전체** | **BSL 1.1** |
+| **나머지 전체** | **PolyForm Noncommercial 1.0.0** |
 
-**BSL 1.1 요약:**
-- 개인/비상업/교육/오픈소스 → **무료**
-- 사내 5인 이하 → **무료**
-- 상업적 사용/6인 이상 → **유료 라이선스 필요**
-- Rolling Change Date: 각 릴리스는 릴리스일 + 4년 후 Apache 2.0으로 자동 전환 (최신 0.17.0 → 2030-05-01). 자세한 내용은 [LICENSE.md](LICENSE.md).
+**PolyForm Noncommercial 요약:**
+- 개인 / 학술·교육 / 비영리 / non-commercial 오픈소스 → **무료**
+- 영리 활동 (회사 내부 업무 자동화 포함, 인원 수 무관) → **상업 라이선스 필요**
+- 소스 공개 정책 유지 — 누구나 열람·학습·수정 가능 (단 noncommercial 조건 하에서만)
+- 상업 라이선스 문의: https://lchfkorea.com
+
+> 라이선스 전환 안내: pyhwpxlib는 v0.18.1 까지 **BSL 1.1** 로 배포되었으며, v0.19.0 부터
+> **PolyForm Noncommercial 1.0.0** 으로 전환되었습니다. PyPI 에 이미 배포된 0.18.1
+> 이하 버전은 그 시점의 BSL 1.1 조건이 그대로 유지됩니다. 자세한 사항은
+> [LICENSE.md §3](LICENSE.md) 참조.
 
 ## 폰트
 

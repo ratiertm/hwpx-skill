@@ -6,6 +6,50 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.18.2 — 2026-05-10
+
+> **License migration patch.** BSL 1.1 → PolyForm Noncommercial 1.0.0
+> (with Apache 2.0 dual-license retained for 3 derived files). No code changes.
+
+### Licensing
+
+- `LICENSE.md` rewritten — Section 2 now references PolyForm Noncommercial
+  1.0.0 instead of BSL 1.1. Section 3 (Migration Note) records the BSL→PolyForm
+  transition timeline.
+- `README.md` / `README_KO.md` License sections updated.
+- `pyproject.toml` `license` field: `Apache-2.0` →
+  `LicenseRef-PolyForm-Noncommercial-1.0.0 AND Apache-2.0` (PEP 639 SPDX
+  expression).
+
+### Policy changes vs BSL 1.1
+
+| Scenario | BSL 1.1 (≤0.18.1) | PolyForm Noncommercial (≥0.18.2) |
+|----------|-------------------|----------------------------------|
+| Personal use | Free | Free |
+| Academic / education / non-profit | Free | Free |
+| Internal use ≤ 5 users | **Free** | **Commercial license required** |
+| Internal use ≥ 6 users | Commercial license required | Commercial license required |
+| Freelancer / consulting deliverables | Free if team < 5 (ambiguous) | **Commercial license required** |
+| SaaS / commercial product | Commercial license required | Commercial license required |
+| Rolling Change Date | Each release → Apache 2.0 after 4 years | **None — perpetual noncommercial** |
+
+### Compatibility
+
+- PyPI artifacts published before 0.18.2 retain their original BSL 1.1 terms
+  (license cannot be changed retroactively for already-distributed binaries).
+- 0.18.2 artifacts ship with the new PolyForm Noncommercial license.
+- All previously held BSL 1.1 commercial licenses remain valid for the
+  versions they were granted under.
+- No code or API changes — `pyhwpxlib==0.18.1` and `pyhwpxlib==0.18.2`
+  produce byte-identical outputs.
+- Test count: **189** (no test changes).
+
+### Commercial inquiries
+
+https://lchfkorea.com
+
+---
+
 ## 0.18.1 — 2026-05-06
 
 > **표 자동 페이지 넘기기.** Hancom UI의 "여러 쪽 지원" / "제목 줄 반복"
