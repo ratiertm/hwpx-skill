@@ -351,11 +351,7 @@ This project uses a **dual license** structure. See [LICENSE.md](LICENSE.md) for
 - Personal / educational / non-profit / non-commercial open-source: **Free**
 - Any commercial use (regardless of team size): **Commercial license required**
 - Source is publicly available — view, study, and modify under the noncommercial terms
-- Commercial inquiries: https://lchfkorea.com
-
-> Migration note: pyhwpxlib used **BSL 1.1** through v0.18.1. Starting **v0.19.0** the
-> license switched to PolyForm Noncommercial 1.0.0. PyPI artifacts published before the
-> switch retain their original BSL 1.1 terms. See [LICENSE.md §3](LICENSE.md) for details.
+- Commercial inquiries: ratiertm@gmail.com
 
 ## Fonts
 

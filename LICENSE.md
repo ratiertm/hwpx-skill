@@ -31,7 +31,7 @@
 
 - **개인·비상업 용도: 무료** (소스 자유 열람, 수정, 재배포 가능)
 - **상업 용도: 별도 라이선스 필요** — 한 명이든 백 명이든 영리 활동에 쓰면 유료
-- 상업 라이선스 문의: https://lchfkorea.com
+- 상업 라이선스 문의: ratiertm@gmail.com
 
 ### Permitted Uses (무료)
 
@@ -82,18 +82,3 @@ PROVIDED ON AN "AS IS" BASIS. LICENSOR HEREBY DISCLAIMS ALL
 WARRANTIES AND CONDITIONS, EXPRESS OR IMPLIED, INCLUDING (WITHOUT
 LIMITATION) WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
 PURPOSE, NON-INFRINGEMENT, AND TITLE.
-
----
-
-## 3. License Migration Note (2026-05)
-
-본 저장소는 **0.18.1 까지 BSL 1.1 (Business Source License) 로 배포**되었으며,
-**0.19.0 부터 PolyForm Noncommercial 1.0.0 으로 전환**되었습니다.
-
-PyPI 에 이미 배포된 0.18.1 이하 버전은 배포 시점의 BSL 1.1 조건이 그대로 유지됩니다
-(소급 변경 불가). 신규 다운로드 / 신규 사용은 본 LICENSE.md 의 PolyForm Noncommercial
-조건을 따릅니다.
-
-기존 BSL 1.1 의 "Rolling Change Date 4년 후 Apache 2.0 자동 전환" 조항은 PolyForm
-전환 후 폐기되었습니다. PolyForm Noncommercial 은 Change Date 를 두지 않으며 영구적으로
-noncommercial 라이선스로 유지됩니다.

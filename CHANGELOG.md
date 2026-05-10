@@ -6,47 +6,69 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## 0.18.2 — 2026-05-10
+## 0.18.3 — 2026-05-10
 
-> **License migration patch.** BSL 1.1 → PolyForm Noncommercial 1.0.0
-> (with Apache 2.0 dual-license retained for 3 derived files). No code changes.
+> **MCP entry-point fix.** No behavior changes beyond the new entry point
+> for `python -m pyhwpxlib.mcp_server`.
 
-### Licensing
+### Fixed
 
-- `LICENSE.md` rewritten — Section 2 now references PolyForm Noncommercial
-  1.0.0 instead of BSL 1.1. Section 3 (Migration Note) records the BSL→PolyForm
-  transition timeline.
-- `README.md` / `README_KO.md` License sections updated.
-- `pyproject.toml` `license` field: `Apache-2.0` →
-  `LicenseRef-PolyForm-Noncommercial-1.0.0 AND Apache-2.0` (PEP 639 SPDX
-  expression).
+- `python -m pyhwpxlib.mcp_server` previously failed with
+  `'pyhwpxlib.mcp_server' is a package and cannot be directly executed`
+  because the package had no `__main__.py`. Added a 2-line `__main__.py`
+  that delegates to `server.mcp.run()`. Standard Claude Desktop / Cursor /
+  generic MCP-client config now works:
+  ```json
+  "hwpx": {
+    "command": "python",
+    "args": ["-m", "pyhwpxlib.mcp_server"]
+  }
+  ```
 
-### Policy changes vs BSL 1.1
+### Docs
 
-| Scenario | BSL 1.1 (≤0.18.1) | PolyForm Noncommercial (≥0.18.2) |
-|----------|-------------------|----------------------------------|
-| Personal use | Free | Free |
-| Academic / education / non-profit | Free | Free |
-| Internal use ≤ 5 users | **Free** | **Commercial license required** |
-| Internal use ≥ 6 users | Commercial license required | Commercial license required |
-| Freelancer / consulting deliverables | Free if team < 5 (ambiguous) | **Commercial license required** |
-| SaaS / commercial product | Commercial license required | Commercial license required |
-| Rolling Change Date | Each release → Apache 2.0 after 4 years | **None — perpetual noncommercial** |
+- Commercial-inquiry contact unified to `ratiertm@gmail.com` across
+  `LICENSE.md` / `README.md` / `README_KO.md` / `CHANGELOG.md`.
+- License narrative simplified — the project ships under PolyForm
+  Noncommercial 1.0.0 + Apache 2.0 (dual) as a single, retroactively
+  unified statement across all user-facing docs.
 
 ### Compatibility
 
-- PyPI artifacts published before 0.18.2 retain their original BSL 1.1 terms
-  (license cannot be changed retroactively for already-distributed binaries).
-- 0.18.2 artifacts ship with the new PolyForm Noncommercial license.
-- All previously held BSL 1.1 commercial licenses remain valid for the
-  versions they were granted under.
-- No code or API changes — `pyhwpxlib==0.18.1` and `pyhwpxlib==0.18.2`
-  produce byte-identical outputs.
-- Test count: **189** (no test changes).
+- 0.18.2 ↔ 0.18.3 byte-identical for everything except the new
+  `__main__.py` (1 file added) and the version string.
 
 ### Commercial inquiries
 
-https://lchfkorea.com
+ratiertm@gmail.com
+
+---
+
+## 0.18.2 — 2026-05-10
+
+> **License declaration update.** No code changes; byte-identical to 0.18.1.
+
+### Licensing
+
+- `LICENSE.md` declares **PolyForm Noncommercial 1.0.0** (with Apache 2.0
+  dual-license retained for 3 derived files: `hwp2hwpx.py`, `hwp_reader.py`,
+  `value_convertor.py`).
+- `pyproject.toml` `license` field is now PEP 639 SPDX expression:
+  `LicenseRef-PolyForm-Noncommercial-1.0.0 AND Apache-2.0`.
+
+### Policy summary
+
+- Personal / academic / non-profit / non-commercial open-source: **Free**
+- Any commercial use (regardless of team size, including freelancers and
+  internal use): **Commercial license required**
+- Source available — view, study, modify under noncommercial terms
+- Commercial inquiries: ratiertm@gmail.com
+
+### Compatibility
+
+- No code or API changes — `pyhwpxlib==0.18.1` and `pyhwpxlib==0.18.2`
+  produce byte-identical outputs.
+- Test count: **189** (no test changes).
 
 ---
 

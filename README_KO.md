@@ -237,12 +237,7 @@ HWPX는 한컴오피스의 차세대 문서 포맷입니다. ZIP 안에 XML 파�
 - 개인 / 학술·교육 / 비영리 / non-commercial 오픈소스 → **무료**
 - 영리 활동 (회사 내부 업무 자동화 포함, 인원 수 무관) → **상업 라이선스 필요**
 - 소스 공개 정책 유지 — 누구나 열람·학습·수정 가능 (단 noncommercial 조건 하에서만)
-- 상업 라이선스 문의: https://lchfkorea.com
-
-> 라이선스 전환 안내: pyhwpxlib는 v0.18.1 까지 **BSL 1.1** 로 배포되었으며, v0.19.0 부터
-> **PolyForm Noncommercial 1.0.0** 으로 전환되었습니다. PyPI 에 이미 배포된 0.18.1
-> 이하 버전은 그 시점의 BSL 1.1 조건이 그대로 유지됩니다. 자세한 사항은
-> [LICENSE.md §3](LICENSE.md) 참조.
+- 상업 라이선스 문의: ratiertm@gmail.com
 
 ## 폰트
 
